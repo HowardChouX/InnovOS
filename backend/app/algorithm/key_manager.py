@@ -13,6 +13,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional
 from app.database import get_db
+from app.algorithm.crypto import encrypt_key, decrypt_key
 
 
 class APIKeyManager:
@@ -47,7 +48,11 @@ class APIKeyManager:
         ).fetchall()
         db.close()
 
-        self._keys_cache = [dict(k) for k in keys]
+        self._keys_cache = []
+        for k in keys:
+            d = dict(k)
+            d["api_key"] = decrypt_key(d["api_key"])
+            self._keys_cache.append(d)
         self._cache_updated_at = now
 
     def _get_next_key(self) -> dict:
@@ -161,7 +166,11 @@ class APIKeyManager:
         db = get_db()
         row = db.execute("SELECT * FROM api_keys WHERE id=?", (key_id,)).fetchone()
         db.close()
-        return dict(row) if row else None
+        if not row:
+            return None
+        result = dict(row)
+        result["api_key"] = decrypt_key(result["api_key"])
+        return result
 
     def list_keys(self) -> list:
         """获取所有Key列表"""
@@ -174,15 +183,15 @@ class APIKeyManager:
                    api_model: str = "deepseek-chat", priority: int = 0, max_rpm: int = 60) -> dict:
         """创建新Key"""
         db = get_db()
+        encrypted_key = encrypt_key(api_key)
         cursor = db.execute(
             """INSERT INTO api_keys (key_name, api_key, api_base_url, api_model, priority, max_rpm)
                VALUES (?, ?, ?, ?, ?, ?)""",
-            (key_name, api_key, api_base_url, api_model, priority, max_rpm)
+            (key_name, encrypted_key, api_base_url, api_model, priority, max_rpm)
         )
         db.commit()
         row = db.execute("SELECT * FROM api_keys WHERE id=?", (cursor.lastrowid,)).fetchone()
         db.close()
-        # 刷新缓存
         self._cache_updated_at = 0
         return dict(row)
 
@@ -200,7 +209,7 @@ class APIKeyManager:
         for field in ["key_name", "api_key", "api_base_url", "api_model", "priority", "max_rpm"]:
             if field in kwargs and kwargs[field] is not None:
                 updates.append(f"{field}=?")
-                params.append(kwargs[field])
+                params.append(encrypt_key(kwargs[field]) if field == "api_key" else kwargs[field])
 
         if "is_active" in kwargs:
             updates.append("is_active=?")

@@ -82,8 +82,14 @@ export function SolutionGeneration() {
             <i className="fa-solid fa-chevron-right" style={{ fontSize: 10, color: 'var(--text-tertiary)', cursor: 'pointer' }} />
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            {solutions[0]?.description?.slice(0, 120) || '通过固态电解质替换液态电解质，结合界面改性技术和多层结构设计，在提升能量密度的同时有效抑制热失控，提高安全性并延长循环寿命。'}
-            {(solutions[0]?.description?.length || 0) > 120 ? '...' : ''}
+            {solutions[0]?.description ? (
+              <>
+                {solutions[0].description.slice(0, 120)}
+                {solutions[0].description.length > 120 ? '...' : ''}
+              </>
+            ) : (
+              <span style={{ color: 'var(--text-tertiary)' }}>暂无方案概述</span>
+            )}
           </div>
         </div>
 

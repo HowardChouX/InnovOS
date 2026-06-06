@@ -106,9 +106,9 @@ CREATE TABLE patents (
 CREATE TABLE api_keys (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     key_name         TEXT NOT NULL,
-    api_key          TEXT NOT NULL,
+    api_key          TEXT NOT NULL,        -- AES-256 加密密文
     api_base_url     TEXT DEFAULT 'https://api.deepseek.com',
-    api_model        TEXT DEFAULT '',
+    api_model        TEXT DEFAULT '',      -- 逗号分隔多模型
     is_active        INTEGER DEFAULT 1,
     priority         INTEGER DEFAULT 0,
     max_rpm          INTEGER DEFAULT 60,

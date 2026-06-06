@@ -54,7 +54,7 @@ export function AppLayout() {
             }}>
               {user?.username?.[0] || '?'}
             </div>
-            <span style={{ fontSize: 12 }}>Team_Innovate</span>
+            <span style={{ fontSize: 12 }}>{user?.username || '用户'}</span>
             <i className="fa-solid fa-chevron-down" style={{ fontSize: 8, color: 'var(--text-tertiary)' }} />
             {showMenu && (
               <div style={{

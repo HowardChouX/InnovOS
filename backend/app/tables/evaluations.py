@@ -9,7 +9,7 @@ def init_evaluations(conn):
             details TEXT DEFAULT '{}',
             status TEXT DEFAULT 'completed',
             created_at TEXT DEFAULT (datetime('now')),
-            FOREIGN KEY (solution_id) REFERENCES solutions(id),
+            FOREIGN KEY (solution_id) REFERENCES solutions(id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES users(id)
         );
     """)

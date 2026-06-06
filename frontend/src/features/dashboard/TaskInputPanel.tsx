@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useTaskStore } from '../../store/useTaskStore';
 
-const DEFAULT_TAGS = ['电池安全', '能量密度', '循环寿命', '热管理'];
+const DEFAULT_TAGS: string[] = [];
 
 export function TaskInputPanel() {
-  const [description, setDescription] = useState('如何在保证电池能量密度的同时，提高其安全性并延长循环寿命？');
+  const [description, setDescription] = useState('');
   const [tags, setTags] = useState<string[]>(DEFAULT_TAGS);
   const [newTag, setNewTag] = useState('');
   const createTask = useTaskStore((s) => s.createTask);

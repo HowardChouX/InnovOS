@@ -1,8 +1,102 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAnalysisStore } from '../../store/useAnalysisStore';
 import { useTaskStore } from '../../store/useTaskStore';
+import { principlesApi, type Principle } from '../../api/principles';
 
 const tabs = ['问题建模', '冲突分析', '技术矛盾', '物理矛盾', '创新方向'];
+
+function TechnicalContradiction() {
+  const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
+  const [principles, setPrinciples] = useState<Principle[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!selectedTaskId) return;
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    principlesApi.recommendByTask(selectedTaskId)
+      .then((data) => { if (!cancelled) setPrinciples(data); })
+      .catch(() => { if (!cancelled) setPrinciples([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedTaskId]);
+
+  if (loading) return <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: 'var(--text-tertiary)' }}>加载中...</div>;
+  if (principles.length === 0) return <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: 'var(--text-tertiary)' }}>暂无推荐原理</div>;
+
+  const CATEGORY_COLORS: Record<string, string> = {
+    '物理': 'var(--accent-blue)',
+    '几何': 'var(--accent-purple)',
+    '时间': 'var(--accent-cyan)',
+    '系统': 'var(--accent-green)',
+    '化学': 'var(--accent-yellow)',
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {principles.map((p) => (
+        <div key={p.id} style={{
+          background: 'rgba(0,0,0,0.2)', borderRadius: 8, border: '1px solid var(--border)',
+          overflow: 'hidden',
+        }}>
+          <div
+            onClick={() => setExpanded(expanded === p.id ? null : p.id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{
+              width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+              background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 600, color: 'var(--accent-blue)',
+            }}>
+              {p.id}
+            </span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{p.definition}</div>
+            </div>
+            <span style={{
+              fontSize: 10, padding: '2px 8px', borderRadius: 4,
+              background: `${CATEGORY_COLORS[p.category] || 'var(--text-tertiary)'}15`,
+              color: CATEGORY_COLORS[p.category] || 'var(--text-tertiary)',
+              border: `1px solid ${CATEGORY_COLORS[p.category] || 'var(--text-tertiary)'}30`,
+            }}>
+              {p.category}
+            </span>
+            <i className={`fa-solid fa-chevron-${expanded === p.id ? 'up' : 'down'}`}
+              style={{ fontSize: 10, color: 'var(--text-tertiary)' }} />
+          </div>
+
+          {expanded === p.id && (
+            <div style={{ padding: '0 14px 12px', borderTop: '1px solid var(--border-light)' }}>
+              {p.examples && p.examples.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-cyan)', marginBottom: 4 }}>应用示例</div>
+                  {p.examples.map((ex, i) => (
+                    <div key={i} style={{ fontSize: 11, color: 'var(--text-secondary)', paddingLeft: 10 }}>
+                      • {ex}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {p.explanation && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-green)', marginBottom: 4 }}>详细说明</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{p.explanation}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function ConflictDiagram() {
   const analysis = useAnalysisStore((s) => s.analysis);
@@ -138,12 +232,16 @@ export function AnalysisResult() {
                 border: '1px solid var(--border)',
               }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-green)', marginBottom: 6 }}>
-                  期望目标
+                  冲突节点
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
-                  <div>• 提高能量密度</div>
-                  <div>• 提升安全性</div>
-                  <div>• 延长循环寿命</div>
+                  {analysis.satelliteNodes.length > 0 ? (
+                    analysis.satelliteNodes.map((node) => (
+                      <div key={node.id}>• {node.label} {node.sublabel || ''}</div>
+                    ))
+                  ) : (
+                    <div style={{ color: 'var(--text-tertiary)' }}>暂无数据</div>
+                  )}
                 </div>
               </div>
 
@@ -152,16 +250,22 @@ export function AnalysisResult() {
                 border: '1px solid var(--border)',
               }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-yellow)', marginBottom: 6 }}>
-                  关键约束
+                  推荐原理
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
-                  <div>• 成本可控</div>
-                  <div>• 工艺可行</div>
-                  <div>• 材料可获得</div>
+                  {analysis.principles.length > 0 ? (
+                    analysis.principles.map((p, i) => (
+                      <div key={i}>• {p}</div>
+                    ))
+                  ) : (
+                    <div style={{ color: 'var(--text-tertiary)' }}>暂无推荐原理</div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
+        ) : active === '技术矛盾' ? (
+          <TechnicalContradiction />
         ) : (
           <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>
             {active} — 功能开发中
