@@ -100,6 +100,26 @@ CREATE TABLE patents (
 );
 ```
 
+### 2.7 API Key 表 (api_keys)
+
+```sql
+CREATE TABLE api_keys (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    key_name         TEXT NOT NULL,
+    api_key          TEXT NOT NULL,
+    api_base_url     TEXT DEFAULT 'https://api.deepseek.com',
+    api_model        TEXT DEFAULT '',
+    is_active        INTEGER DEFAULT 1,
+    priority         INTEGER DEFAULT 0,
+    max_rpm          INTEGER DEFAULT 60,
+    current_rpm      INTEGER DEFAULT 0,
+    last_reset_at    TEXT,
+    last_used_at     TEXT,
+    request_count    INTEGER DEFAULT 0,
+    created_at       TEXT DEFAULT (datetime('now'))
+);
+```
+
 ### 2.7 评估记录表 (evaluations)
 
 ```sql
@@ -166,4 +186,6 @@ users ──< tasks ──< analyses (1:1)
   └──< audit_logs
 
 patents (独立表，无外键)
+
+api_keys (独立表，AI Key 池管理)
 ```

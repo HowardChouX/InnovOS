@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 export function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
@@ -39,9 +40,15 @@ export function LoginPage() {
           </div>
           <div>
             <label className="text-sm text-slate-400 mb-1 block">密码</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-              placeholder="输入密码" />
+            <div className="relative">
+              <input type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 pr-10"
+                placeholder="输入密码" />
+              <span onClick={() => setShowPw(!showPw)}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: 14 }}>
+                <i className={`fa-regular ${showPw ? 'fa-eye-slash' : 'fa-eye'}`} />
+              </span>
+            </div>
           </div>
           <button type="submit" className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-2 rounded-lg font-medium hover:opacity-90 transition">
             登录

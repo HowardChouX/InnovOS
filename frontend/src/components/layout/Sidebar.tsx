@@ -1,8 +1,15 @@
 import { useLocation, Link } from 'react-router-dom';
 import { NAV_ITEMS } from '../../utils/constants';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export function Sidebar() {
   const location = useLocation();
+  const isAdmin = useAuthStore((s) => s.isAdmin);
+
+  const items = [
+    ...NAV_ITEMS,
+    ...(isAdmin ? [{ label: 'Key管理', path: '/admin/keys', icon: 'fa-key' }] : []),
+  ];
 
   return (
     <aside style={{
@@ -10,7 +17,7 @@ export function Sidebar() {
       display: 'flex', flexDirection: 'column', flexShrink: 0,
     }}>
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '10px 8px', flex: 1 }}>
-        {NAV_ITEMS.map((item) => {
+        {items.map((item) => {
           const active = location.pathname === item.path;
           return (
             <Link key={item.path} to={item.path} style={{
@@ -25,6 +32,15 @@ export function Sidebar() {
             >
               <i className={`fa-solid ${item.icon}`} style={{ width: 16, textAlign: 'center', fontSize: 12 }} />
               <span>{item.label}</span>
+              {item.path === '/admin/keys' && (
+                <span style={{
+                  marginLeft: 'auto', fontSize: 9, padding: '1px 5px',
+                  background: 'rgba(251,191,36,0.15)', color: 'var(--accent-yellow)',
+                  borderRadius: 3,
+                }}>
+                  Admin
+                </span>
+              )}
             </Link>
           );
         })}

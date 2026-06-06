@@ -30,10 +30,10 @@ def register(body: UserRegister):
     db.commit()
     user_id = cursor.lastrowid
 
-    user = db.execute("SELECT id, username, created_at FROM users WHERE id = ?", (user_id,)).fetchone()
+    user = db.execute("SELECT id, username, role, created_at FROM users WHERE id = ?", (user_id,)).fetchone()
     db.close()
 
-    token = create_access_token({"user_id": user["id"]})
+    token = create_access_token({"user_id": user["id"], "role": user["role"]})
     return {"access_token": token, "user": dict(user)}
 
 
@@ -46,10 +46,10 @@ def login(body: UserLogin):
     if not user or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="用户名或密码错误")
 
-    token = create_access_token({"user_id": user["id"]})
+    token = create_access_token({"user_id": user["id"], "role": user["role"]})
     return {
         "access_token": token,
-        "user": {"id": user["id"], "username": user["username"], "created_at": user["created_at"]},
+        "user": {"id": user["id"], "username": user["username"], "role": user["role"], "created_at": user["created_at"]},
     }
 
 

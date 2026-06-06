@@ -292,7 +292,59 @@ q    string  搜索关键词（可选，为空返回前5条）
 #### GET /api/feedback/{solution_id}
 获取方案的所有反馈（需认证）
 
-### 2.9 健康检查
+### 2.9 API Key 管理模块（仅管理员）
+
+#### GET /api/keys
+获取 API Key 列表
+
+#### POST /api/keys
+创建 API Key
+
+**请求体：**
+```json
+{
+    "keyName": "DeepSeek-1",
+    "apiKey": "sk-xxxxxxxxxxxxxxxx",
+    "apiBaseUrl": "https://api.deepseek.com",
+    "apiModel": "deepseek-v4-flash,deepseek-v4-pro",
+    "priority": 0,
+    "maxRpm": 60
+}
+```
+
+#### PUT /api/keys/{key_id}
+更新 API Key（支持部分更新）
+
+#### DELETE /api/keys/{key_id}
+删除 API Key
+
+#### POST /api/keys/{key_id}/test
+测试 API Key 连接
+
+### 2.10 分析触发模块
+
+#### POST /api/analysis/{task_id}/trigger
+触发 AI 分析（需认证）
+
+**响应 (200)：**
+```json
+{
+    "code": 200,
+    "data": {
+        "id": "10",
+        "taskId": "10",
+        "centerNode": { "id": "center", "label": "核心冲突", "description": "...", "type": "center" },
+        "satelliteNodes": [
+            { "id": "s1", "label": "能量密度", "sublabel": "(提升)", "type": "satellite", "color": "#60a5fa", "position": "top" }
+        ],
+        "edges": [ { "sourceId": "center", "targetId": "s1", "label": "冲突" } ],
+        "principles": ["分割原理", "动态化原理", "复合材料原理"]
+    },
+    "message": "分析完成"
+}
+```
+
+### 2.11 健康检查
 
 #### GET /api/health
 服务健康检查（公开接口）

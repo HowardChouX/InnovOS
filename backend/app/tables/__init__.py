@@ -7,6 +7,7 @@ from .patents import init_patents
 from .evaluations import init_evaluations
 from .feedbacks import init_feedbacks
 from .audit_logs import init_audit_logs
+from .api_keys import init_api_keys
 
 
 def init_all_tables(conn):
@@ -19,4 +20,5 @@ def init_all_tables(conn):
     init_evaluations(conn)
     init_feedbacks(conn)
     init_audit_logs(conn)
+    init_api_keys(conn)
     conn.commit()

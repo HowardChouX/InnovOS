@@ -5,12 +5,16 @@ import { analysisApi } from '../api/analysis';
 interface AnalysisStore {
   analysis: ConflictAnalysis | null;
   loading: boolean;
+  analyzing: boolean;
   fetchAnalysis: (taskId: string) => Promise<void>;
+  triggerAnalysis: (taskId: string) => Promise<void>;
 }
 
 export const useAnalysisStore = create<AnalysisStore>((set) => ({
   analysis: null,
   loading: false,
+  analyzing: false,
+
   fetchAnalysis: async (taskId) => {
     set({ loading: true });
     try {
@@ -18,6 +22,16 @@ export const useAnalysisStore = create<AnalysisStore>((set) => ({
       set({ analysis, loading: false });
     } catch {
       set({ loading: false });
+    }
+  },
+
+  triggerAnalysis: async (taskId) => {
+    set({ analyzing: true, loading: true });
+    try {
+      const analysis = await analysisApi.triggerAnalysis(taskId);
+      set({ analysis, analyzing: false, loading: false });
+    } catch {
+      set({ analyzing: false, loading: false });
     }
   },
 }));

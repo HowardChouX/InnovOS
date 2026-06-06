@@ -1,5 +1,9 @@
 import json
 from app.database import get_db
+from app.auth import hash_password
+
+SEED_ADMIN_USERNAME = "InnovOS2026@admin"
+SEED_ADMIN_PASSWORD = "K9#mP7$xR2!vL8"
 
 SEED_PATENTS = [
     {
@@ -33,6 +37,36 @@ SEED_PATENTS = [
         "relevance_score": 93,
     },
 ]
+
+
+def seed_admin_user():
+    """创建/重置默认管理员账号"""
+    db = get_db()
+    password_hash = hash_password(SEED_ADMIN_PASSWORD)
+
+    # 删除旧的admin用户避免冲突
+    db.execute("DELETE FROM users WHERE username='admin' OR username='InnovOS'")
+    db.commit()
+
+    existing = db.execute("SELECT id FROM users WHERE username=?", (SEED_ADMIN_USERNAME,)).fetchone()
+
+    if not existing:
+        db.execute(
+            "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+            (SEED_ADMIN_USERNAME, password_hash, "admin")
+        )
+        db.commit()
+        print(f"✅ 已创建管理员账号: {SEED_ADMIN_USERNAME} / {SEED_ADMIN_PASSWORD}")
+    else:
+        db.execute(
+            "UPDATE users SET password_hash=?, role='admin' WHERE username=?",
+            (password_hash, SEED_ADMIN_USERNAME)
+        )
+        db.commit()
+        print(f"✅ 已重置管理员密码: {SEED_ADMIN_USERNAME} / {SEED_ADMIN_PASSWORD}")
+
+    print("⚠️  请在生产环境中修改默认密码！")
+    db.close()
 
 
 def seed_patents():
