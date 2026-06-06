@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTaskStore } from '../../store/useTaskStore';
+import { InlineConfirmModal } from '../../components/ui/InlineConfirmModal';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   pending: { label: '待处理', color: 'var(--accent-yellow)', bg: 'rgba(251,191,36,0.12)' },
@@ -33,6 +34,8 @@ export function TaskList() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
 
   useEffect(() => {
     if (!initialized.current) {
@@ -40,6 +43,14 @@ export function TaskList() {
       fetchTasks();
     }
   }, [fetchTasks]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+
 
   const filtered = tasks.filter((t) => {
     const matchSearch = !search || t.title.toLowerCase().includes(search.toLowerCase());
@@ -164,12 +175,23 @@ export function TaskList() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (confirm('确认删除此任务?')) deleteTask(task.id);
+                      setConfirmModal({
+                        open: true,
+                        title: '确认删除',
+                        message: `确认删除任务 "${task.title}"？`,
+                        onConfirm: () => {
+                          setConfirmModal(prev => ({ ...prev, open: false }));
+                          deleteTask(task.id);
+                        },
+                      });
                     }}
                     style={{
-                      background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)',
-                      color: 'var(--accent-red)', cursor: 'pointer', fontSize: 10,
+                      background: 'rgba(248,113,113,0.1)',
+                      border: '1px solid rgba(248,113,113,0.2)',
+                      color: 'var(--accent-red)',
+                      cursor: 'pointer', fontSize: 10,
                       padding: '2px 6px', borderRadius: 4, fontFamily: 'inherit', flexShrink: 0,
+                      transition: 'all 0.15s',
                     }}
                   >
                     <i className="fa-solid fa-trash-can" style={{ fontSize: 9 }} />
@@ -180,6 +202,14 @@ export function TaskList() {
           })
         )}
       </div>
+      <InlineConfirmModal
+        open={confirmModal.open}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, open: false }))}
+      />
     </div>
+
   );
 }

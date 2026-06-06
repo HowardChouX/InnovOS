@@ -51,22 +51,26 @@ class APIKeyManager:
         self._keys_cache = []
         for k in keys:
             d = dict(k)
-            d["api_key"] = decrypt_key(d["api_key"])
-            self._keys_cache.append(d)
+            try:
+                d["api_key"] = decrypt_key(d["api_key"])
+                self._keys_cache.append(d)
+            except Exception:
+                # 解密失败，跳过该key
+                continue
         self._cache_updated_at = now
 
     def _get_next_key(self) -> dict:
         """获取下一个可用的Key（轮询）"""
         self._refresh_keys_cache()
 
-        if not self._keys_cache:
-            raise RuntimeError("未配置任何可用的API Key，请联系管理员")
+        if self._keys_cache:
+            # 轮询选择
+            key = self._keys_cache[self._current_index % len(self._keys_cache)]
+            self._current_index = (self._current_index + 1) % len(self._keys_cache)
+            return key
 
-        # 轮询选择
-        key = self._keys_cache[self._current_index % len(self._keys_cache)]
-        self._current_index = (self._current_index + 1) % len(self._keys_cache)
-
-        return key
+        # 如果没有可用的 API key，直接报错
+        raise RuntimeError("未配置任何可用的API Key，请在管理后台添加")
 
     def _check_rate_limit(self, key: dict) -> bool:
         """检查Key是否达到限流"""

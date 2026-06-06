@@ -23,7 +23,6 @@ export function SolutionGeneration() {
   const emptyPanel = (msg: string) => (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', width: '100%', minHeight: 200 }}>
       <div className="card-title">
-        <i className="fa-solid fa-wand-magic-sparkles" style={{ fontSize: 12, color: 'var(--accent-purple)' }} />
         创新方案生成
       </div>
       <div style={{ padding: '30px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>{msg}</div>
@@ -37,7 +36,6 @@ export function SolutionGeneration() {
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', width: '100%', minHeight: 300 }}>
       <div className="card-title">
-        <i className="fa-solid fa-wand-magic-sparkles" style={{ fontSize: 12, color: 'var(--accent-purple)' }} />
         创新方案生成
       </div>
 

@@ -1,14 +1,13 @@
 import type { ReactNode } from 'react';
 import { useWorkflowStore } from '../../store/useWorkflowStore';
-import { useTaskStore } from '../../store/useTaskStore';
 import { WORKFLOW_STEPS } from '../../types/workflow';
 import type { AgentStatus } from '../../types/workflow';
 
-const statusConfig: Record<AgentStatus, { color: string; bg: string; label: string; icon: string }> = {
-  completed: { color: 'var(--accent-green)', bg: 'rgba(74,222,128,0.15)', label: '已完成', icon: '✓' },
-  running: { color: 'var(--accent-blue)', bg: 'rgba(96,165,250,0.15)', label: '运行中', icon: '◌' },
-  pending: { color: 'var(--text-tertiary)', bg: 'rgba(100,116,139,0.1)', label: '等待中', icon: '○' },
-  failed: { color: 'var(--accent-red)', bg: 'rgba(248,113,113,0.15)', label: '失败', icon: '✕' },
+const statusConfig: Record<AgentStatus, { color: string; bg: string; label: string }> = {
+  completed: { color: 'var(--accent-green)', bg: 'rgba(74,222,128,0.15)', label: '已完成' },
+  running: { color: 'var(--accent-blue)', bg: 'rgba(96,165,250,0.15)', label: '运行中' },
+  pending: { color: 'var(--text-tertiary)', bg: 'rgba(100,116,139,0.1)', label: '等待中' },
+  failed: { color: 'var(--accent-red)', bg: 'rgba(248,113,113,0.15)', label: '失败' },
 };
 
 const workflowStatusConfig: Record<string, { color: string; bg: string; label: string }> = {
@@ -77,11 +76,8 @@ function TimelineStep({
         opacity: step.status === 'pending' ? 0.5 : 1,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <i className={agent.icon} style={{ fontSize: 10, color: agent.color }} />
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-              {agent.label}
-            </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+            {agent.label}
           </div>
           <span style={{
             fontSize: 10, padding: '2px 8px', borderRadius: 4,
@@ -104,9 +100,9 @@ function TimelineStep({
 }
 
 function DefaultStateView() {
-  const defaultSteps = WORKFLOW_STEPS.map((_, i) => ({
-    status: i === 0 ? 'running' as const : 'pending' as const,
-    description: i === 0 ? '理解用户需求，提取关键要素' : undefined,
+  const defaultSteps = WORKFLOW_STEPS.map((agent) => ({
+    status: 'pending' as const,
+    description: agent.description,
     duration: undefined,
   }));
 
@@ -122,9 +118,6 @@ function DefaultStateView() {
             isLast={i === WORKFLOW_STEPS.length - 1}
           />
         ))}
-      </div>
-      <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-tertiary)', padding: '12px 0 4px' }}>
-        选择一个任务以启动工作流
       </div>
     </div>
   );
@@ -160,13 +153,10 @@ function WorkflowProgressView({ workflow }: { workflow: NonNullable<ReturnType<t
 
 export function AgentWorkflowPanel() {
   const workflow = useWorkflowStore((s) => s.workflow);
-  const loading = useWorkflowStore((s) => s.loading);
-  const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
 
   const wrap = (content: ReactNode) => (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', minHeight: 0 }}>
       <div className="card-title">
-        <i className="fa-solid fa-robot" style={{ fontSize: 12, color: 'var(--accent-blue)' }} />
         多Agent协同工作流
         {workflow && (
           <span style={{
@@ -185,17 +175,9 @@ export function AgentWorkflowPanel() {
     </div>
   );
 
-  if (!selectedTaskId) {
+  if (!workflow) {
     return wrap(<DefaultStateView />);
   }
 
-  return wrap(
-    loading && !workflow ? (
-      <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-tertiary)', marginTop: 40 }}>加载中...</div>
-    ) : !workflow ? (
-      <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-tertiary)', marginTop: 40 }}>暂无工作流数据</div>
-    ) : (
-      <WorkflowProgressView workflow={workflow} />
-    ),
-  );
+  return wrap(<WorkflowProgressView workflow={workflow} />);
 }

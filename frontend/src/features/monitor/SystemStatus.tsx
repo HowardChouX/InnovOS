@@ -11,7 +11,6 @@ export function SystemStatus() {
   return (
     <GlassPanel>
       <div className="card-title">
-        <i className="fa-solid fa-server" style={{ fontSize: 12, color: 'var(--accent-green)' }} />
         系统状态
       </div>
 

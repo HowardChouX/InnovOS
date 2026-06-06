@@ -15,7 +15,10 @@ export function Sidebar() {
 
   const items = [
     ...NAV_ITEMS.filter((item) => !(item.path === ROUTES.MONITOR && !isAdmin)),
-    ...(isAdmin ? [{ label: 'Key管理', path: '/admin/keys', icon: 'fa-key' }] : []),
+    ...(isAdmin ? [
+      { label: 'Key管理', path: '/admin/keys', icon: 'fa-key' },
+      { label: '用户管理', path: '/admin/users', icon: 'fa-users' },
+    ] : []),
   ];
 
   return (
@@ -39,7 +42,7 @@ export function Sidebar() {
             >
               <i className={`fa-solid ${item.icon}`} style={{ width: 16, textAlign: 'center', fontSize: 12 }} />
               <span>{item.label}</span>
-              {item.path === '/admin/keys' && (
+              {(item.path.startsWith('/admin') || item.path === ROUTES.MONITOR) && isAdmin && (
                 <span style={{
                   marginLeft: 'auto', fontSize: 9, padding: '1px 5px',
                   background: 'rgba(251,191,36,0.15)', color: 'var(--accent-yellow)',

@@ -6,6 +6,7 @@ import { OverviewCards } from './OverviewCards';
 import { TaskStatsChart } from './TaskStatsChart';
 import { KeyUsageChart } from './KeyUsageChart';
 import { SystemStatus } from './SystemStatus';
+import { HealthCheckPanel } from './HealthCheckPanel';
 
 export function MonitorPage() {
   const isAdmin = useAuthStore((s) => s.isAdmin);
@@ -13,6 +14,7 @@ export function MonitorPage() {
   const fetchAll = useMonitorStore((s) => s.fetchAll);
   const fetchKeyStats = useMonitorStore((s) => s.fetchKeyStats);
   const fetchSystemStatus = useMonitorStore((s) => s.fetchSystemStatus);
+  const fetchHealth = useMonitorStore((s) => s.fetchHealth);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -22,7 +24,8 @@ export function MonitorPage() {
     fetchAll();
     fetchKeyStats();
     fetchSystemStatus();
-  }, [isAdmin, navigate, fetchAll, fetchKeyStats, fetchSystemStatus]);
+    fetchHealth();
+  }, [isAdmin, navigate, fetchAll, fetchKeyStats, fetchSystemStatus, fetchHealth]);
 
   if (!isAdmin) return null;
 
@@ -32,6 +35,7 @@ export function MonitorPage() {
       <TaskStatsChart />
       <KeyUsageChart />
       <SystemStatus />
+      <HealthCheckPanel />
     </div>
   );
 }

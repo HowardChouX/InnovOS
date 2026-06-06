@@ -57,6 +57,17 @@ export interface SystemStatus {
   };
 }
 
+export interface HealthCheck {
+  status: 'healthy' | 'degraded';
+  checks: {
+    database: { status: string; responseMs?: number; message?: string };
+    disk: { status: string; usedPercent?: number; freeGB?: number; message?: string };
+    memory: { status: string; usedPercent?: number; availableGB?: number; message?: string };
+    backend: { status: string; responseMs?: number; message?: string };
+    aiApi: { status: string; responseMs?: number; message?: string };
+  };
+}
+
 export const monitorApi = {
   async getOverview(): Promise<MonitorOverview> {
     const res = await apiRequest<{ data: MonitorOverview }>('/api/monitor/overview');
@@ -76,5 +87,10 @@ export const monitorApi = {
   async getSystemStatus(): Promise<SystemStatus> {
     const res = await apiRequest<{ data: SystemStatus }>('/api/monitor/system');
     return res.data;
+  },
+
+  async getHealth(): Promise<HealthCheck> {
+    const res = await apiRequest<HealthCheck>('/api/health');
+    return res;
   },
 };

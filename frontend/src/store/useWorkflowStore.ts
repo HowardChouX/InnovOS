@@ -9,6 +9,7 @@ interface WorkflowStore {
   fetchWorkflow: (taskId: string) => Promise<void>;
   startPolling: (taskId: string) => void;
   stopPolling: () => void;
+  reset: () => void;
 }
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -33,12 +34,13 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
     const poll = async () => {
       try {
         const workflow = await workflowApi.getByTaskId(taskId);
+        console.log('Workflow poll:', workflow.status, workflow.steps.map(s => ({ id: s.agentId, status: s.status })));
         set({ workflow });
         if (workflow.status === 'completed' || workflow.status === 'failed') {
           get().stopPolling();
         }
-      } catch {
-        // ignore poll errors
+      } catch (err) {
+        console.error('Workflow poll error:', err);
       }
     };
 
@@ -51,5 +53,9 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
       pollTimer = null;
     }
     set({ polling: false });
+  },
+  reset: () => {
+    get().stopPolling();
+    set({ workflow: null });
   },
 }));

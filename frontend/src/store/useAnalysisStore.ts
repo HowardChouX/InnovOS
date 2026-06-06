@@ -28,8 +28,10 @@ export const useAnalysisStore = create<AnalysisStore>((set) => ({
   triggerAnalysis: async (taskId) => {
     set({ analyzing: true, loading: true });
     try {
-      const analysis = await analysisApi.triggerAnalysis(taskId);
-      set({ analysis, analyzing: false, loading: false });
+      await analysisApi.triggerAnalysis(taskId);
+      // 分析已启动，不设置 analysis，等待后台完成
+      // 完成后通过 fetchAnalysis 获取结果
+      set({ analyzing: false, loading: false });
     } catch {
       set({ analyzing: false, loading: false });
     }
