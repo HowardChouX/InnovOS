@@ -39,9 +39,16 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 
     db = get_db()
     user = db.execute(
-        "SELECT id, username, created_at FROM users WHERE id = ?", (user_id,)
+        "SELECT id, username, role, created_at FROM users WHERE id = ?", (user_id,)
     ).fetchone()
     db.close()
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
     return dict(user)
+
+
+def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    """要求管理员权限"""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    return user

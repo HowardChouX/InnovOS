@@ -14,7 +14,7 @@ export function WelcomeGuide() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, maxWidth: 600 }}>
         {[
           { step: '1', title: '描述问题', desc: '用自然语言描述您的技术问题或创新目标', icon: 'fa-pen' },
-          { step: '2', title: 'AI 分析', desc: '自动识别核心矛盾，检索专利路径，推荐 TRIZ 原理', icon: 'fa-brain' },
+          { step: '2', title: 'AI 分析', desc: '自动识别核心矛盾，检索专利路径，推荐创新原理', icon: 'fa-brain' },
           { step: '3', title: '生成方案', desc: '多 Agent 协同生成创新方案，四维评估引擎评分', icon: 'fa-lightbulb' },
         ].map((item) => (
           <div key={item.step} style={{

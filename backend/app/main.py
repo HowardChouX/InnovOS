@@ -1,9 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db
-from app.api import auth, tasks, analysis, patents, solutions, workflow, evaluation, feedback
+from app.api import auth, tasks, analysis, patents, solutions, workflow, evaluation, feedback, keys
+from app.seed import seed_admin_user, seed_patents
 
 init_db()
+seed_admin_user()
+seed_patents()
 
 app = FastAPI(title="InnovOS API", description="创新智能平台后端 API")
 
@@ -23,6 +26,7 @@ app.include_router(solutions.router)
 app.include_router(workflow.router)
 app.include_router(evaluation.router)
 app.include_router(feedback.router)
+app.include_router(keys.router)
 
 
 @app.get("/api/health")

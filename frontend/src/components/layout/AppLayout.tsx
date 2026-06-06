@@ -76,8 +76,11 @@ export function AppLayout() {
         <main style={{
           flex: 1, padding: 14, overflowY: 'auto',
           background: 'var(--bg-dark)',
+          display: 'flex', flexDirection: 'column',
         }}>
-          <Outlet />
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

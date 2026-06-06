@@ -6,4 +6,12 @@ export const analysisApi = {
     const res = await apiRequest<{ data: ConflictAnalysis }>(`/api/analysis/${taskId}`);
     return res.data;
   },
+
+  async triggerAnalysis(taskId: string): Promise<ConflictAnalysis> {
+    const res = await apiRequest<{ data: ConflictAnalysis }>(
+      `/api/analysis/${taskId}/trigger`,
+      { method: 'POST' }
+    );
+    return res.data;
+  },
 };

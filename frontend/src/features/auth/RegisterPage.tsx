@@ -6,6 +6,8 @@ export function RegisterPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
   const register = useAuthStore((s) => s.register);
   const navigate = useNavigate();
@@ -37,15 +39,27 @@ export function RegisterPage() {
           </div>
           <div>
             <label className="text-sm text-slate-400 mb-1 block">密码</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-              placeholder="至少4个字符" />
+            <div className="relative">
+              <input type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 pr-10"
+                placeholder="至少4个字符" />
+              <span onClick={() => setShowPw(!showPw)}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: 14 }}>
+                <i className={`fa-regular ${showPw ? 'fa-eye-slash' : 'fa-eye'}`} />
+              </span>
+            </div>
           </div>
           <div>
             <label className="text-sm text-slate-400 mb-1 block">确认密码</label>
-            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)}
-              className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-              placeholder="再次输入密码" />
+            <div className="relative">
+              <input type={showConfirm ? 'text' : 'password'} value={confirm} onChange={(e) => setConfirm(e.target.value)}
+                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 pr-10"
+                placeholder="再次输入密码" />
+              <span onClick={() => setShowConfirm(!showConfirm)}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: 14 }}>
+                <i className={`fa-regular ${showConfirm ? 'fa-eye-slash' : 'fa-eye'}`} />
+              </span>
+            </div>
           </div>
           <button type="submit" className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-2 rounded-lg font-medium hover:opacity-90 transition">注册</button>
           <p className="text-center text-sm text-slate-500">已有账号？ <Link to="/login" className="text-cyan-400 hover:text-cyan-300">登录</Link></p>

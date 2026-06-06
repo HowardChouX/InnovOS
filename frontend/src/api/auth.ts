@@ -1,5 +1,17 @@
 const BASE = 'http://localhost:8000';
 
+interface AuthUser {
+  id: number;
+  username: string;
+  role: string;
+  created_at: string;
+}
+
+interface AuthResponse {
+  access_token: string;
+  user: AuthUser;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
@@ -12,14 +24,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const authApi = {
   register(username: string, password: string) {
-    return request<{ access_token: string; user: { id: number; username: string; created_at: string } }>(
+    return request<AuthResponse>(
       '/api/auth/register',
       { method: 'POST', body: JSON.stringify({ username, password }) }
     );
   },
 
   login(username: string, password: string) {
-    return request<{ access_token: string; user: { id: number; username: string; created_at: string } }>(
+    return request<AuthResponse>(
       '/api/auth/login',
       { method: 'POST', body: JSON.stringify({ username, password }) }
     );
@@ -34,3 +46,5 @@ export const authApi = {
     });
   },
 };
+
+export type { AuthUser, AuthResponse };
