@@ -7,8 +7,8 @@ export const analysisApi = {
     return res.data;
   },
 
-  async triggerAnalysis(taskId: string): Promise<ConflictAnalysis> {
-    const res = await apiRequest<{ data: ConflictAnalysis }>(
+  async triggerAnalysis(taskId: string): Promise<{ id: string; taskId: string; status: string }> {
+    const res = await apiRequest<{ data: { id: string; taskId: string; status: string } }>(
       `/api/analysis/${taskId}/trigger`,
       { method: 'POST' }
     );

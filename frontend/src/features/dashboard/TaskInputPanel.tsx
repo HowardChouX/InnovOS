@@ -1,36 +1,53 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTaskStore } from '../../store/useTaskStore';
-
-const DEFAULT_TAGS: string[] = [];
+import { useAnalysisStore } from '../../store/useAnalysisStore';
+import { useWorkflowStore } from '../../store/useWorkflowStore';
 
 export function TaskInputPanel() {
   const [description, setDescription] = useState('');
-  const [tags, setTags] = useState<string[]>(DEFAULT_TAGS);
-  const [newTag, setNewTag] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const createTask = useTaskStore((s) => s.createTask);
+  const triggerAnalysis = useAnalysisStore((s) => s.triggerAnalysis);
+  const stopPolling = useWorkflowStore((s) => s.stopPolling);
+  const workflow = useWorkflowStore((s) => s.workflow);
+
+  // 根据工作流状态更新分析按钮
+  useEffect(() => {
+    if (!workflow) {
+      setIsAnalyzing(false);
+      return;
+    }
+    if (workflow.status === 'running') {
+      setIsAnalyzing(true);
+    } else if (workflow.status === 'completed' || workflow.status === 'failed') {
+      setIsAnalyzing(false);
+    }
+  }, [workflow]);
 
   const handleSubmit = async () => {
     if (!description.trim()) return;
-    const task = await createTask({ title: description.slice(0, 50), description, tags });
-    if (task) setDescription('');
+    const task = await createTask({ title: description.slice(0, 50), description, tags: [] });
+    if (!task) return;
+
+    setDescription('');
+    setIsAnalyzing(true);
+
+    // 触发分析（后台执行，不阻塞UI）
+    // 轮询由 DashboardPage 的 selectedTaskId effect 自动处理
+    triggerAnalysis(task.id).catch(() => {
+      // 分析失败会在工作流中显示
+    });
   };
 
-  const addTag = () => {
-    if (newTag.trim() && !tags.includes(newTag.trim())) {
-      setTags([...tags, newTag.trim()]);
-      setNewTag('');
-    }
-  };
-
-  const removeTag = (tag: string) => {
-    setTags(tags.filter((t) => t !== tag));
+  const handleCancel = () => {
+    stopPolling();
+    setIsAnalyzing(false);
   };
 
   return (
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div className="card-title">
-          <i className="fa-solid fa-pen-to-square" style={{ fontSize: 12, color: 'var(--accent-blue)' }} />
           创新任务输入
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -54,54 +71,53 @@ export function TaskInputPanel() {
 
       <textarea value={description} onChange={(e) => setDescription(e.target.value)}
         placeholder="输入您的创新问题..."
+        disabled={isAnalyzing}
         style={{
           width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)',
           borderRadius: 8, padding: 12, marginBottom: 12, minHeight: 60,
           fontSize: 14, color: 'var(--text-primary)',
           resize: 'vertical', outline: 'none', fontFamily: 'inherit',
+          opacity: isAnalyzing ? 0.6 : 1,
         }} />
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        {isAnalyzing && (
+          <button
+            onClick={handleCancel}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'var(--accent-red)', border: 'none',
+              color: '#fff', padding: '8px 20px', borderRadius: 6,
+              cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+            }}
+          >
+            <i className="fa-solid fa-stop" style={{ fontSize: 11 }} />
+            取消
+          </button>
+        )}
         <button
-          onClick={() => {
-            const tag = prompt('输入关键词:');
-            if (tag?.trim()) addTag();
-          }}
+          onClick={handleSubmit}
+          disabled={isAnalyzing || !description.trim()}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '4px 10px', borderRadius: 20, fontSize: 12,
-            background: 'transparent', border: '1px dashed var(--border)',
-            color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: isAnalyzing ? 'var(--text-tertiary)' : 'var(--accent)',
+            border: 'none',
+            color: '#fff', padding: '8px 20px', borderRadius: 6,
+            cursor: isAnalyzing ? 'not-allowed' : 'pointer', fontSize: 13, fontFamily: 'inherit',
           }}
         >
-          + 添加关键词
+          {isAnalyzing ? (
+            <>
+              <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 11 }} />
+              分析中...
+            </>
+          ) : (
+            <>
+              开始分析 <i className="fa-solid fa-arrow-right" style={{ fontSize: 11 }} />
+            </>
+          )}
         </button>
-        {tags.map((tag) => (
-          <span key={tag} style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '4px 10px', borderRadius: 20, fontSize: 12,
-            background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)',
-            color: 'var(--accent-blue)',
-          }}>
-            {tag}
-            <button onClick={() => removeTag(tag)} style={{
-              background: 'none', border: 'none', color: 'inherit',
-              cursor: 'pointer', fontSize: 10, padding: 0, fontFamily: 'inherit',
-            }}>
-              <i className="fa-solid fa-xmark" />
-            </button>
-          </span>
-        ))}
       </div>
-
-      <button onClick={handleSubmit} style={{
-        marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6,
-        background: 'var(--accent)', border: 'none',
-        color: '#fff', padding: '8px 20px', borderRadius: 6,
-        cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
-      }}>
-        开始分析 <i className="fa-solid fa-arrow-right" style={{ fontSize: 11 }} />
-      </button>
     </div>
   );
 }

@@ -38,11 +38,27 @@ def get_workflow(task_id: int, user: dict = Depends(get_current_user)):
     if not row:
         raise HTTPException(status_code=404, detail="Workflow not yet started. Trigger analysis first.")
 
+    steps = json.loads(row["steps"])
+    # 将 snake_case 字段转换为 camelCase
+    converted_steps = []
+    for step in steps:
+        converted_steps.append({
+            "agentId": step.get("agent_id"),
+            "agentType": step.get("agent_type"),
+            "agentLabel": step.get("agent_label"),
+            "status": step.get("status"),
+            "description": step.get("description"),
+            "startedAt": step.get("started_at"),
+            "completedAt": step.get("completed_at"),
+            "duration": step.get("duration"),
+            "output": step.get("output"),
+        })
+
     return {
         "data": {
             "id": str(row["id"]), "taskId": str(row["task_id"]),
             "status": row["status"],
-            "steps": json.loads(row["steps"]),
+            "steps": converted_steps,
             "createdAt": row["created_at"],
         },
         "message": "success", "code": 200,

@@ -29,7 +29,6 @@ export function TaskStatsChart() {
       {/* 任务状态分布 */}
       <GlassPanel style={{ flex: 1 }}>
         <div className="card-title">
-          <i className="fa-solid fa-chart-pie" style={{ fontSize: 12, color: 'var(--accent-blue)' }} />
           任务状态分布
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -66,7 +65,6 @@ export function TaskStatsChart() {
       {/* 近7天趋势 */}
       <GlassPanel style={{ flex: 1 }}>
         <div className="card-title">
-          <i className="fa-solid fa-chart-line" style={{ fontSize: 12, color: 'var(--accent-cyan)' }} />
           近7天任务趋势
         </div>
         <div style={{

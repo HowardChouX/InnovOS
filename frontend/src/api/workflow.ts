@@ -15,7 +15,7 @@ export const workflowApi = {
   },
 
   async updateStep(taskId: string, body: {
-    agent_type: string;
+    agent_id: string;
     status: string;
     description?: string;
     duration?: string;

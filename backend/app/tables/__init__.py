@@ -8,6 +8,9 @@ from .evaluations import init_evaluations
 from .feedbacks import init_feedbacks
 from .audit_logs import init_audit_logs
 from .api_keys import init_api_keys
+from .notifications import init_notifications
+from .knowledge import init_knowledge_docs
+from .problem_modelings import init_problem_modelings
 
 
 def init_all_tables(conn):
@@ -21,4 +24,7 @@ def init_all_tables(conn):
     init_feedbacks(conn)
     init_audit_logs(conn)
     init_api_keys(conn)
+    init_notifications(conn)
+    init_knowledge_docs(conn)
+    init_problem_modelings(conn)
     conn.commit()

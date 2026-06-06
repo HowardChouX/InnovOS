@@ -5,6 +5,7 @@ import {
   type TaskStats,
   type KeyStats,
   type SystemStatus,
+  type HealthCheck,
 } from '../api/monitor';
 
 interface MonitorStore {
@@ -12,11 +13,13 @@ interface MonitorStore {
   taskStats: TaskStats | null;
   keyStats: KeyStats | null;
   systemStatus: SystemStatus | null;
+  health: HealthCheck | null;
   loading: boolean;
   fetchOverview: () => Promise<void>;
   fetchTaskStats: () => Promise<void>;
   fetchKeyStats: () => Promise<void>;
   fetchSystemStatus: () => Promise<void>;
+  fetchHealth: () => Promise<void>;
   fetchAll: () => Promise<void>;
 }
 
@@ -25,6 +28,7 @@ export const useMonitorStore = create<MonitorStore>((set) => ({
   taskStats: null,
   keyStats: null,
   systemStatus: null,
+  health: null,
   loading: false,
 
   fetchOverview: async () => {
@@ -58,6 +62,15 @@ export const useMonitorStore = create<MonitorStore>((set) => ({
     try {
       const systemStatus = await monitorApi.getSystemStatus();
       set({ systemStatus });
+    } catch {
+      // silently fail
+    }
+  },
+
+  fetchHealth: async () => {
+    try {
+      const health = await monitorApi.getHealth();
+      set({ health });
     } catch {
       // silently fail
     }

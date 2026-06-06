@@ -176,7 +176,6 @@ export function AnalysisResult() {
   return (
     <div className="card" style={{ height: '100%', minHeight: 300, display: 'flex', flexDirection: 'column' }}>
       <div className="card-title">
-        <i className="fa-solid fa-chart-bar" style={{ fontSize: 12, color: 'var(--accent-blue)' }} />
         问题分析结果
       </div>
 
@@ -223,7 +222,7 @@ export function AnalysisResult() {
                   问题描述
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                  {analysis.centerNode.description || '在提升电池能量密度的过程中，往往伴随发热增加导致安全性下降，同时加速电池老化，缩短循环寿命。'}
+                  {analysis.centerNode?.description || '在提升电池能量密度的过程中，往往伴随发热增加导致安全性下降，同时加速电池老化，缩短循环寿命。'}
                 </div>
               </div>
 

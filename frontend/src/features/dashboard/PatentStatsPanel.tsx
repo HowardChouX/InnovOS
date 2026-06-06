@@ -9,7 +9,6 @@ export function PatentStatsPanel() {
   return (
     <div className="card" style={{ minHeight: 180 }}>
       <div className="card-title">
-        <i className="fa-solid fa-magnifying-glass" style={{ fontSize: 12, color: 'var(--accent-blue)' }} />
         专利检索与分析
       </div>
 

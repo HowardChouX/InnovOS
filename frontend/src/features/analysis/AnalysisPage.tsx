@@ -98,7 +98,6 @@ export function AnalysisPage() {
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <GlassPanel style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <div className="card-title">
-          <i className="fa-solid fa-chart-bar" style={{ color: 'var(--accent-blue)' }} />
           问题分析
         </div>
 

@@ -12,7 +12,6 @@ export function KeyUsageChart() {
   return (
     <GlassPanel>
       <div className="card-title">
-        <i className="fa-solid fa-key" style={{ fontSize: 12, color: 'var(--accent-yellow)' }} />
         API Key 使用统计
       </div>
 

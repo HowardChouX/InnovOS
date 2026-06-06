@@ -4,6 +4,7 @@ import { keysApi } from '../../api/keys';
 import type { ApiKey } from '../../api/keys';
 import { GlassPanel } from '../../components/ui/GlassPanel';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { InlineConfirmModal } from '../../components/ui/InlineConfirmModal';
 
 interface ModelInfo {
   id: string;
@@ -31,6 +32,8 @@ export function KeyManagementPage() {
     priority: 0,
     maxRpm: 60,
   });
+  const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
 
   const loadKeys = async () => {
     setLoading(true);
@@ -49,9 +52,17 @@ export function KeyManagementPage() {
     loadKeys();
   }, []);
 
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+
+
   const fetchModels = async () => {
     if (!newKey.apiKey || !newKey.apiBaseUrl) {
-      alert('请先填写 API Key 和 API Base URL');
+      setToast({ msg: '请先填写 API Key 和 API Base URL', type: 'error' });
       return;
     }
     setModelsLoading(true);
@@ -67,7 +78,7 @@ export function KeyManagementPage() {
       setSelectedModels([]);
       setNewKey({ ...newKey, apiModel: '' });
     } catch (e) {
-      alert(`获取模型列表失败: ${e instanceof Error ? e.message : '未知错误'}`);
+      setToast({ msg: `获取模型列表失败: ${e instanceof Error ? e.message : '未知错误'}`, type: 'error' });
       setModels([]);
     } finally {
       setModelsLoading(false);
@@ -111,22 +122,30 @@ export function KeyManagementPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('确定删除此Key？')) return;
-    try {
-      await keysApi.delete(id);
-      loadKeys();
-    } catch (e) {
-      console.error('删除失败:', e);
-    }
+  const handleDelete = (id: number) => {
+    setConfirmModal({
+      open: true,
+      title: '确认删除',
+      message: '确认删除该 API Key？',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, open: false }));
+        try {
+          await keysApi.delete(id);
+          loadKeys();
+        } catch (e) {
+          console.error('删除失败:', e);
+          setToast({ msg: '删除失败', type: 'error' });
+        }
+      },
+    });
   };
 
   const handleTest = async (id: number) => {
     try {
       const result = await keysApi.test(id);
-      alert(result.message);
+      setToast({ msg: result.message, type: 'success' });
     } catch {
-      alert('测试失败');
+      setToast({ msg: '测试失败', type: 'error' });
     }
   };
 
@@ -143,10 +162,7 @@ export function KeyManagementPage() {
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <GlassPanel style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <div className="card-title" style={{ justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <i className="fa-solid fa-key" style={{ color: 'var(--accent-blue)' }} />
-            API Key 管理
-          </div>
+          API Key 管理
           <button
             onClick={() => { setShowCreate(true); setModels([]); setSelectedModels([]); }}
             className="btn-primary"
@@ -218,8 +234,11 @@ export function KeyManagementPage() {
                         onClick={() => handleDelete(key.id)}
                         style={{
                           padding: '4px 8px', borderRadius: 4,
-                          background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)',
-                          color: 'var(--accent-red)', cursor: 'pointer', fontSize: 11,
+                          background: 'rgba(248,113,113,0.1)',
+                          border: '1px solid rgba(248,113,113,0.2)',
+                          color: 'var(--accent-red)',
+                          cursor: 'pointer', fontSize: 11,
+                          transition: 'all 0.15s',
                         }}
                       >
                         删除
@@ -401,6 +420,13 @@ export function KeyManagementPage() {
         </div>,
         document.body
       )}
+      <InlineConfirmModal
+        open={confirmModal.open}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, open: false }))}
+      />
     </div>
   );
 }
