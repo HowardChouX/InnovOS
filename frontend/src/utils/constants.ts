@@ -8,6 +8,7 @@ export const ROUTES = {
   RESULTS: '/results',
   KNOWLEDGE: '/knowledge',
   SETTINGS: '/settings',
+  MONITOR: '/monitor',
 } as const;
 
 export const NAV_ITEMS = [
@@ -19,6 +20,7 @@ export const NAV_ITEMS = [
   { label: '方案评估', path: ROUTES.EVALUATION, icon: 'fa-chart-line' },
   { label: '成果管理', path: ROUTES.RESULTS, icon: 'fa-folder-open' },
   { label: '知识库管理', path: ROUTES.KNOWLEDGE, icon: 'fa-database' },
+  { label: '数据监控', path: ROUTES.MONITOR, icon: 'fa-chart-pie' },
   { label: '系统设置', path: ROUTES.SETTINGS, icon: 'fa-cog' },
 ] as const;
 

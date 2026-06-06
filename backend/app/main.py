@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db
-from app.api import auth, tasks, analysis, patents, solutions, workflow, evaluation, feedback, keys
+from app.api import auth, tasks, analysis, patents, solutions, workflow, evaluation, feedback, keys, monitor, sidebar, principles
 from app.seed import seed_admin_user, seed_patents
 
 init_db()
@@ -27,6 +27,9 @@ app.include_router(workflow.router)
 app.include_router(evaluation.router)
 app.include_router(feedback.router)
 app.include_router(keys.router)
+app.include_router(monitor.router)
+app.include_router(sidebar.router)
+app.include_router(principles.router)
 
 
 @app.get("/api/health")

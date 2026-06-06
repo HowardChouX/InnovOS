@@ -145,6 +145,22 @@ def update_task(task_id: int, body: UpdateTaskInput, user: dict = Depends(get_cu
 @router.delete("/{task_id}")
 def delete_task(task_id: int, user: dict = Depends(get_current_user)):
     db = get_db()
+    row = db.execute(
+        "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
+        (task_id, user["id"]),
+    ).fetchone()
+    if not row:
+        db.close()
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    solution_ids = [r["id"] for r in db.execute("SELECT id FROM solutions WHERE task_id = ?", (task_id,)).fetchall()]
+    if solution_ids:
+        placeholders = ",".join("?" for _ in solution_ids)
+        db.execute(f"DELETE FROM evaluations WHERE solution_id IN ({placeholders})", solution_ids)
+        db.execute(f"DELETE FROM feedbacks WHERE solution_id IN ({placeholders})", solution_ids)
+    db.execute("DELETE FROM solutions WHERE task_id = ?", (task_id,))
+    db.execute("DELETE FROM analyses WHERE task_id = ?", (task_id,))
+    db.execute("DELETE FROM workflows WHERE task_id = ?", (task_id,))
     db.execute("DELETE FROM tasks WHERE id = ? AND user_id = ?", (task_id, user["id"]))
     db.commit()
     db.close()

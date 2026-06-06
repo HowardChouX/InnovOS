@@ -197,8 +197,74 @@ LOG_LEVEL=INFO
 | 测试 | SQLite 测试库 | INFO | 开启 |
 | 生产 | PostgreSQL | WARNING | 关闭 |
 
-## 7. 测试（待实现）
+## 7. 测试规范
 
-项目当前无测试框架集成。建议后续补充：
-- 后端：pytest + httpx（FastAPI TestClient）
-- 前端：Vitest + React Testing Library
+### 7.1 测试框架
+
+| 层级 | 框架 | 说明 |
+|------|------|------|
+| 后端单元测试 | pytest | 函数级别测试 |
+| 后端接口测试 | pytest + httpx | API 端点测试 |
+| 前端单元测试 | Vitest | 组件/Hook 测试 |
+| 前端集成测试 | Vitest + React Testing Library | 页面级别测试 |
+
+### 7.2 测试文件结构
+
+```
+backend/tests/
+├── conftest.py           # 测试配置和 fixtures
+├── test_auth.py          # 认证模块测试
+├── test_keys.py          # Key 管理测试
+├── test_analysis.py      # 分析模块测试
+└── test_algorithm/       # 算法模块测试
+    ├── test_zr_ipm.py
+    └── test_key_manager.py
+
+frontend/src/
+├── __tests__/
+│   ├── components/       # 组件测试
+│   ├── features/         # 功能测试
+│   └── api/              # API 测试
+└── *.test.tsx            # 测试文件就近放置
+```
+
+### 7.3 测试命名规范
+
+```python
+# 后端：test_功能_场景_预期结果
+def test_create_key_valid_input_returns_success():
+def test_create_key_missing_api_key_returns_422():
+def test_decrypt_key_wrong_key_returns_original():
+```
+
+```typescript
+// 前端：describe(功能) + it(场景)
+describe('KeyManagementPage', () => {
+  it('should display empty state when no keys', () => {});
+  it('should open create modal on button click', () => {});
+});
+```
+
+### 7.4 测试覆盖率要求
+
+| 模块 | 最低覆盖率 | 说明 |
+|------|-----------|------|
+| 认证 | 90% | 安全相关，高覆盖 |
+| Key 管理 | 85% | 核心功能 |
+| AI 调用 | 80% | 依赖外部服务，mock 测试 |
+| UI 组件 | 70% | 重点测试交互逻辑 |
+
+### 7.5 运行测试
+
+```bash
+# 后端测试
+cd backend
+pytest tests/ -v --cov=app --cov-report=html
+
+# 前端测试
+cd frontend
+npm run test -- --coverage
+
+# 全量测试
+make test
+```

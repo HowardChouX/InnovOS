@@ -9,6 +9,6 @@ def init_solutions(conn):
             confidence_score INTEGER DEFAULT 0,
             patent_references TEXT DEFAULT '[]',
             rating INTEGER DEFAULT 0,
-            FOREIGN KEY (task_id) REFERENCES tasks(id)
+            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
         );
     """)

@@ -1,13 +1,20 @@
+import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { NAV_ITEMS } from '../../utils/constants';
+import { NAV_ITEMS, ROUTES } from '../../utils/constants';
 import { useAuthStore } from '../../store/useAuthStore';
+import { sidebarApi, type SidebarStats } from '../../api/sidebar';
 
 export function Sidebar() {
   const location = useLocation();
   const isAdmin = useAuthStore((s) => s.isAdmin);
+  const [stats, setStats] = useState<SidebarStats | null>(null);
+
+  useEffect(() => {
+    sidebarApi.getStats().then(setStats).catch(() => {});
+  }, []);
 
   const items = [
-    ...NAV_ITEMS,
+    ...NAV_ITEMS.filter((item) => !(item.path === ROUTES.MONITOR && !isAdmin)),
     ...(isAdmin ? [{ label: 'Key管理', path: '/admin/keys', icon: 'fa-key' }] : []),
   ];
 
@@ -63,9 +70,9 @@ export function Sidebar() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {[
-            { label: '今日任务', value: '24' },
-            { label: '已完成', value: '18' },
-            { label: '进行中', value: '6' },
+            { label: '今日任务', value: stats?.todayTasks ?? '-' },
+            { label: '已完成', value: stats?.completedTasks ?? '-' },
+            { label: '进行中', value: stats?.analyzingTasks ?? '-' },
           ].map((item) => (
             <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-tertiary)' }}>
               <span>{item.label}</span>
@@ -73,13 +80,9 @@ export function Sidebar() {
             </div>
           ))}
           <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 6, marginTop: 2 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-tertiary)', marginBottom: 4 }}>
-              <span>知识库案例</span>
-              <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>12,458</span>
-            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-tertiary)' }}>
               <span>专利数据量</span>
-              <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>5,231,987</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{stats?.patentCount?.toLocaleString() ?? '-'}</span>
             </div>
           </div>
         </div>

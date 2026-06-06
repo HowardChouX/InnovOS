@@ -7,6 +7,7 @@ import { RegisterPage } from '../features/auth/RegisterPage';
 import { PlaceholderPage } from '../features/PlaceholderPage';
 import { AnalysisPage } from '../features/analysis/AnalysisPage';
 import { KeyManagementPage } from '../features/admin/KeyManagementPage';
+import { MonitorPage } from '../features/monitor/MonitorPage';
 
 export const routes = [
   { path: '/login', element: <LoginPage /> },
@@ -28,6 +29,7 @@ export const routes = [
       { path: 'results', element: <PlaceholderPage title="成果管理" /> },
       { path: 'knowledge', element: <PlaceholderPage title="知识库管理" /> },
       { path: 'settings', element: <PlaceholderPage title="系统设置" /> },
+      { path: 'monitor', element: <MonitorPage /> },
       { path: 'admin/keys', element: <KeyManagementPage /> },
     ],
   },

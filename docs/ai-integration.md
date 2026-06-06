@@ -344,20 +344,15 @@ interface AnalysisStore {
 }
 ```
 
-### 5.3 调用链路
+### 5.3 安全机制
 
-```
-用户点击"开始分析"
-  → useAnalysisStore.triggerAnalysis(taskId)
-  → analysisApi.triggerAnalysis(taskId)
-  → POST /api/analysis/{taskId}/trigger
-  → ZRIPMEngine.analyze(description)
-  → chat_completion(system_prompt, user_prompt)
-  → key_manager.get_key_for_request()
-  → pick_model(api_model)
-  → OpenAI SDK 调用
-  → 返回冲突图谱 → 前端渲染
-```
+| 机制 | 说明 |
+|------|------|
+| Key 加密存储 | AES-256 (Fernet) 加密，密文存入 SQLite |
+| 密钥管理 | 环境变量 `INNOVOS_ENCRYPT_KEY`，代码中不出现 |
+| 前端脱敏 | 展示时 Key 自动脱敏（`sk-xxxx****`） |
+| 权限控制 | Key 管理接口仅管理员可访问 |
+| 传输安全 | JWT Token 鉴权，生产需 HTTPS |
 
 ---
 

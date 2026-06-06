@@ -6,6 +6,6 @@ def init_workflows(conn):
             status TEXT DEFAULT 'running',
             steps TEXT DEFAULT '[]',
             created_at TEXT DEFAULT (datetime('now')),
-            FOREIGN KEY (task_id) REFERENCES tasks(id)
+            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
         );
     """)

@@ -61,11 +61,21 @@ InnovOS 是一款基于全球专利数据库、真实创新案例数据库及人
 
 ## 文档目录
 
+### 核心文档
 - [产品愿景](./DEVELOPMENT_GUIDE.md)
 - [系统架构](./architecture.md)
 - [数据库设计](./database.md)
 - [API 规范](./api.md)
 - [开发规范](./development.md)
+
+### AI 集成
+- [AI 接入开发文档](./ai-integration.md)
+- [Key 管理系统](./key-management.md)
+
+### 算法文档
 - [ZR-IPM 算法](./DEVELOPMENT_GUIDE.md#zr-ipm-算法智融创新问题映射算法)
 - [四维评估引擎](./algorithm/evaluation.md)
+
+### 部署文档
+- [生产环境配置](./production.md)
 

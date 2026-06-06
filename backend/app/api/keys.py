@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.auth import require_admin
 from app.algorithm.key_manager import key_manager
 from app.algorithm.ai_client import pick_model
+from app.algorithm.crypto import decrypt_key
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -29,10 +30,16 @@ class UpdateKeyInput(BaseModel):
 
 
 def row_to_dict(row: dict) -> dict:
+    # 解密后取前缀脱敏，不暴露加密格式
+    try:
+        plain_key = decrypt_key(row["api_key"])
+        masked = plain_key[:7] + "****" if len(plain_key) > 7 else "****"
+    except Exception:
+        masked = "****"
     return {
         "id": row["id"],
         "keyName": row["key_name"],
-        "apiKey": row["api_key"][:8] + "****",
+        "apiKey": masked,
         "apiBaseUrl": row["api_base_url"],
         "apiModel": row["api_model"],
         "isActive": bool(row["is_active"]),

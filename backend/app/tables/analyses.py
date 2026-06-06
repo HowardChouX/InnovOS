@@ -7,6 +7,6 @@ def init_analyses(conn):
             satellite_nodes TEXT NOT NULL DEFAULT '[]',
             edges TEXT NOT NULL DEFAULT '[]',
             principles TEXT NOT NULL DEFAULT '[]',
-            FOREIGN KEY (task_id) REFERENCES tasks(id)
+            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
         );
     """)
