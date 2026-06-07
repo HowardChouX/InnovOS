@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Task, CreateTaskInput, UpdateTaskInput } from '../types/task';
 import { tasksApi } from '../api/tasks';
+import { useWorkflowStore } from './useWorkflowStore';
 
 interface TaskStore {
   tasks: Task[];
@@ -54,6 +55,10 @@ export const useTaskStore = create<TaskStore>((set) => ({
       await tasksApi.remove(id);
       set((s) => {
         const tasks = s.tasks.filter((t) => t.id !== id);
+        // 如果删除的是当前选中的 task，清除 workflow 状态
+        if (s.selectedTaskId === id) {
+          useWorkflowStore.getState().clearWorkflow();
+        }
         return {
           tasks,
           selectedTaskId: s.selectedTaskId === id ? (tasks[0]?.id ?? null) : s.selectedTaskId,

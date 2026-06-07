@@ -10,6 +10,7 @@ interface WorkflowStore {
   startPolling: (taskId: string) => void;
   stopPolling: () => void;
   reset: () => void;
+  clearWorkflow: () => void;
 }
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -24,7 +25,8 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
       const workflow = await workflowApi.getByTaskId(taskId);
       set({ workflow, loading: false });
     } catch {
-      set({ loading: false });
+      // 关键：失败时清除旧workflow数据，避免显示错误task的workflow
+      set({ workflow: null, loading: false });
     }
   },
   startPolling: (taskId) => {
@@ -40,7 +42,9 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
           get().stopPolling();
         }
       } catch (err) {
-        console.error('Workflow poll error:', err);
+        // 如果workflow还没创建（404），继续轮询而不是停止
+        // 其他错误也继续轮询，让后续重试恢复
+        console.warn('Workflow poll warning (will retry):', err);
       }
     };
 
@@ -53,6 +57,9 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
       pollTimer = null;
     }
     set({ polling: false });
+  },
+  clearWorkflow: () => {
+    set({ workflow: null });
   },
   reset: () => {
     get().stopPolling();

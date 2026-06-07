@@ -41,8 +41,14 @@ export function DashboardPage() {
     if (!selectedTaskId) {
       stopPolling();
       clearModeling();
+      // 清除 workflow 状态，确保右侧面板重置
+      useWorkflowStore.getState().clearWorkflow();
       return;
     }
+
+    // 关键：切换任务时先清除旧的 workflow，避免显示上一个任务的 workflow
+    useWorkflowStore.getState().clearWorkflow();
+
     fetchAnalysis(selectedTaskId);
     fetchStats(selectedTaskId);
     fetchSolutions(selectedTaskId);
@@ -58,20 +64,27 @@ export function DashboardPage() {
   // 监听工作流步骤变化，实时同步问题建模
   useEffect(() => {
     if (!workflow || !selectedTaskId) return;
-    
+
+    // 关键：workflow首次被获取到时，刷新task列表以更新status（pending -> analyzing）
+    // 这解决了createTask和triggerAnalysis之间的竞态条件
+    if (workflow.status === 'running' || workflow.status === 'idle') {
+      fetchTasks();
+    }
+
     // 检查每个Agent步骤是否完成，完成后刷新对应数据
     const completedSteps = workflow.steps?.filter((s) => s.status === 'completed');
     if (completedSteps && completedSteps.length > 0) {
       // 刷新问题建模数据
       refreshModeling(selectedTaskId);
     }
-    
+
     // 整个工作流完成时刷新所有数据
     if (workflow.status === 'completed') {
       fetchAnalysis(selectedTaskId);
       fetchSolutions(selectedTaskId);
+      fetchTasks();  // 再次刷新task以更新status为completed
     }
-  }, [workflow, selectedTaskId, fetchAnalysis, fetchSolutions, refreshModeling]);
+  }, [workflow, selectedTaskId, fetchAnalysis, fetchSolutions, refreshModeling, fetchTasks]);
 
   return (
     <div style={{ display: 'flex', gap: 14, minWidth: 800, minHeight: 0, height: '100%' }}>

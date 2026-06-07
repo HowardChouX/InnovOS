@@ -1,11 +1,15 @@
 import json
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException
+import sys
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from app.auth import get_current_user
 from app.database import get_db
 from app.algorithm.zr_ipm import ZRIPMEngine
 
 router = APIRouter(prefix="/api/analysis", tags=["analysis"])
+
+# 保持对后台任务的引用，防止被垃圾回收
+_background_tasks = set()
 
 WORKFLOW_AGENTS = [
     {"agent_id": "agent1", "agent_type": "problem_analysis", "agent_label": "需求洞察Agent", "description": "理解用户需求，提取关键要素"},
@@ -43,6 +47,7 @@ def update_workflow_step(db, task_id: int, agent_id: str, status: str, descripti
 
     row = db.execute("SELECT steps FROM workflows WHERE task_id=?", (task_id,)).fetchone()
     if not row:
+        print(f"[DEBUG] Workflow not found for task_id={task_id}", flush=True)
         return
 
     steps = json.loads(row["steps"])
@@ -64,6 +69,7 @@ def update_workflow_step(db, task_id: int, agent_id: str, status: str, descripti
                 step["duration"] = duration
             if output:
                 step["output"] = output
+            print(f"[DEBUG] Updated step {agent_id} to status={status} for task_id={task_id}", flush=True)
             break
 
     has_running = any(s["status"] == "running" for s in steps)
@@ -84,6 +90,7 @@ def update_workflow_step(db, task_id: int, agent_id: str, status: str, descripti
         (workflow_status, json.dumps(steps), task_id),
     )
     db.commit()
+    print(f"[DEBUG] Committed workflow status={workflow_status} for task_id={task_id}", flush=True)
 
 
 async def _update_problem_modeling(db, task_id: int, task_description: str, analysis_result: dict, 
@@ -264,12 +271,15 @@ async def _update_problem_modeling(db, task_id: int, task_description: str, anal
 
 async def run_analysis_background(task_id: int, user_id: int, task_description: str):
     """后台执行分析任务"""
+    print(f"[DEBUG] Background task started for task_id={task_id}", flush=True)
     db = get_db()
     engine = ZRIPMEngine()
-    
+
     try:
         # Step 1: 需求洞察 - AI分析问题
+        print(f"[DEBUG] Setting agent1 to running for task_id={task_id}", flush=True)
         update_workflow_step(db, task_id, "agent1", "running")
+        print(f"[DEBUG] Agent1 set to running successfully", flush=True)
         
         analysis_result = await engine.analyze(task_description)
         
@@ -435,6 +445,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
         db.commit()
 
     except Exception as e:
+        print(f"[ERROR] Background task failed for task_id={task_id}: {e}")
         db.execute(
             "UPDATE tasks SET status='failed', updated_at=datetime('now') WHERE id=?",
             (task_id,)
@@ -529,7 +540,10 @@ async def trigger_analysis(task_id: int, user: dict = Depends(get_current_user))
     db.close()
 
     # 后台启动分析任务
-    asyncio.create_task(run_analysis_background(task_id, user["id"], task["description"]))
+    # 使用 BackgroundTasks 确保任务在响应发送后继续执行
+    task = asyncio.create_task(run_analysis_background(task_id, user["id"], task["description"]))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
     return {
         "data": {

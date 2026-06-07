@@ -26,17 +26,27 @@ export function TaskInputPanel() {
 
   const handleSubmit = async () => {
     if (!description.trim()) return;
-    const task = await createTask({ title: description.slice(0, 50), description, tags: [] });
-    if (!task) return;
 
-    setDescription('');
+    // 禁用输入，显示加载状态
     setIsAnalyzing(true);
 
-    // 触发分析（后台执行，不阻塞UI）
-    // 轮询由 DashboardPage 的 selectedTaskId effect 自动处理
-    triggerAnalysis(task.id).catch(() => {
-      // 分析失败会在工作流中显示
-    });
+    try {
+      // 创建任务
+      const task = await createTask({ title: description.slice(0, 50), description, tags: [] });
+      if (!task) {
+        setIsAnalyzing(false);
+        return;
+      }
+
+      setDescription('');
+
+      // 触发分析（后台执行，不阻塞UI）
+      // 注意：selectedTaskId 的设置会自动触发 DashboardPage 的 workflow 轮询
+      await triggerAnalysis(task.id);
+    } catch (error) {
+      console.error('Failed to start analysis:', error);
+      setIsAnalyzing(false);
+    }
   };
 
   const handleCancel = () => {

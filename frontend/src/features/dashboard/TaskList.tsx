@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTaskStore } from '../../store/useTaskStore';
+import { useWorkflowStore } from '../../store/useWorkflowStore';
 import { InlineConfirmModal } from '../../components/ui/InlineConfirmModal';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -8,6 +9,23 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   completed: { label: '已完成', color: 'var(--accent-green)', bg: 'rgba(74,222,128,0.12)' },
   failed: { label: '失败', color: 'var(--accent-red)', bg: 'rgba(248,113,113,0.12)' },
 };
+
+// 获取workflow当前运行步骤的标签
+function getWorkflowProgressLabel(workflow: { status: string; steps?: Array<{ agentId: string; agentLabel?: string; status: string }> } | null): string | null {
+  if (!workflow || workflow.status === 'completed' || workflow.status === 'failed') return null;
+
+  const runningStep = workflow.steps?.find(s => s.status === 'running');
+  if (runningStep) {
+    return runningStep.agentLabel || runningStep.agentId;
+  }
+
+  const lastCompleted = workflow.steps?.filter(s => s.status === 'completed').pop();
+  if (lastCompleted) {
+    return `已完成 ${lastCompleted.agentLabel || lastCompleted.agentId}`;
+  }
+
+  return null;
+}
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr.replace(' ', 'T') + 'Z');
@@ -30,6 +48,7 @@ export function TaskList() {
   const deleteTask = useTaskStore((s) => s.deleteTask);
   const loading = useTaskStore((s) => s.loading);
   const fetchTasks = useTaskStore((s) => s.fetchTasks);
+  const workflow = useWorkflowStore((s) => s.workflow);
   const initialized = useRef(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -44,11 +63,24 @@ export function TaskList() {
     }
   }, [fetchTasks]);
 
+  // 关键：当workflow完成或失败时，自动刷新task列表以同步状态
+  useEffect(() => {
+    if (workflow && (workflow.status === 'completed' || workflow.status === 'failed')) {
+      console.log('Workflow finished, refreshing task list...');
+      fetchTasks();
+    }
+  }, [workflow, fetchTasks]);
+
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3000);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // 计算当前workflow进度标签（仅对选中的analyzing task显示）
+  const progressLabel = selectedTaskId && workflow
+    ? getWorkflowProgressLabel(workflow)
+    : null;
 
 
 
