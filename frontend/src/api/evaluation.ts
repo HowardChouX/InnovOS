@@ -16,4 +16,11 @@ export const evaluationApi = {
     );
     return res.data;
   },
+
+  async getLatest(solutionId: string): Promise<Evaluation> {
+    const res = await apiRequest<{ data: Evaluation }>(
+      `/api/evaluation/${solutionId}/latest`,
+    );
+    return res.data;
+  },
 };

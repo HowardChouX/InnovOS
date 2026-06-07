@@ -273,6 +273,9 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
         
         analysis_result = await engine.analyze(task_description)
         
+        # 增量更新：问题要素
+        await _update_problem_modeling(db, task_id, task_description, analysis_result, "agent1")
+        
         update_workflow_step(db, task_id, "agent1", "completed",
                            description="理解用户需求，提取关键要素",
                            output=json.dumps(analysis_result, ensure_ascii=False))
@@ -289,8 +292,8 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
             "principles": analysis_result.get("principles", []),
         })
         
-        # 生成问题建模
-        await _generate_problem_modeling(db, task_id, task_description, analysis_result)
+        # 增量更新：冲突分析 + 模型结构
+        await _update_problem_modeling(db, task_id, task_description, analysis_result, "agent2")
         
         update_workflow_step(db, task_id, "agent2", "completed",
                            description="构建问题模型，识别核心冲突",
@@ -299,13 +302,26 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
         # Step 3: 专利分析 - 检索相关专利
         update_workflow_step(db, task_id, "agent5", "running")
         
-        patent_keywords = analysis_result.get("patentKeywords",
-            [task_description[:20]])
-
-        db_patents = db.execute(
-            "SELECT * FROM patents WHERE title LIKE ? OR abstract LIKE ? LIMIT 5",
-            (f"%{patent_keywords[0]}%", f"%{patent_keywords[0]}%")
-        ).fetchall() if patent_keywords else []
+        # 获取AI提取的关键词，如果没有则使用任务描述
+        patent_keywords = analysis_result.get("patentKeywords", [])
+        if not patent_keywords:
+            # 使用任务描述作为关键词（前50字）
+            patent_keywords = [task_description[:50]]
+        
+        # 使用多关键词 OR 检索（最多3个关键词）
+        search_keywords = patent_keywords[:3]
+        
+        # 构建 OR 条件
+        or_conditions = []
+        params = []
+        for keyword in search_keywords:
+            or_conditions.append("(title LIKE ? OR abstract LIKE ?)")
+            params.extend([f"%{keyword}%", f"%{keyword}%"])
+        
+        where_clause = " OR ".join(or_conditions) if or_conditions else "1=1"
+        
+        sql = f"SELECT * FROM patents WHERE {where_clause} ORDER BY relevance_score DESC LIMIT 10"
+        db_patents = db.execute(sql, params).fetchall()
 
         patent_info = []
         for p in db_patents:
@@ -315,6 +331,10 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
                 "relevance": p["relevance_score"],
             })
 
+        # 增量更新：推荐原理
+        await _update_problem_modeling(db, task_id, task_description, analysis_result, "agent5",
+                                       extra_data={"patents": patent_info})
+        
         update_workflow_step(db, task_id, "agent5", "completed",
                            description=f"检索到 {len(patent_info)} 条相关专利",
                            output=json.dumps(patent_info, ensure_ascii=False))
@@ -339,6 +359,10 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
                 )
             )
 
+        # 增量更新：创新方向
+        await _update_problem_modeling(db, task_id, task_description, analysis_result, "agent3",
+                                       extra_data={"solutions": solutions})
+        
         update_workflow_step(db, task_id, "agent3", "completed",
                            description=f"生成 {len(solutions)} 个创新方案",
                            output=json.dumps(solutions, ensure_ascii=False))
@@ -377,6 +401,10 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
                         (sol_id, user_id, dim, score_val, json.dumps(eval_result), "completed")
                     )
 
+        # 增量更新：评估分数
+        await _update_problem_modeling(db, task_id, task_description, analysis_result, "agent4",
+                                       extra_data={"evaluations": evaluations})
+        
         update_workflow_step(db, task_id, "agent4", "completed",
                            description=f"评估 {len(evaluations)} 个方案",
                            output=json.dumps(evaluations, ensure_ascii=False))
@@ -405,9 +433,6 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
             (task_id,)
         )
         db.commit()
-
-        # 生成问题建模
-        await _generate_problem_modeling(db, task_id, task_description, analysis_result)
 
     except Exception as e:
         db.execute(

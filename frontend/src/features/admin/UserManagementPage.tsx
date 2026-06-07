@@ -18,7 +18,7 @@ export function UserManagementPage() {
   const [notifyTitle, setNotifyTitle] = useState('');
   const [notifyContent, setNotifyContent] = useState('');
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, _setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);

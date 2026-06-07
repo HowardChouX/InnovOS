@@ -90,4 +90,5 @@ class ZRIPMEngine:
                 for i, s in enumerate(satellites)
             ],
             "principles": ai_result.get("principles", []),
+            "patentKeywords": ai_result.get("patentKeywords", []),
         }

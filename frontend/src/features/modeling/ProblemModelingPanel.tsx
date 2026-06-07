@@ -1,13 +1,30 @@
 import { useState } from 'react';
 import type { ProblemModeling } from '../../types/modeling';
+import type { WorkflowState } from '../../types/workflow';
 
 interface ProblemModelingPanelProps {
   modeling: ProblemModeling | null;
   loading: boolean;
+  workflow: WorkflowState | null;
 }
 
-export function ProblemModelingPanel({ modeling, loading }: ProblemModelingPanelProps) {
+export function ProblemModelingPanel({ modeling, loading, workflow }: ProblemModelingPanelProps) {
   const [activeTab, setActiveTab] = useState('elements');
+
+  // 获取每个步骤的状态
+  const getStepStatus = (agentId: string) => {
+    const step = workflow?.steps?.find((s) => s.agentId === agentId);
+    return step?.status || 'pending';
+  };
+
+  // 步骤与标签映射
+  const tabConfig = [
+    { key: 'elements', label: '问题要素', icon: 'fa-list-check', agentId: 'agent1' },
+    { key: 'conflicts', label: '冲突分析', icon: 'fa-bolt', agentId: 'agent2' },
+    { key: 'principles', label: '推荐原理', icon: 'fa-lightbulb', agentId: 'agent5' },
+    { key: 'directions', label: '创新方向', icon: 'fa-compass', agentId: 'agent3' },
+    { key: 'structure', label: '模型结构', icon: 'fa-sitemap', agentId: 'agent4' },
+  ];
 
   if (loading) {
     return (
@@ -15,7 +32,7 @@ export function ProblemModelingPanel({ modeling, loading }: ProblemModelingPanel
         <div className="card-title">问题建模</div>
         <div style={{ padding: '40px 0', textAlign: 'center' }}>
           <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 24, color: 'var(--accent-blue)' }} />
-          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>生成问题建模...</div>
+          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>加载问题建模...</div>
         </div>
       </div>
     );
@@ -33,14 +50,6 @@ export function ProblemModelingPanel({ modeling, loading }: ProblemModelingPanel
     );
   }
 
-  const tabs = [
-    { key: 'elements', label: '问题要素', icon: 'fa-list-check' },
-    { key: 'conflicts', label: '冲突分析', icon: 'fa-bolt' },
-    { key: 'principles', label: '推荐原理', icon: 'fa-lightbulb' },
-    { key: 'directions', label: '创新方向', icon: 'fa-compass' },
-    { key: 'structure', label: '模型结构', icon: 'fa-sitemap' },
-  ];
-
   return (
     <div className="card" style={{ minHeight: 300 }}>
       <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -49,29 +58,48 @@ export function ProblemModelingPanel({ modeling, loading }: ProblemModelingPanel
           问题建模
         </div>
         <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-          {modeling.modelStructure.problemType} · {modeling.modelStructure.complexity}
+          {modeling.modelStructure?.problemType || '未知'} · {modeling.modelStructure?.complexity || '未知'}
         </span>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs with step status */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--border-light)', paddingBottom: 8 }}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            style={{
-              padding: '6px 12px', borderRadius: 6, fontSize: 12,
-              background: activeTab === tab.key ? 'rgba(59,130,246,0.15)' : 'transparent',
-              border: activeTab === tab.key ? '1px solid rgba(59,130,246,0.3)' : '1px solid transparent',
-              color: activeTab === tab.key ? 'var(--accent-blue)' : 'var(--text-tertiary)',
-              cursor: 'pointer', fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', gap: 4,
-            }}
-          >
-            <i className={`fa-solid ${tab.icon}`} style={{ fontSize: 10 }} />
-            {tab.label}
-          </button>
-        ))}
+        {tabConfig.map((tab) => {
+          const status = getStepStatus(tab.agentId);
+          const isActive = activeTab === tab.key;
+          const isCompleted = status === 'completed';
+          const isRunning = status === 'running';
+          
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                padding: '6px 12px', borderRadius: 6, fontSize: 12,
+                background: isActive ? 'rgba(59,130,246,0.15)' : 'transparent',
+                border: isActive ? '1px solid rgba(59,130,246,0.3)' : '1px solid transparent',
+                color: isActive ? 'var(--accent-blue)' : isCompleted ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                cursor: 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', gap: 4,
+                position: 'relative',
+              }}
+            >
+              <i className={`fa-solid ${tab.icon}`} style={{ fontSize: 10 }} />
+              {tab.label}
+              {/* Step status indicator */}
+              {isRunning && (
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: 'var(--accent-blue)', display: 'inline-block',
+                  animation: 'pulse 1.5s infinite',
+                }} />
+              )}
+              {isCompleted && (
+                <i className="fa-solid fa-check" style={{ fontSize: 8, color: 'var(--accent-green)' }} />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Content */}
@@ -81,21 +109,21 @@ export function ProblemModelingPanel({ modeling, loading }: ProblemModelingPanel
             <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 12, border: '1px solid var(--border-light)' }}>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>核心目标</div>
               <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                {modeling.problemElements.coreGoal}
+                {modeling.problemElements?.coreGoal || '暂无数据'}
               </div>
             </div>
 
             <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 12, border: '1px solid var(--border-light)' }}>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>技术对象</div>
               <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>
-                {modeling.problemElements.techObject}
+                {modeling.problemElements?.techObject || '暂无数据'}
               </div>
             </div>
 
             <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 12, border: '1px solid var(--border-light)' }}>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 8 }}>约束条件</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {modeling.problemElements.constraints.map((c, i) => (
+                {modeling.problemElements?.constraints?.map((c: string, i: number) => (
                   <span key={i} style={{
                     padding: '3px 10px', borderRadius: 4, fontSize: 11,
                     background: 'rgba(251,191,36,0.15)', color: 'var(--accent-yellow)',
@@ -103,14 +131,14 @@ export function ProblemModelingPanel({ modeling, loading }: ProblemModelingPanel
                   }}>
                     {c}
                   </span>
-                ))}
+                )) || <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>暂无数据</span>}
               </div>
             </div>
 
             <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 12, border: '1px solid var(--border-light)' }}>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 8 }}>潜在冲突</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {modeling.problemElements.potentialConflicts.map((conflict) => (
+                {modeling.problemElements?.potentialConflicts?.map((conflict: any) => (
                   <div key={conflict.id} style={{
                     display: 'flex', alignItems: 'center', gap: 8,
                     padding: '6px 10px', borderRadius: 4,
@@ -126,7 +154,7 @@ export function ProblemModelingPanel({ modeling, loading }: ProblemModelingPanel
                       </span>
                     )}
                   </div>
-                ))}
+                )) || <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>暂无数据</span>}
               </div>
             </div>
           </div>
@@ -134,7 +162,7 @@ export function ProblemModelingPanel({ modeling, loading }: ProblemModelingPanel
 
         {activeTab === 'conflicts' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {modeling.conflicts.map((conflict, index) => (
+            {modeling.conflicts?.length > 0 ? modeling.conflicts.map((conflict: any, index: number) => (
               <div key={index} style={{
                 background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 14,
                 border: '1px solid var(--border-light)',
@@ -157,7 +185,7 @@ export function ProblemModelingPanel({ modeling, loading }: ProblemModelingPanel
                   {conflict.description}
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  {conflict.parameters.map((param, i) => (
+                  {conflict.parameters?.map((param: any, i: number) => (
                     <div key={i} style={{
                       padding: '4px 10px', borderRadius: 4,
                       background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
@@ -171,13 +199,17 @@ export function ProblemModelingPanel({ modeling, loading }: ProblemModelingPanel
                   ))}
                 </div>
               </div>
-            ))}
+            )) : (
+              <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>
+                暂无冲突分析数据
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'principles' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {modeling.recommendedPrinciples.map((principle, index) => (
+            {modeling.recommendedPrinciples?.length > 0 ? modeling.recommendedPrinciples.map((principle: string, index: number) => (
               <div key={index} style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '10px 14px', borderRadius: 8,
@@ -202,13 +234,17 @@ export function ProblemModelingPanel({ modeling, loading }: ProblemModelingPanel
                   推荐
                 </span>
               </div>
-            ))}
+            )) : (
+              <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>
+                暂无推荐原理数据
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'directions' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {modeling.innovationDirections.map((dir, index) => (
+            {modeling.innovationDirections?.length > 0 ? modeling.innovationDirections.map((dir: any, index: number) => (
               <div key={index} style={{
                 background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 14,
                 border: '1px solid var(--border-light)',
@@ -236,7 +272,11 @@ export function ProblemModelingPanel({ modeling, loading }: ProblemModelingPanel
                   {dir.description}
                 </div>
               </div>
-            ))}
+            )) : (
+              <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>
+                暂无创新方向数据
+              </div>
+            )}
           </div>
         )}
 
@@ -246,13 +286,13 @@ export function ProblemModelingPanel({ modeling, loading }: ProblemModelingPanel
               <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 12, border: '1px solid var(--border-light)' }}>
                 <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>问题类型</div>
                 <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                  {modeling.modelStructure.problemType}
+                  {modeling.modelStructure?.problemType || '暂无数据'}
                 </div>
               </div>
               <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 12, border: '1px solid var(--border-light)' }}>
                 <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>复杂度</div>
                 <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                  {modeling.modelStructure.complexity}
+                  {modeling.modelStructure?.complexity || '暂无数据'}
                 </div>
               </div>
             </div>
@@ -260,7 +300,7 @@ export function ProblemModelingPanel({ modeling, loading }: ProblemModelingPanel
             <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 12, border: '1px solid var(--border-light)' }}>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 8 }}>关键因素</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {modeling.modelStructure.keyFactors.map((factor, i) => (
+                {modeling.modelStructure?.keyFactors?.map((factor: string, i: number) => (
                   <span key={i} style={{
                     padding: '4px 10px', borderRadius: 4, fontSize: 11,
                     background: 'rgba(59,130,246,0.1)', color: 'var(--accent-blue)',
@@ -268,21 +308,21 @@ export function ProblemModelingPanel({ modeling, loading }: ProblemModelingPanel
                   }}>
                     {factor}
                   </span>
-                ))}
+                )) || <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>暂无数据</span>}
               </div>
             </div>
 
             <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 12, border: '1px solid var(--border-light)' }}>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>根本原因</div>
               <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.5 }}>
-                {modeling.modelStructure.rootCause}
+                {modeling.modelStructure?.rootCause || '暂无数据'}
               </div>
             </div>
 
             <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 12, border: '1px solid var(--border-light)' }}>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>解决方案空间</div>
               <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                {modeling.modelStructure.solutionSpace}
+                {modeling.modelStructure?.solutionSpace || '暂无数据'}
               </div>
             </div>
           </div>
