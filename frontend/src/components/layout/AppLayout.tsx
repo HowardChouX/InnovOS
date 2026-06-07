@@ -80,18 +80,6 @@ export function AppLayout() {
     setDetailNotify(n);
   };
 
-  const handleMarkRead = async (id: number) => {
-    try {
-      await notificationsApi.markAsRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-      );
-      setUnreadCount((c) => Math.max(0, c - 1));
-    } catch {
-      // silent
-    }
-  };
-
   const handleMarkAllRead = async () => {
     try {
       await notificationsApi.markAllAsRead();
