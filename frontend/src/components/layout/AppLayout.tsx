@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { useAuthStore } from '../../store/useAuthStore';
 import { notificationsApi, type Notification } from '../../api/notifications';
 
 export function AppLayout() {
+  const location = useLocation();
+  const isKnowledgePage = location.pathname === '/knowledge';
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
@@ -155,6 +157,14 @@ export function AppLayout() {
     return `${d.getMonth() + 1}-${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
 
+  const notifyTypeConfig: Record<string, { icon: string; color: string }> = {
+    system: { icon: 'fa-solid fa-gear', color: 'var(--text-tertiary)' },
+    workflow: { icon: 'fa-solid fa-diagram-project', color: 'var(--accent-blue)' },
+    patent: { icon: 'fa-solid fa-file-lines', color: 'var(--accent-purple)' },
+    alert: { icon: 'fa-solid fa-triangle-exclamation', color: 'var(--accent-red)' },
+  };
+  const getNotifyType = (type: string) => notifyTypeConfig[type] || notifyTypeConfig.system;
+
   return (
 
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)' }}>
@@ -282,6 +292,7 @@ export function AppLayout() {
                               flexShrink: 0,
                             }} />
                           )}
+                          <i className={getNotifyType(n.type).icon} style={{ fontSize: 10, color: getNotifyType(n.type).color, flexShrink: 0 }} />
                           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {n.title}
                           </span>
@@ -352,7 +363,7 @@ export function AppLayout() {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <Sidebar />
         <main style={{
-          flex: 1, padding: 14, overflowY: 'auto',
+          flex: 1, padding: isKnowledgePage ? 0 : 14, overflowY: 'auto',
           background: 'var(--bg-dark)',
           display: 'flex', flexDirection: 'column',
         }}>
@@ -378,6 +389,7 @@ export function AppLayout() {
                   width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-red)', flexShrink: 0,
                 }} />
               )}
+              <i className={getNotifyType(detailNotify.type).icon} style={{ fontSize: 13, color: getNotifyType(detailNotify.type).color }} />
               <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>
                 {detailNotify.title}
               </span>

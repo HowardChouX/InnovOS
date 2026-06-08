@@ -70,22 +70,22 @@ export interface HealthCheck {
 
 export const monitorApi = {
   async getOverview(): Promise<MonitorOverview> {
-    const res = await apiRequest<{ data: MonitorOverview }>('/api/monitor/overview');
+    const res = await apiRequest<{ data: MonitorOverview }>('/api/admin/monitor/overview');
     return res.data;
   },
 
   async getTaskStats(): Promise<TaskStats> {
-    const res = await apiRequest<{ data: TaskStats }>('/api/monitor/tasks');
+    const res = await apiRequest<{ data: TaskStats }>('/api/admin/monitor/tasks');
     return res.data;
   },
 
   async getKeyStats(): Promise<KeyStats> {
-    const res = await apiRequest<{ data: KeyStats }>('/api/monitor/keys');
+    const res = await apiRequest<{ data: KeyStats }>('/api/admin/monitor/keys');
     return res.data;
   },
 
   async getSystemStatus(): Promise<SystemStatus> {
-    const res = await apiRequest<{ data: SystemStatus }>('/api/monitor/system');
+    const res = await apiRequest<{ data: SystemStatus }>('/api/admin/monitor/system');
     return res.data;
   },
 

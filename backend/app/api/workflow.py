@@ -2,6 +2,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from app.auth import get_current_user
 from app.database import get_db
+from app.utils import utc_iso
 from pydantic import BaseModel
 from typing import Optional
 
@@ -59,7 +60,7 @@ def get_workflow(task_id: int, user: dict = Depends(get_current_user)):
             "id": str(row["id"]), "taskId": str(row["task_id"]),
             "status": row["status"],
             "steps": converted_steps,
-            "createdAt": row["created_at"],
+            "createdAt": utc_iso(row["created_at"]),
         },
         "message": "success", "code": 200,
     }
@@ -103,7 +104,7 @@ def create_workflow(task_id: int, user: dict = Depends(get_current_user)):
             "id": str(row["id"]), "taskId": str(row["task_id"]),
             "status": row["status"],
             "steps": json.loads(row["steps"]),
-            "createdAt": row["created_at"],
+            "createdAt": utc_iso(row["created_at"]),
         },
         "message": "Workflow created",
         "code": 200,

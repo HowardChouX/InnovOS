@@ -16,7 +16,7 @@
   --accent-green: #4ade80;
   --accent-yellow: #fbbf24;
   --accent-red: #f87171;
-  --accent-purple: #a78bfa;
+  --accent-purple: #8b5cf6;
   --accent-cyan: #22d3ee;
   --shadow: rgba(0,0,0,0.4);
 }
@@ -132,4 +132,14 @@ body {
   padding: 2px 8px;
   border-radius: 4px;
   display: inline-block;
+}
+
+/* contentEditable placeholder */
+[data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+[data-placeholder]:focus:empty::before {
+  content: attr(data-placeholder);
 }

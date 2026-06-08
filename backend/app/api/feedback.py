@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.auth import get_current_user
 from app.database import get_db
+from app.utils import utc_iso
 from app.models.feedback import FeedbackCreate
 
 router = APIRouter(prefix="/api/feedback", tags=["feedback"])
@@ -36,7 +37,7 @@ def create_feedback(body: FeedbackCreate, user: dict = Depends(get_current_user)
             "rating": row["rating"],
             "feedbackType": row["feedback_type"],
             "comments": row["comments"],
-            "createdAt": row["created_at"],
+            "createdAt": utc_iso(row["created_at"]),
         },
         "message": "success", "code": 200,
     }

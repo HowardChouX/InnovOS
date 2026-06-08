@@ -2,6 +2,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.auth import get_current_user
 from app.database import get_db
+from app.utils import utc_iso
 from pydantic import BaseModel
 from typing import Optional
 
@@ -31,8 +32,8 @@ def row_to_dict(row):
         "description": row["description"],
         "tags": json.loads(row["tags"]),
         "status": row["status"],
-        "createdAt": row["created_at"],
-        "updatedAt": row["updated_at"],
+        "createdAt": utc_iso(row["created_at"]),
+        "updatedAt": utc_iso(row["updated_at"]),
     }
 
 

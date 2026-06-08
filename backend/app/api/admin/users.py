@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.auth import get_current_user
 from app.database import get_db
+from app.utils import utc_iso
 from pydantic import BaseModel
 from typing import Optional
 
-router = APIRouter(prefix="/api/users", tags=["users"])
+router = APIRouter(prefix="/users", tags=["users"])
 
 
 class UpdateUserInput(BaseModel):
@@ -38,7 +39,7 @@ def list_users(user: dict = Depends(get_current_user)):
                 "email": row["email"],
                 "role": row["role"],
                 "isActive": bool(row["is_active"]),
-                "createdAt": row["created_at"],
+                "createdAt": utc_iso(row["created_at"]),
             }
             for row in rows
         ],
@@ -85,7 +86,7 @@ def update_user(user_id: int, body: UpdateUserInput, user: dict = Depends(get_cu
             "email": row["email"],
             "role": row["role"],
             "isActive": bool(row["is_active"]),
-            "createdAt": row["created_at"],
+            "createdAt": utc_iso(row["created_at"]),
         },
         "message": "success",
         "code": 200,

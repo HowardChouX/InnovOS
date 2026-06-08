@@ -1,432 +1,291 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { keysApi } from '../../api/keys';
-import type { ApiKey } from '../../api/keys';
-import { GlassPanel } from '../../components/ui/GlassPanel';
-import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { providersApi, type Provider } from '../../api/admin/providers';
 import { InlineConfirmModal } from '../../components/ui/InlineConfirmModal';
-
-interface ModelInfo {
-  id: string;
-  owned_by?: string;
-}
+import { ModelSelector } from '../../components/ui/ModelSelector';
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '8px 12px', borderRadius: 6,
-  background: 'var(--bg-card)', border: '1px solid var(--border)',
-  color: 'var(--text-primary)', fontSize: 13, fontFamily: 'inherit',
+  background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)',
+  color: 'var(--text-primary)', fontSize: 13, fontFamily: 'inherit', outline: 'none',
+};
+
+const labelStyle: React.CSSProperties = {
+  fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4,
 };
 
 export function KeyManagementPage() {
-  const [keys, setKeys] = useState<ApiKey[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
-  const [models, setModels] = useState<ModelInfo[]>([]);
-  const [modelsLoading, setModelsLoading] = useState(false);
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
-  const [newKey, setNewKey] = useState({
-    keyName: '',
-    apiKey: '',
-    apiBaseUrl: '',
-    apiModel: '',
-    priority: 0,
-    maxRpm: 60,
-  });
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
-  const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
+  const [checking, setChecking] = useState(false);
+  const [showCheckModelPicker, setShowCheckModelPicker] = useState(false);
+  const [_checkModel] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+  const [editKey, setEditKey] = useState('');
+  const [editModels, setEditModels] = useState<string[]>([]);
+  const [editPriority, setEditPriority] = useState(0);
+  const [editMaxRpm, setEditMaxRpm] = useState(60);
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [detecting, setDetecting] = useState(false);
+  const [detectedModels, setDetectedModels] = useState<string[]>([]);
+  const [showModelSelector, setShowModelSelector] = useState(false);
 
-  const loadKeys = async () => {
+  const load = async () => {
     setLoading(true);
     try {
-      const data = await keysApi.list();
-      setKeys(data);
-    } catch {
-      console.error('加载Key列表失败');
-    } finally {
-      setLoading(false);
-    }
+      const res = await providersApi.listBuiltin();
+      setProviders(res.data);
+      if (!selectedId && res.data.length > 0) {
+        const first = res.data.find(p => p.isConfigured) || res.data[0];
+        setSelectedId(first.providerId);
+      }
+    } catch { /* */ } finally { setLoading(false); }
   };
+
+  useEffect(() => { load(); }, []);
+  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); } }, [toast]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadKeys();
-  }, []);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3000);
-    return () => clearTimeout(t);
-  }, [toast]);
-
-
-
-  const fetchModels = async () => {
-    if (!newKey.apiKey || !newKey.apiBaseUrl) {
-      setToast({ msg: '请先填写 API Key 和 API Base URL', type: 'error' });
-      return;
+    const p = providers.find(x => x.providerId === selectedId);
+    if (p) {
+      setEditKey('');
+      setEditModels(p.models || []);
+      setEditPriority(p.priority || 0);
+      setEditMaxRpm(60);
+      setDetectedModels([]);
     }
-    setModelsLoading(true);
+  }, [selectedId, providers]);
+
+  const selected = providers.find(x => x.providerId === selectedId);
+
+  const handleSave = async () => {
+    if (!selected) return;
+    setSaving(true);
     try {
-      const baseUrl = newKey.apiBaseUrl.replace(/\/+$/, '');
-      const res = await fetch(`${baseUrl}/v1/models`, {
-        headers: { 'Authorization': `Bearer ${newKey.apiKey}` },
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const list: ModelInfo[] = data.data || data.models || [];
-      setModels(list);
-      setSelectedModels([]);
-      setNewKey({ ...newKey, apiModel: '' });
-    } catch (e) {
-      setToast({ msg: `获取模型列表失败: ${e instanceof Error ? e.message : '未知错误'}`, type: 'error' });
-      setModels([]);
-    } finally {
-      setModelsLoading(false);
-    }
+      const data: any = { priority: editPriority, max_rpm: editMaxRpm, models: editModels };
+      if (editKey) data.api_key = editKey;
+      if (selected.isConfigured) {
+        await providersApi.update(selected.providerId, data);
+      } else {
+        await providersApi.add({ provider_id: selected.providerId, name: selected.name, api_host: selected.apiHost, ...data });
+      }
+      setToast({ msg: '保存成功', type: 'success' });
+      await load();
+    } catch (e) { setToast({ msg: e instanceof Error ? e.message : '保存失败', type: 'error' }); }
+    finally { setSaving(false); }
   };
 
-  const toggleModel = (modelId: string) => {
-    let updated: string[];
-    if (selectedModels.includes(modelId)) {
-      updated = selectedModels.filter((m) => m !== modelId);
-    } else {
-      updated = [...selectedModels, modelId];
-    }
-    setSelectedModels(updated);
-    setNewKey({ ...newKey, apiModel: updated.join(',') });
+  const handleCheck = (model?: string) => {
+    if (!selected) return;
+    setShowCheckModelPicker(false);
+    setChecking(true);
+    const testModel = model || (editModels.length > 0 ? editModels[0] : '');
+    if (!testModel) { setShowCheckModelPicker(true); setChecking(false); return; }
+    providersApi.check(selected.providerId, testModel).then(r => {
+      setToast(r.data.status === 'ok'
+        ? { msg: `${testModel} ✅ ${r.data.latency_ms}ms`, type: 'success' }
+        : { msg: r.data.message || `${testModel} ❌ 连接失败`, type: 'error' });
+    }).catch(() => setToast({ msg: `${testModel} ❌ 连接失败`, type: 'error' }))
+    .finally(() => setChecking(false));
   };
 
-  const selectAllModels = () => {
-    const all = models.map((m) => m.id);
-    setSelectedModels(all);
-    setNewKey({ ...newKey, apiModel: all.join(',') });
+  const handleCheckClick = () => {
+    if (!selected) return;
+    if (editModels.length === 0) { setShowCheckModelPicker(true); return; }
+    if (editModels.length === 1) { handleCheck(editModels[0]); return; }
+    setShowCheckModelPicker(true);
   };
 
-  const [createError, setCreateError] = useState('');
-  const [creating, setCreating] = useState(false);
+  const handleToggle = async () => {
+    if (!selected) return;
+    try { await providersApi.update(selected.providerId, { is_enabled: !selected.isEnabled }); await load(); } catch { /* */ }
+  };
 
-  const handleCreate = async () => {
-    setCreating(true);
-    setCreateError('');
+  const handleDelete = async () => {
+    if (!selected) return;
+    setConfirmDelete(false);
+    try { await providersApi.delete(selected.providerId); setSelectedId(null); await load(); }
+    catch { setToast({ msg: '删除失败', type: 'error' }); }
+  };
+
+  const handleDetectModels = async () => {
+    if (!selected) return;
+    setDetecting(true);
+    setDetectedModels([]);
     try {
-      await keysApi.create(newKey);
-      setShowCreate(false);
-      setNewKey({ keyName: '', apiKey: '', apiBaseUrl: '', apiModel: '', priority: 0, maxRpm: 60 });
-      setModels([]);
-      setSelectedModels([]);
-      loadKeys();
-    } catch (e) {
-      setCreateError(e instanceof Error ? e.message : '创建失败');
-    } finally {
-      setCreating(false);
-    }
+      const res = await providersApi.detectModels(selected.providerId, editKey || undefined);
+      const models = res.data?.models || [];
+      setDetectedModels(models);
+      if (models.length > 0) setShowModelSelector(true);
+      else setToast({ msg: '未检测到模型', type: 'error' });
+    } catch { setToast({ msg: '检测失败', type: 'error' }); }
+    finally { setDetecting(false); }
   };
 
-  const handleDelete = (id: number) => {
-    setConfirmModal({
-      open: true,
-      title: '确认删除',
-      message: '确认删除该 API Key？',
-      onConfirm: async () => {
-        setConfirmModal(prev => ({ ...prev, open: false }));
-        try {
-          await keysApi.delete(id);
-          loadKeys();
-        } catch (e) {
-          console.error('删除失败:', e);
-          setToast({ msg: '删除失败', type: 'error' });
-        }
-      },
-    });
+  const handleModelsConfirm = (models: string[]) => {
+    setEditModels(models);
+    setShowModelSelector(false);
+    setToast({ msg: `已选择 ${models.length} 个模型`, type: 'success' });
   };
 
-  const handleTest = async (id: number) => {
+  const [newP, setNewP] = useState({ provider_id: '', name: '', api_host: '', api_key: '' });
+  const [adding, setAdding] = useState(false);
+  const handleAdd = async () => {
+    setAdding(true);
     try {
-      const result = await keysApi.test(id);
-      setToast({ msg: result.message, type: 'success' });
-    } catch {
-      setToast({ msg: '测试失败', type: 'error' });
-    }
-  };
-
-  const handleToggleActive = async (key: ApiKey) => {
-    try {
-      await keysApi.update(key.id, { ...key, isActive: !key.isActive });
-      loadKeys();
-    } catch (e) {
-      console.error('更新失败:', e);
-    }
+      await providersApi.add({ ...newP, api_model: '', priority: 0, max_rpm: 60 });
+      setShowAdd(false); setNewP({ provider_id: '', name: '', api_host: '', api_key: '' }); await load();
+    } catch (e) { setToast({ msg: e instanceof Error ? e.message : '添加失败', type: 'error' }); }
+    finally { setAdding(false); }
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <GlassPanel style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-        <div className="card-title" style={{ justifyContent: 'space-between' }}>
-          API Key 管理
-          <button
-            onClick={() => { setShowCreate(true); setModels([]); setSelectedModels([]); }}
-            className="btn-primary"
-            style={{ fontSize: 12, padding: '6px 12px' }}
-          >
-            + 添加 Key
-          </button>
+    <div style={{ display: 'flex', flex: 1, minHeight: 0, gap: 0, height: '100%' }}>
+      {/* Left Sidebar */}
+      <div style={{ width: 260, flexShrink: 0, background: 'var(--bg-panel)', borderRight: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>模型服务</span>
+          <button onClick={() => setShowAdd(true)} style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: 'var(--accent-blue)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>+</button>
         </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+          {providers.map(p => {
+            const active = p.providerId === selectedId;
+            return (
+              <div key={p.providerId} onClick={() => setSelectedId(p.providerId)} style={{
+                padding: '9px 14px', cursor: 'pointer',
+                background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
+                borderLeft: active ? '3px solid var(--accent-blue)' : '3px solid transparent',
+                display: 'flex', alignItems: 'center', gap: 10,
+              }}>
+                <div style={{ width: 28, height: 28, borderRadius: 6, background: p.isConfigured ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: p.isConfigured ? 'var(--accent-green)' : 'var(--text-tertiary)' }}>{p.name[0]}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? 'var(--text-primary)' : 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 1 }}>{p.isConfigured ? (p.apiKeyMasked || '已配置') : '未配置'}{p.models?.length > 0 ? ` · ${p.models.length}个模型` : ''}</div>
+                </div>
+                {p.isConfigured && !p.isEnabled && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(248,113,113,0.15)', color: 'var(--accent-red)' }}>禁用</span>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
-        {loading ? (
-          <div style={{ padding: 40, textAlign: 'center' }}>
-            <LoadingSpinner />
-          </div>
-        ) : keys.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
-            暂无API Key，请添加
-          </div>
+      {/* Right Panel */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+        {!selected ? (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>选择一个供应商进行配置</div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-secondary)' }}>名称</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-secondary)' }}>Key</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-secondary)' }}>模型</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-secondary)' }}>优先级</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-secondary)' }}>RPM</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-secondary)' }}>状态</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-secondary)' }}>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {keys.map((key) => (
-                  <tr key={key.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <td style={{ padding: '8px 12px', fontWeight: 500 }}>{key.keyName}</td>
-                    <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 11 }}>{key.apiKey}</td>
-                    <td style={{ padding: '8px 12px' }}>{key.apiModel}</td>
-                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>{key.priority}</td>
-                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                      <span style={key.currentRpm >= key.maxRpm ? { color: 'var(--accent-red)' } : {}}>
-                        {key.currentRpm}/{key.maxRpm}
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                      <span
-                        onClick={() => handleToggleActive(key)}
-                        style={{
-                          padding: '2px 8px', borderRadius: 4, cursor: 'pointer',
-                          background: key.isActive ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)',
-                          color: key.isActive ? 'var(--accent-green)' : 'var(--accent-red)',
-                          fontSize: 11,
-                        }}
-                      >
-                        {key.isActive ? '启用' : '禁用'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                      <button
-                        onClick={() => handleTest(key.id)}
-                        style={{
-                          marginRight: 6, padding: '4px 8px', borderRadius: 4,
-                          background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
-                          color: 'var(--accent-blue)', cursor: 'pointer', fontSize: 11,
-                        }}
-                      >
-                        测试
-                      </button>
-                      <button
-                        onClick={() => handleDelete(key.id)}
-                        style={{
-                          padding: '4px 8px', borderRadius: 4,
-                          background: 'rgba(248,113,113,0.1)',
-                          border: '1px solid rgba(248,113,113,0.2)',
-                          color: 'var(--accent-red)',
-                          cursor: 'pointer', fontSize: 11,
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        删除
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </GlassPanel>
-
-      {showCreate && createPortal(
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 9999,
-        }}>
-          <div className="card" style={{ width: 460, maxHeight: '85vh', overflow: 'auto' }}>
-            <div className="card-title">添加 API Key</div>
-
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                名称
-              </label>
-              <input
-                value={newKey.keyName}
-                onChange={(e) => setNewKey({ ...newKey, keyName: e.target.value })}
-                placeholder="如：DeepSeek-1"
-                style={inputStyle}
-              />
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                API Key
-              </label>
-              <input
-                type="password"
-                value={newKey.apiKey}
-                onChange={(e) => setNewKey({ ...newKey, apiKey: e.target.value })}
-                placeholder="sk-xxxxxxxxxxxxxxxx"
-                style={inputStyle}
-              />
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                API Base URL
-              </label>
-              <input
-                value={newKey.apiBaseUrl}
-                onChange={(e) => setNewKey({ ...newKey, apiBaseUrl: e.target.value })}
-                placeholder="https://api.deepseek.com"
-                style={inputStyle}
-              />
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <button
-                onClick={fetchModels}
-                disabled={!newKey.apiKey || !newKey.apiBaseUrl || modelsLoading}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px',
-                  borderRadius: 6, fontSize: 12, cursor: 'pointer',
-                  background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)',
-                  color: 'var(--accent-blue)', fontFamily: 'inherit',
-                  opacity: (!newKey.apiKey || !newKey.apiBaseUrl || modelsLoading) ? 0.5 : 1,
-                }}
-              >
-                {modelsLoading ? (
-                  <><LoadingSpinner /> 获取中...</>
-                ) : (
-                  <><i className="fa-solid fa-download" style={{ fontSize: 11 }} /> 获取模型列表</>
+          <div style={{ maxWidth: 520 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: selected.isConfigured ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, color: selected.isConfigured ? 'var(--accent-green)' : 'var(--text-tertiary)' }}>{selected.name[0]}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>{selected.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{selected.apiHost}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {selected.isConfigured && (
+                  <button onClick={handleCheckClick} disabled={checking} style={{ padding: '6px 14px', borderRadius: 6, fontSize: 12, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: 'var(--accent-blue)', cursor: 'pointer', fontFamily: 'inherit', opacity: checking ? 0.5 : 1 }}>{checking ? '检查中...' : '检查连接'}</button>
                 )}
-              </button>
+                <button onClick={handleToggle} style={{ padding: '6px 14px', borderRadius: 6, fontSize: 12, background: selected.isEnabled ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', border: `1px solid ${selected.isEnabled ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`, color: selected.isEnabled ? 'var(--accent-green)' : 'var(--accent-red)', cursor: 'pointer', fontFamily: 'inherit' }}>{selected.isEnabled ? '已启用' : '已禁用'}</button>
+              </div>
             </div>
 
-            {models.length > 0 && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                    选择模型 <span style={{ color: 'var(--accent-blue)' }}>({selectedModels.length}/{models.length})</span>
-                  </label>
-                  <span
-                    onClick={selectAllModels}
-                    style={{ fontSize: 11, color: 'var(--accent-blue)', cursor: 'pointer' }}
-                  >
-                    全选
-                  </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={labelStyle}>API Key</label>
+                <input type="password" value={editKey} onChange={e => setEditKey(e.target.value)} placeholder={selected.hasApiKey ? '已设置（留空保持不变）' : '请输入 API Key'} style={inputStyle} />
+                {selected.hasApiKey && <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>当前: {selected.apiKeyMasked}</div>}
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>模型 ({editModels.length})</label>
+                  <button onClick={handleDetectModels} disabled={detecting || !selected.isConfigured} style={{ padding: '3px 10px', borderRadius: 4, fontSize: 11, cursor: 'pointer', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: 'var(--accent-blue)', fontFamily: 'inherit', opacity: (detecting || !selected.isConfigured) ? 0.5 : 1 }}>{detecting ? '检测中...' : '模型检测'}</button>
                 </div>
-                <div style={{
-                  border: '1px solid var(--border)', borderRadius: 6, maxHeight: 180, overflowY: 'auto',
-                }}>
-                  {models.map((m) => (
-                    <div
-                      key={m.id}
-                      onClick={() => toggleModel(m.id)}
-                      style={{
-                        padding: '7px 12px', fontSize: 12, cursor: 'pointer',
-                        background: selectedModels.includes(m.id) ? 'rgba(59,130,246,0.1)' : 'transparent',
-                        borderBottom: '1px solid var(--border-light)',
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        color: selectedModels.includes(m.id) ? 'var(--accent-blue)' : 'var(--text-primary)',
-                      }}
-                    >
-                      <span style={{
-                        width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                        border: `1px solid ${selectedModels.includes(m.id) ? 'var(--accent-blue)' : 'var(--border)'}`,
-                        background: selectedModels.includes(m.id) ? 'var(--accent-blue)' : 'transparent',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        {selectedModels.includes(m.id) && (
-                          <i className="fa-solid fa-check" style={{ fontSize: 8, color: '#fff' }} />
-                        )}
-                      </span>
-                      <span style={{ fontFamily: 'monospace' }}>{m.id}</span>
-                      {m.owned_by && (
-                        <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-tertiary)' }}>{m.owned_by}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                {editModels.length > 0 ? (
+                  <div style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', maxHeight: 120, overflowY: 'auto' }}>
+                    {editModels.map(m => (
+                      <div key={m} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', fontSize: 12, color: 'var(--text-primary)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <span>{m}</span>
+                        <button onClick={() => setEditModels(prev => prev.filter(x => x !== m))} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 14 }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ padding: '12px', borderRadius: 6, textAlign: 'center', background: 'rgba(0,0,0,0.1)', border: '1px dashed var(--border)', color: 'var(--text-tertiary)', fontSize: 12, cursor: 'pointer' }} onClick={handleDetectModels}>点击「模型检测」获取可用模型</div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div style={{ flex: 1 }}><label style={labelStyle}>优先级 (越小越优先)</label><input type="number" value={editPriority} onChange={e => setEditPriority(Number(e.target.value))} style={inputStyle} /></div>
+                <div style={{ flex: 1 }}><label style={labelStyle}>RPM 限制</label><input type="number" value={editMaxRpm} onChange={e => setEditMaxRpm(Number(e.target.value))} style={inputStyle} /></div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <button onClick={handleSave} disabled={saving} style={{ padding: '8px 24px', borderRadius: 6, fontSize: 13, fontWeight: 500, background: 'var(--accent)', border: 'none', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', opacity: saving ? 0.5 : 1 }}>{saving ? '保存中...' : '保存'}</button>
+                {selected.isConfigured && <button onClick={() => setConfirmDelete(true)} style={{ padding: '8px 18px', borderRadius: 6, fontSize: 13, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--accent-red)', cursor: 'pointer', fontFamily: 'inherit' }}>移除</button>}
+              </div>
+            </div>
+
+            {(selected.website || selected.keyUrl) && (
+              <div style={{ marginTop: 24, padding: '10px 14px', borderRadius: 8, background: 'rgba(0,0,0,0.1)', fontSize: 11, color: 'var(--text-tertiary)' }}>
+                {selected.website && <span style={{ marginRight: 16 }}>官网: <a href={selected.website} target="_blank" rel="noopener" style={{ color: 'var(--accent-blue)' }}>{selected.website}</a></span>}
+                {selected.keyUrl && <span>获取 Key: <a href={selected.keyUrl} target="_blank" rel="noopener" style={{ color: 'var(--accent-blue)' }}>{selected.keyUrl}</a></span>}
               </div>
             )}
+          </div>
+        )}
+      </div>
 
-            <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-              <div style={{ width: 80 }}>
-                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                  优先级
-                </label>
-                <input
-                  type="number"
-                  value={newKey.priority}
-                  onChange={(e) => setNewKey({ ...newKey, priority: Number(e.target.value) })}
-                  style={inputStyle}
-                />
+      {/* Add Custom Provider Modal */}
+      {showAdd && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 24, border: '1px solid var(--border)', width: 420 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>添加自定义供应商</div>
+            {[
+              { label: 'ID', key: 'provider_id', placeholder: '如 my-api' },
+              { label: '名称', key: 'name', placeholder: '如 My API' },
+              { label: 'API Host', key: 'api_host', placeholder: 'https://api.example.com' },
+              { label: 'API Key', key: 'api_key', placeholder: 'sk-xxx', type: 'password' },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 12 }}>
+                <label style={labelStyle}>{f.label}</label>
+                <input type={(f as any).type || 'text'} value={(newP as any)[f.key]} onChange={e => setNewP({ ...newP, [f.key]: e.target.value })} placeholder={f.placeholder} style={inputStyle} />
               </div>
-              <div style={{ width: 80 }}>
-                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                  RPM
-                </label>
-                <input
-                  type="number"
-                  value={newKey.maxRpm}
-                  onChange={(e) => setNewKey({ ...newKey, maxRpm: Number(e.target.value) })}
-                  style={inputStyle}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 16 }}>
-              {createError && (
-                <div style={{
-                  flex: 1, padding: '6px 10px', borderRadius: 6, fontSize: 12,
-                  background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)',
-                  color: 'var(--accent-red)',
-                }}>
-                  {createError}
-                </div>
-              )}
-              <button
-                onClick={() => setShowCreate(false)}
-                style={{ padding: '8px 16px', borderRadius: 6, background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)', fontSize: 13, cursor: 'pointer' }}
-              >
-                取消
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={creating || !newKey.keyName || !newKey.apiKey || !newKey.apiBaseUrl || selectedModels.length === 0}
-                className="btn-primary"
-                style={{ opacity: (creating || !newKey.keyName || !newKey.apiKey || !newKey.apiBaseUrl || selectedModels.length === 0) ? 0.5 : 1 }}
-              >
-                {creating ? '创建中...' : '创建'}
-              </button>
+            ))}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button onClick={() => setShowAdd(false)} style={{ padding: '7px 16px', borderRadius: 6, fontSize: 13, background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit' }}>取消</button>
+              <button onClick={handleAdd} disabled={adding || !newP.provider_id || !newP.name || !newP.api_host} style={{ padding: '7px 16px', borderRadius: 6, fontSize: 13, background: 'var(--accent)', border: 'none', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', opacity: (adding || !newP.provider_id || !newP.name || !newP.api_host) ? 0.5 : 1 }}>{adding ? '添加中...' : '添加'}</button>
             </div>
           </div>
-        </div>,
-        document.body
+        </div>, document.body
       )}
-      <InlineConfirmModal
-        open={confirmModal.open}
-        title={confirmModal.title}
-        message={confirmModal.message}
-        onConfirm={confirmModal.onConfirm}
-        onCancel={() => setConfirmModal(prev => ({ ...prev, open: false }))}
-      />
+
+      {/* Model Selector */}
+      <ModelSelector open={showModelSelector} onClose={() => setShowModelSelector(false)} selectedModels={editModels} availableModels={detectedModels} onConfirm={handleModelsConfirm} title={`${selected?.name || ''} 模型`} />
+
+      {/* Check Model Picker */}
+      {showCheckModelPicker && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 24, border: '1px solid var(--border)', width: 400 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12 }}>选择一个模型进行测试</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 300, overflowY: 'auto', marginBottom: 16 }}>
+              {(editModels.length > 0 ? editModels : selected?.models || []).map(m => (
+                <div key={m} onClick={() => handleCheck(m)} style={{ padding: '9px 12px', borderRadius: 6, cursor: 'pointer', background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-primary)', fontSize: 13, fontFamily: 'monospace' }}>{m}</div>
+              ))}
+            </div>
+            <button onClick={() => setShowCheckModelPicker(false)} style={{ padding: '7px 16px', borderRadius: 6, fontSize: 13, width: '100%', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit' }}>取消</button>
+          </div>
+        </div>, document.body
+      )}
+
+      <InlineConfirmModal open={confirmDelete} title="移除供应商" message={`确认移除 ${selected?.name}？`} onConfirm={handleDelete} onCancel={() => setConfirmDelete(false)} />
+
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 20, right: 20, padding: '10px 16px', borderRadius: 8, fontSize: 13, zIndex: 9999, background: toast.type === 'success' ? 'rgba(74,222,128,0.15)' : 'rgba(248,113,113,0.15)', border: `1px solid ${toast.type === 'success' ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`, color: toast.type === 'success' ? 'var(--accent-green)' : 'var(--accent-red)', backdropFilter: 'blur(10px)' }}>{toast.msg}</div>
+      )}
     </div>
   );
 }

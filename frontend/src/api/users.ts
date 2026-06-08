@@ -16,12 +16,12 @@ export interface UpdateUserInput {
 
 export const usersApi = {
   async list(): Promise<User[]> {
-    const res = await apiRequest<{ data: User[] }>('/api/users');
+    const res = await apiRequest<{ data: User[] }>('/api/admin/users');
     return res.data;
   },
 
   async update(id: number, input: UpdateUserInput): Promise<User> {
-    const res = await apiRequest<{ data: User }>(`/api/users/${id}`, {
+    const res = await apiRequest<{ data: User }>(`/api/admin/users/${id}`, {
       method: 'PUT',
       body: JSON.stringify(input),
     });
@@ -29,6 +29,6 @@ export const usersApi = {
   },
 
   async delete(id: number): Promise<void> {
-    await apiRequest(`/api/users/${id}`, { method: 'DELETE' });
+    await apiRequest(`/api/admin/users/${id}`, { method: 'DELETE' });
   },
 };

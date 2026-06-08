@@ -1,24 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { NAV_ITEMS, ROUTES } from '../../utils/constants';
+import { NAV_ITEMS } from '../../utils/constants';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useWorkflowStore } from '../../store/useWorkflowStore';
 import { sidebarApi, type SidebarStats } from '../../api/sidebar';
+
+const _PHASE_LABELS: Record<string, string> = {
+  demand_portrait: '需求画像',
+  problem_modeling: '问题建模',
+  patent_search: '专利检索',
+  solution_gen: '方案生成',
+  evaluation: '方案评估',
+};
 
 export function Sidebar() {
   const location = useLocation();
   const isAdmin = useAuthStore((s) => s.isAdmin);
   const [stats, setStats] = useState<SidebarStats | null>(null);
+  const { currentPhase, isRunning } = useWorkflowStore();
 
   useEffect(() => {
     sidebarApi.getStats().then(setStats).catch(() => {});
   }, []);
 
   const items = [
-    ...NAV_ITEMS.filter((item) => !(item.path === ROUTES.MONITOR && !isAdmin)),
-    ...(isAdmin ? [
-      { label: 'Key管理', path: '/admin/keys', icon: 'fa-key' },
-      { label: '用户管理', path: '/admin/users', icon: 'fa-users' },
-    ] : []),
+    ...NAV_ITEMS.filter((item) => !((item.path as string) === '/monitor' && !isAdmin)),
   ];
 
   return (
@@ -42,18 +48,59 @@ export function Sidebar() {
             >
               <i className={`fa-solid ${item.icon}`} style={{ width: 16, textAlign: 'center', fontSize: 12 }} />
               <span>{item.label}</span>
-              {(item.path.startsWith('/admin') || item.path === ROUTES.MONITOR) && isAdmin && (
-                <span style={{
-                  marginLeft: 'auto', fontSize: 9, padding: '1px 5px',
-                  background: 'rgba(251,191,36,0.15)', color: 'var(--accent-yellow)',
-                  borderRadius: 3,
-                }}>
-                  Admin
-                </span>
-              )}
             </Link>
           );
         })}
+
+        {/* 工作流进度 */}
+        {isRunning && (
+          <div style={{ marginTop: 8, borderTop: '1px solid var(--border-light)', paddingTop: 8 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6, fontWeight: 600 }}>
+              流程进度
+            </div>
+            {Object.entries(_PHASE_LABELS).map(([phase, label]) => {
+              const isCurrent = phase === currentPhase;
+              const isDone = Object.keys(_PHASE_LABELS).indexOf(phase) < Object.keys(_PHASE_LABELS).indexOf(currentPhase);
+              return (
+                <div key={phase} style={{
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px',
+                  fontSize: 11, color: isCurrent ? 'var(--accent-blue)' : isDone ? 'var(--accent-green)' : 'var(--text-tertiary)',
+                }}>
+                  <i className={`fa-solid ${isDone ? 'fa-check-circle' : isCurrent ? 'fa-spinner fa-spin' : 'fa-circle'}`}
+                    style={{ fontSize: 8 }} />
+                  <span>{label}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* 管理员模块 */}
+        {isAdmin && (
+          <div style={{ marginTop: 8, borderTop: '1px solid var(--border-light)', paddingTop: 8 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6, fontWeight: 600 }}>
+              管理员
+            </div>
+            {[
+              { label: '模型服务', path: '/admin/keys', icon: 'fa-server' },
+              { label: '用户管理', path: '/admin/users', icon: 'fa-users' },
+              { label: '数据监控', path: '/monitor', icon: 'fa-chart-line' },
+            ].map((item) => {
+              const active = location.pathname === item.path;
+              return (
+                <Link key={item.path} to={item.path} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px',
+                  borderRadius: 8, textDecoration: 'none', fontSize: 12,
+                  color: active ? '#fff' : 'var(--text-secondary)',
+                  background: active ? 'var(--accent)' : 'transparent',
+                }}>
+                  <i className={`fa-solid ${item.icon}`} style={{ width: 14, textAlign: 'center', fontSize: 11 }} />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </nav>
 
       {/* System Status */}
