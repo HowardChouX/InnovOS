@@ -2,6 +2,7 @@
 AI客户端
 
 支持企业级Key池轮询、并发控制、自动切换和限流重试。
+支持 Provider 感知路由：按 provider_id 选择 Key，并从 model_service 解析 base_url。
 """
 
 import asyncio
@@ -18,14 +19,40 @@ def pick_model(api_model: str) -> str:
     return random.choice(models) if models else "deepseek-chat"
 
 
+def _resolve_base_url(key_config: dict, provider_id: str = "") -> str:
+    """解析 API base_url
+
+    优先级：
+    1. key_config 中的 api_base_url（显式配置）
+    2. model_service 中的 provider api_host（按 provider_id 查询）
+    3. 默认 deepseek
+    """
+    # 如果 key 有显式配置的 url，直接使用
+    if key_config.get("api_base_url"):
+        return key_config["api_base_url"]
+
+    # 从 model_service 解析
+    if provider_id:
+        try:
+            from app.algorithm.model_service import model_service
+            provider = model_service.get(provider_id)
+            if provider and provider.get("apiHost"):
+                return provider["apiHost"]
+        except Exception:
+            pass
+
+    return "https://api.deepseek.com"
+
+
 async def chat_completion(
     system_prompt: str = "",
     user_prompt: str = "",
     temperature: float = 0.3,
     response_format: type = str,
     max_retries: int = 3,
+    provider_id: str = "",
 ) -> Any:
-    """带自动Key切换的AI调用
+    """带自动Key切换的AI调用（Provider 感知）
 
     Args:
         system_prompt: 系统提示词
@@ -33,6 +60,7 @@ async def chat_completion(
         temperature: 温度参数
         response_format: 返回格式（str 或 dict）
         max_retries: 最大重试次数
+        provider_id: 指定供应商ID，为空则轮询所有可用Key
 
     Returns:
         AI返回的内容
@@ -43,16 +71,17 @@ async def chat_completion(
     last_error = None
 
     for attempt in range(max_retries):
-        # 获取并发许可
         await key_manager.acquire()
         key_config = None
         try:
-            # 获取可用Key
-            key_config = await key_manager.get_key_for_request()
+            key_config = await key_manager.get_key_for_request(provider_id)
+
+            # Provider 感知路由：解析 base_url
+            base_url = _resolve_base_url(key_config, provider_id)
 
             client = OpenAI(
                 api_key=key_config["api_key"],
-                base_url=key_config["api_base_url"]
+                base_url=base_url,
             )
 
             messages = []
@@ -71,7 +100,6 @@ async def chat_completion(
             resp = client.chat.completions.create(**kwargs)
             content = resp.choices[0].message.content
 
-            # 记录使用次数
             if key_config["id"]:
                 key_manager.record_usage(key_config["id"])
 
@@ -85,20 +113,16 @@ async def chat_completion(
 
             if key_config and key_config.get("id"):
                 if "401" in error_msg or "403" in error_msg or "unauthorized" in error_msg or "invalid" in error_msg:
-                    # Key无效，禁用并重试
                     key_manager.mark_key_failed(key_config["id"], "401")
                     continue
                 elif "429" in error_msg or "rate" in error_msg or "too many" in error_msg:
-                    # 限流，标记并重试其他Key
                     key_manager.mark_key_failed(key_config["id"], "429")
                     await asyncio.sleep(1)
                     continue
                 elif "insufficient_quota" in error_msg or "exceeded" in error_msg:
-                    # 额度不足，禁用
                     key_manager.mark_key_failed(key_config["id"], "403")
                     continue
 
-            # 其他错误，等待后重试
             if attempt < max_retries - 1:
                 await asyncio.sleep(1)
                 continue

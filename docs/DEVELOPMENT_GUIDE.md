@@ -1,678 +1,576 @@
-# InnovOS 系统开发文档
+# InnovOS 重构文档
 
-## 项目概述
+**版本**：v3.0 | **更新**：2026-06-07 | **依据**：功能思维导图
 
-**InnovOS**（智融创新操作系统）是一款基于多Agent协同工作流的AI赋能创新问题求解系统，旨在解决传统创新工具难以满足高效率的行业痛点。
+---
 
-### 核心定位
-
-通过构建多Agent协同工作流，实现创新全流程智能赋能，让AI真正参与创新全过程，实现问题解决能力的系统化升级。
-
-### 行业痛点
-
-| 痛点 | 具体表现 |
-|------|--------|
-| **需求识别难** | 用户需求分散、真实痛点难识别；政策、产业、技术信息割裂；"想法"非"真需求" |
-| **创新方法门槛高** | TRIZ等方法偏专业周期长；团队掌握难、协同难；过度依赖少数专家个人经验 |
-| **方案生成与验证脱节** | 创意生成与验证相互分离；筛选与验证机制弱；从想法到方案耗时长；试错成本高 |
-| **成果转化难** | 缺乏政策、产业与供应链适配；专利、商业模式、项目之间缺少联动；创新成果难以沉淀 |
-
-### 痛点链条
+## 项目概览
 
 ```
-痛点链条 → 需求不清 → 方法复杂 → 生成慢 → 验证难
+InnovOS
+├── 使用指南
+├── 通知
+├── 账户
+└── 侧边栏
+    ├── 普通用户（首页 / 知识库 / 历史方案 / 专利转化）
+    └── 管理员  （+ 专利数据库管理 / 数据监控 / Key管理 / 用户管理）
 ```
 
-**解决方案**：亟需一套AI赋能的一体化创新系统，助力创新活动高效转化。
+**技术栈**：React 19 + TypeScript + Vite 8 + Zustand 5（前端）| FastAPI + SQLite（后端）
 
 ---
 
-## 系统架构
+## 一、使用指南
 
-### 核心机制
+### 1.1 需求
 
-InnovOS构建了四大核心机制：
+侧边栏顶部或 Header 中的「使用指南」链接 → 打开使用文档页面。
 
-| 机制 | 功能 | 价值 |
-|------|------|------|
-| **多模型协同机制** | 实现任务动态分工 | 让最适合的模型完成最适合的创新任务 |
-| **多Agent工作流机制** | 实现创新流程协同 | 支持复杂创新任务的全流程系统化支撑 |
-| **RAG专利增强机制** | 提升创新路径检索能力 | 专利路径有效召回率提升57.1% |
-| **创新质量评估机制** | 增强方案工程化能力 | 创新路径偏离率降低至6.5% |
+### 1.2 实现
 
-### 核心算法
-
-#### ZR-IPM 算法（智融创新问题映射算法）
-
-**英文全称**：Zhirong Innovation Problem Mapping
-
-**功能**：实现创新问题智能建模
-
-**核心特点**：
-- 传统创新方法"不会描述问题"：表达模糊、场景复杂、多目标冲突
-- ZR-IPM算法将TRIZ问题建模过程转化为**可计算、可推理的智能流程**
-
-**算法流程**：
-```
-多维语义解析 → 创新问题分类 → 方案路径映射 → 专利RAG增强 → 动态推理匹配 → 结构化问题建模
-```
-
-**算法效果**：
-- 问题建模准确率：**87.4%**
-- 平均问题解析时间：**2.17秒**
-
-**关键技术攻关**：
-- 2024.06：识别不同用户对同一问题存在多种表达方式
-- 2024.08：提出问题智能建模
-- 2024.10：多维语义特征提取与权重分析
-- 2025.01：问题目标、副作用与关键变量自动识别
-- 2025.03：算法原型验证
+| 项 | 文件 | 说明 |
+|----|------|------|
+| 新增页面 | `frontend/src/pages/GuidePage.tsx` | 静态帮助文档页，介绍 6-Agent 流程、知识库用法、专利检索、方案评估 |
+| 修改路由 | `frontend/src/routes/index.tsx` | 添加 `{ path: 'guide', element: <GuidePage /> }` |
+| 修改入口 | `frontend/src/components/layout/AppLayout.tsx` | Header「使用指南」span 绑定 `navigate('/guide')` |
 
 ---
 
-## 系统功能模块
+## 二、通知
 
-### 7大核心功能模块
-
-#### 1. 任务输入
-
-**系统自动识别**：
-- 核心目标
-- 技术对象
-- 场景约束
-- 潜在冲突
-
-**用户可**：
-- 修改问题描述
-- 补充约束条件
-- 调整创新目标
-
-#### 2. 问题智能建模
-
-**系统自动完成**：
-- 结构化创新问题模型
-
-**用户可**：
-- 修改问题结构
-- 调整核心矛盾
-- 删除无关因素
-- 确认创新方向
-
-#### 3. 多Agent协同推理
-
-**系统自动完成**：
-- 任务分工
-- 创新路径推理
-- 方案协同生成
-- 信息动态整合
-
-**用户可**：
-- 选择推理方向
-- 调整任务重点
-- 指定专业场景
-- 控制生成深度
-
-#### 4. 知识增强与专利推理
-
-**系统自动完成**：
-- 调用知识库进行知识增强分析
-
-**用户可**：
-- 收藏相关案例
-- 剔除低相关路径
-- 补充行业知识
-- 调整检索方向
-
-#### 5. 创新方案生成与动态优化
-
-**用户可**：
-- 重新生成方案
-- 合并多个方案
-- 修改关键参数
-- 调整实施条件
-
-#### 6. 成果转化输出
-
-**系统输出**：
-- 技术路线图
-- 专利草案
-- 项目方案书
-- 创新报告
-
-**用户可**：
-- 编辑内容
-- 修改格式
-- 增减模块
-- 一键导出成果
-
-#### 7. 用户反馈与持续学习
-
-**用户**：
-- 对方案进行评分
-- 标记有效/无效方案
-- 上传实际应用结果
-- 补充行业经验与案例
-
-**系统**：
-- 记录用户反馈
-- 优化问题建模逻辑
-- 调整创新路径推荐
-- 增强行业知识关联
-- 更新创新案例库
-
-### 核心理念
+### 2.1 功能清单
 
 ```
-采用"AI生成→用户校正→系统迭代"的人机协同机制
-让每一步输出都可编辑、可反馈、可优化
+通知
+├── 用户接收端
+│   ├── 读取 ✅ 已实现
+│   └── 删除 ✅ 已实现
+└── 管理员发送端
+    ├── 发送 ✅ 已实现
+    └── 撤销发送 ❌ 待实现
 ```
 
----
+### 2.2 现有实现
 
-## 四大创新点
+- **后端** `backend/app/api/notifications.py`：CRUD + 批量发送 + 已读 + 清空
+- **前端** `frontend/src/components/layout/AppLayout.tsx`：Header 通知下拉面板（本地 state）
+- **API** `frontend/src/api/notifications.ts`：完整端点封装
 
-### 创新点一：自主开发ZR-IPM算法
+### 2.3 待实现：撤销发送
 
-**目标**：实现创新问题智能建模
-
-**传统方法问题**：
-- 表达模糊
-- 场景复杂
-- 多目标冲突
-
-**算法效果**：
-- 问题建模准确率：87.4%
-- 平均问题解析时间：2.17秒
-
-**突破**：首次将TRIZ问题建模过程转化为可计算、可推理的智能流程
+| 项 | 文件 | 变更 |
+|----|------|------|
+| 表增加字段 | `backend/app/tables/notifications.py` | `ALTER TABLE notifications ADD COLUMN is_recalled INTEGER DEFAULT 0` |
+| 新增端点 | `backend/app/api/notifications.py` | `DELETE /api/notifications/{id}/recall`（Admin，软删除设 `is_recalled=1`） |
+| 修改列表查询 | `backend/app/api/notifications.py` | `list_notifications` 排除 `is_recalled=1` 的记录 |
+| 新增已发列表 | `backend/app/api/notifications.py` | `GET /api/notifications/sent`（Admin，含撤销选项） |
+| 前端 API | `frontend/src/api/notifications.ts` | 新增 `recall(id)` 和 `getSentNotifications()` |
+| 前端 UI | `frontend/src/components/layout/AppLayout.tsx` | 通知面板增加「已发送」Tab + 每条通知的「撤销」按钮 |
 
 ---
 
-### 创新点二：自主构建ZR-MoA架构
+## 三、账户
 
-**目标**：实现多模型专业分工与协同增强
+### 3.1 功能清单
 
-**单模型架构存在的问题**：
-- 小任务调用高性能模型，推理成本高
-- 检索、推理、生成任务混杂，效率低
-- 长链路任务容易出现推理断裂
-
-**ZR-MoA架构组成**：
 ```
-主模型 + 专业模型 + Embedding 协同架构
+账户
+├── 类型
+│   ├── 管理员 ✅（users.role = 'admin'）
+│   └── 普通用户 ✅（users.role = 'user'）
+├── 注册 → 手机号注册 ⏳ 暂不实现（无 SMS 服务）
+├── 找回密码 → 手机号验证码找回 ⏳ 暂不实现
+└── 数据绑定账户 ⏳ 待实现
 ```
 
-**主模型**：DeepSeek-R1
-- 具备较强链式推理与复杂任务分析能力
-- 适合创新问题长链路推理场景
+### 3.2 账户设置（本次实现）
 
-**专业模型层**：
-| 模型 | 任务 | 说明 |
-|------|------|------|
-| Qwen-Turbo | 需求洞察 | NLP理解、信息提取任务简单，不需要高性能模型 |
-| DeepSeek-R1 | 问题建模Agent | ZR-IPM算法需要强推理与复杂逻辑 |
-| BGE-M3 | 专利分析 | 专利向量化，多场景语义匹配 |
-| Qwen-Max | 方案生成 | 长文本生成，与工程化表达效果很好 |
-| DeepSeek-R1 | 方案评估 | 评估更依赖推理能力 |
-| Qwen-Max | 成果转化 | 中文长文本、结构化输出很适合 |
+| 项 | 文件 | 变更 |
+|----|------|------|
+| 新增端点 | `backend/app/api/auth.py` | `PUT /api/auth/profile`（修改用户名） |
+| 新增端点 | `backend/app/api/auth.py` | `PUT /api/auth/password`（修改密码，验证当前密码） |
+| 前端 API | `frontend/src/api/auth.ts` | 新增 `updateProfile()` 和 `changePassword()` |
+| 新增页面 | `frontend/src/pages/AccountSettingsPage.tsx` | 显示用户名/角色/创建时间 + 修改用户名表单 + 修改密码表单 |
+| 新增路由 | `frontend/src/routes/index.tsx` | `{ path: 'account', element: <AccountSettingsPage /> }` |
+| 用户菜单 | `frontend/src/components/layout/AppLayout.tsx` | 下拉菜单增加「账户设置」入口 |
 
-**InnovOS解决思路**：
-- 多模型动态路由
-- 多Agent协同工作流
-- Embedding + RAG 向量检索增强、知识库支撑、上下文增强
+### 3.3 手机号注册 / 密码找回（预留）
 
-**性能提升**：
-- 平均Token消耗：降低 **32.8%**
-- 平均响应时间：降低 **47.8%**
-
-**核心理念**：让最适合的模型，完成最适合的创新任务
+需要接入 SMS 服务商后再实现：
+- `POST /api/auth/register-phone` — 手机号 + 验证码注册
+- `POST /api/auth/send-code` — 发送短信验证码
+- `POST /api/auth/reset-password` — 验证码 + 新密码重置
 
 ---
 
-### 创新点三：构建创新知识库
+## 四、侧边栏
 
-**目标**：实现中国场景下的创新能力增强
+### 4.1 导航结构（角色区分）
 
-**通用模型存在的问题**：
-- 缺少中国创新场景数据
-- 不理解真实工程问题
-- 创新路径检索能力有限
-
-**知识库构成**：
-
-#### 1. 中国专利知识库
-- 数据来源：国家公开专利数据库
-- 当前规模：**10万+** 中国专利案例
-- 技术实现：Patent-RAG，Embedding向量化，语义检索增强
-
-#### 2. 中国场景专业知识库
-- 资源分析 → 核心痛点 → 政策导向 → 技术趋势
-- 当前规模：**3000+** 案例
-- 覆盖领域：制造、电力、新能源等领域
-- 让系统从中国实践出发
-
-#### 3. 企业真实问题场景库
-- 数据来源：创新创业培训与企业实践过程中
-  - 脱敏问题场景
-  - 创新需求
-  - 技术瓶颈
-- 当前规模：**5000+**
-- 包含完整问题解决过程
-
-**InnovOS知识中台**：
 ```
-融合向量化检索 + 知识图谱 + RAG增强
+侧边栏
+├── 普通用户导航
+│   ├── 首页        /
+│   ├── 知识库      /knowledge
+│   ├── 历史方案    /history          ← 新增
+│   ├── 专利转化    /patent-conversion ← 新增
+│   └── 专利检索    /patents
+└── 管理员追加导航
+    ├── 专利数据库管理  /admin/patents  ← 新增
+    ├── 数据监控        /monitor
+    ├── Key管理         /admin/keys
+    └── 用户管理        /admin/users
 ```
 
-**知识库能力效果**：
-| 指标 | 使用通用模型 | 使用InnovOS | 改变幅度 |
-|------|------------|-----------|--------|
-| 专利路径有效召回率 | 54.8% | **86.1%** | ↑ 57.1% |
-| 平均问题解析时间 | 45.2秒 | **23.6秒** | ↓ 47.8% |
-| 结构化方案输出率 | 63.5% | **91.2%** | ↑ 43.6% |
+### 4.2 实现
 
-**突破**：通过真实创新知识增强，有效降低通用大模型"幻觉"问题
+| 项 | 文件 | 变更 |
+|----|------|------|
+| 导航配置 | `frontend/src/utils/constants.ts` | 拆分 `USER_NAV_ITEMS` + `ADMIN_NAV_ITEMS`，删除旧 placeholder 路由 |
+| 侧边栏 | `frontend/src/components/layout/Sidebar.tsx` | 按角色渲染两组导航项 |
+| 路由 | `frontend/src/routes/index.tsx` | 新增 `/history`、`/patent-conversion`、`/admin/patents`；删除 `/solutions`、`/evaluation`、`/results` 占位路由 |
 
----
+### 4.3 侧边栏状态机
 
-### 创新点四：构建创新质量评估机制
+在侧边栏中显示当前任务的分析进度（替代右侧 `AgentWorkflowPanel`）：
 
-**目标**：实现AI方案工程化优化
+```
+侧边栏状态机
+├── 知识库分析
+│   └── 知识库RAG检索 → 检索总结
+├── 需求洞察
+│   ├── 七维度资源分析
+│   ├── IFR理想解
+│   ├── 九屏幕分析
+│   ├── 金鱼法
+│   ├── STC算子
+│   ├── 需求洞察思维工具
+│   └── 目标需求（★用户打分）
+├── 问题建模
+│   ├── 组件超组件分析
+│   ├── 因果链分析
+│   ├── 功能分析
+│   ├── 矛盾分析（物理矛盾→4分离原理 / 技术矛盾→40原理）
+│   ├── 裁剪分析（A功能消除 / B自我功能 / C功能转移同类 / D功能转移超类）
+│   ├── 进化趋势分析
+│   └── 创新方向（★用户打分 + 可视化）
+├── 专利检索
+│   └── 检索筛选高相关度专利 → 用户★打分
+├── 方案生成
+│   └── 结合知识库+目标需求+创新方向+专利 → 多方案 → 用户★打分
+└── 方案评估（标准）
+    ├── 满足用户需求（★）
+    ├── 知识库重要信息AI评分（★）
+    ├── 专利评估（★）
+    └── 方案生成（★）
+```
 
-**为什么需要质量评估机制**：
-- 通用模型存在的问题：创新路径偏离真实需求
-
-**InnovOS解决思路**：
-通过：
-- 多Agent交叉校验
-- 创新路径一致性分析
-- 工程约束推理
-- 专利相似度评估
-
-实现创新方案动态优化
-
-**四维评估引擎**：
-
-#### 1. 创新性评估引擎
-**技术实现**：
-- 专利相似度匹配
-- 技术演化分析
-- 创新性评分模型
-
-#### 2. 工程可行性评估引擎
-**技术实现**：
-- 约束条件推理
-- 规则约束校验
-- 场景适配分析
-
-#### 3. 推理完整性评估引擎
-**技术实现**：
-- 推理链校验
-- 多Agent交叉验证
-- 语义一致性分析
-
-#### 4. 成果转化评估引擎
-**技术实现**：
-- 专利可申请性分析
-- 技术路线映射
-- 产业场景匹配
-
-**评估机制效果**：
-| 指标 | 使用InnovOS |
-|------|-----------|
-| 创新路径偏离率 | **6.5%** |
-| 无效方案生成率 | **9.1%** |
-
-**闭环机制**：生成 → 评估 → 优化，实现创新方案动态优化
+| 项 | 文件 | 变更 |
+|----|------|------|
+| 类型定义 | `frontend/src/types/workflow.ts` | 扩展 `WORKFLOW_STEPS` 常量，增加子步骤定义 |
+| Store | `frontend/src/store/useWorkflowStore.ts` | 步骤数据增加 `subSteps` 字段追踪 |
+| 组件 | `frontend/src/components/layout/SidebarWorkflowProgress.tsx` | **新增**：垂直时间线，可展开/折叠子步骤，运行中脉冲动画 |
+| Sidebar | `frontend/src/components/layout/Sidebar.tsx` | 导航项下方、系统状态上方插入 `<SidebarWorkflowProgress />` |
+| Dashboard | `frontend/src/features/dashboard/DashboardPage.tsx` | 删除右侧 `<AgentWorkflowPanel />`，主内容区扩展为全宽 |
 
 ---
 
-## 系统与通用大模型的参数对比
+## 五、首页
 
-| 指标 | 通用模型 | InnovOS | 改变幅度 |
-|------|--------|---------|--------|
-| 专利路径有效召回率 | 54.8% | **86.1%** | ↑ 57.1% |
-| 平均Token消耗 | 18,400 | **12,360** | ↓ 32.8% |
-| 平均响应时间 | 45.2秒 | **23.6秒** | ↓ 47.8% |
-| 结构化方案输出率 | 63.5% | **91.2%** | ↑ 43.6% |
+### 5.1 普通用户 → 首页
 
-**核心价值**：InnovOS让AI真正参与创新全流程，实现问题解决能力的系统化升级
+```
+首页
+├── 中间核心内容（7 项）
+│   ├── 任务输入     ✅ TaskInputPanel
+│   ├── 我的任务     ✅ TaskList
+│   ├── 问题分析结果  ✅ AnalysisResult（5 个 Tab）
+│   ├── 知识库分析    ❌ 待实现 → KnowledgeRAGPanel
+│   ├── 专利检索分析  ✅ PatentStatsPanel
+│   ├── 方案生成     ✅ SolutionGeneration（评估数据待对接真实 API）
+│   └── 方案评估     ❌ 待实现 → EvaluationResult
+└── 侧边栏状态机    ✅ 见 4.3
+```
 
----
+### 5.2 待实现项
 
-## 竞品分析
-
-### 市场现状
-
-市场中的方法工具，大多聚焦单点能力，缺少对复杂创新任务的全流程系统化支撑。
-
-### 核心能力对比
-
-| 核心能力/指标 | 专利检索工具 | 传统创新工具 | 通用大模型 | InnovOS |
-|--------------|------------|------------|----------|---------|
-| 创新问题智能建模 | × | △ | × | ● |
-| 多Agent协同工作流 | × | × | × | ● |
-| 中国专利知识增强 | ● | × | △ | ● |
-| 创新质量评估机制 | × | × | × | ● |
-| 创新全流程支持 | × | △ | × | ● |
-
-**图例说明**：● 深度支持 | △ 部分支持 | × 不支持
-
-### 性能对比
-
-| 指标 | 通用大模型 | InnovOS | 提升 |
-|------|----------|---------|------|
-| 专利路径有效召回率 | 54.8% | **86.1%** | ↑ 57.1% |
-| 创新方案结构完整率 | 63.5% | **91.2%** | ↑ 43.6% |
-| 多步骤任务稳定完成率 | 48.9% | **84.6%** | ↑ 35.7% |
-| 创新任务平均响应时间 | 13.6秒 | **7.1秒** | ↓ 47.8% |
+| 项 | 文件 | 变更 |
+|----|------|------|
+| 知识库 RAG 面板 | `frontend/src/components/dashboard/KnowledgeRAGPanel.tsx` | **新增**：显示当前任务相关的知识库检索结果，展示 9 大信息维度匹配 |
+| 真实评估结果 | `frontend/src/components/dashboard/EvaluationResult.tsx` | **新增**：对接 `GET /api/evaluation/{solution_id}/latest`，替换 SolutionGeneration 中的硬编码评估卡片 |
+| 管线集成 RAG | `backend/app/api/analysis.py` | Agent1 执行前先调用知识库 RAG 检索，将结果传入 AI 分析 prompt |
 
 ---
 
-## 技术栈
+## 六、知识库
 
-### 后端技术栈
+### 6.1 功能清单
 
-| 类别 | 技术选型 | 说明 |
-|------|--------|------|
-| Web框架 | FastAPI (Python 3.10+) | 高性能异步框架 |
-| 数据库 | SQLite（开发）/ PostgreSQL（生产） | 关系型数据存储 |
-| ORM | SQLAlchemy + Alembic | 数据库迁移与映射 |
-| 缓存 | Redis | 性能优化 |
-| 任务队列 | Celery + Redis | 异步任务处理 |
-| 向量数据库 | FAISS / Pinecone | 向量检索与相似度匹配 |
-| AI/ML | Sentence-BERT, Claude/GPT API | 语义理解与生成 |
+```
+知识库
+├── 用户输入文本或导入文档
+│   ├── 文本输入      ✅ 已实现
+│   └── 文档导入      ❌ 待实现（PDF/DOCX/TXT/MD）
+├── 呈现样式
+│   └── 类似 CherryStudio 知识库  ❌ 待优化
+└── AI检索识别重要信息
+    └── 9 大维度结构化检索  ❌ 待实现
+```
 
-**AI模型架构（ZR-MoA）**：
-- 主模型：DeepSeek-R1
-- 专业模型：Qwen-Turbo、BGE-M3、Qwen-Max
-- 向量化：Embedding + RAG
+### 6.2 文档导入实现
 
-### 前端技术栈
+**参考**：Cherry-Studio 知识库（`/home/chou/cherry-studio/src/main/knowledge/`）
 
-| 类别 | 技术选型 | 说明 |
-|------|--------|------|
-| 框架 | React 18 + TypeScript | 组件化UI开发 |
-| 构建工具 | Vite 8 | 快速构建与热重载 |
-| UI框架 | TailwindCSS + 自定义组件库 | 样式管理 |
-| 状态管理 | Zustand | 轻量级状态管理 |
-| 路由 | React Router v6 | 前端路由 |
-| 可视化 | Recharts / D3.js | 数据可视化 |
+| 项 | 文件 | 变更 |
+|----|------|------|
+| 文件解析器 | `backend/app/algorithm/file_parser.py` | **新增**：`parse_pdf()` (pypdf)、`parse_docx()` (python-docx)、`parse_txt()` (chardet 编码检测)、`parse_markdown()` |
+| 文本分块器 | `backend/app/algorithm/text_chunker.py` | **新增**：`chunk_text(text, chunk_size=500, overlap=50)` 递归字符分割 |
+| 新增依赖 | `backend/pyproject.toml` | 添加 `python-multipart`、`pypdf`、`python-docx`、`chardet` |
+| 表扩展 | `backend/app/tables/knowledge.py` | 新增字段：`file_name`、`file_size`、`chunk_index`、`parent_id`、`chunk_count` |
+| 上传端点 | `backend/app/api/knowledge.py` | `POST /api/knowledge/upload`（接收 UploadFile → 解析 → 分块 → 入库） |
+| 分块查询 | `backend/app/api/knowledge.py` | `GET /api/knowledge/docs/{id}/chunks` |
+| AI 搜索 | `backend/app/api/knowledge.py` | `POST /api/knowledge/ai-search`（AI 提取 9 维度信息） |
+| 上传组件 | `frontend/src/components/ui/FileUpload.tsx` | **新增**：拖拽上传区域 + 进度条 + 文件类型过滤 |
+| 上传 API | `frontend/src/api/knowledge.ts` | 新增 `uploadFile(file, metadata)` 使用 FormData + fetch |
+| 页面更新 | `frontend/src/pages/KnowledgeBasePage.tsx` | 增加「导入文件」按钮 + 文件类型图标 + 分块数显示 |
+| 详情页 | `frontend/src/pages/KnowledgeDetailPage.tsx` | **新增**：展示文档详情 + 分块内容列表 |
+| Store | `frontend/src/store/useKnowledgeStore.ts` | **新增**：知识库状态管理（文档列表、分块、搜索） |
 
-### DevOps
+### 6.3 AI 重要信息维度
 
-| 类别 | 技术选型 | 说明 |
-|------|--------|------|
-| 容器化 | Docker + Docker Compose | 环境隔离 |
-| CI/CD | GitHub Actions | 自动化部署 |
-| 监控 | Prometheus + Grafana | 性能监控 |
-| 日志 | Winston / Sentry | 错误追踪 |
-
----
-
-## 系统性能指标
-
-### 核心指标
-
-| 指标 | 要求 | 说明 |
-|------|------|------|
-| 数据规模 | ≥1000万条 | 专利及案例数据 |
-| 问题识别准确率 | ≥88% | 使用ZR-IPM算法 |
-| 相似路径匹配准确率 | ≥85% | 向量检索+语义匹配 |
-| 方案生成成功率 | ≥90% | AI生成+质量评估 |
-| 平均响应时间 | ≤60秒 | 并发200用户 |
-| 最大并发用户数 | ≥200 | 系统容量 |
-| 系统可用性 | ≥99% | SLA要求 |
-| 稳定性 | 连续72小时无异常 | 生产环境 |
-
-### 实际表现（对比通用模型）
-
-| 指标 | 通用模型 | InnovOS | 提升幅度 |
-|------|--------|---------|--------|
-| 专利路径有效召回率 | 54.8% | **86.1%** | ↑ 57.1% |
-| 平均Token消耗 | 18,400 | **12,360** | ↓ 32.8% |
-| 平均响应时间 | 45.2秒 | **23.6秒** | ↓ 47.8% |
-| 结构化方案输出率 | 63.5% | **91.2%** | ↑ 43.6% |
-
----
-
-## 商业模式
-
-### 上游：核心资源与能力支持
-
-| 资源 | 内容 |
+| 维度 | 说明 |
 |------|------|
-| 大模型 | 通义千问、DeepSeek |
-| 云服务与算力 | 阿里云 |
-| 数据资源 | 行业数据库 |
-| 专家资源 | 山东省创新方法研究会、中国创造学会 |
+| 目标需求的运作逻辑 | 核心功能和工作原理 |
+| 资源 | 可用材料、能源、信息资源 |
+| 适用领域 | 技术领域和应用场景 |
+| 操作指南 | 使用和操作约束 |
+| 相关工程知识 | 工程参数和标准 |
+| 政策 | 法规和政策约束 |
+| 预算 | 成本和预算限制 |
+| 参考对比产品 | 竞品和标杆产品 |
+| 用户反馈 | 终端用户体验和问题 |
 
-### 下游：客户类型与已有客户
+### 6.4 知识库检索总结
 
-**客户类型**：
-- 电力能源企业
-- 制造业企业
-- 高校与科研院所
-- 科技服务机构
+知识库检索结果作为**整个流程的参考信息**，传递给后续所有 Agent：
+- Agent1（需求洞察）：参考知识库中的目标需求运作逻辑、资源、适用领域
+- Agent2（问题建模）：参考工程知识、操作指南
+- Agent5（专利检索）：参考相关工程知识、适用领域
+- Agent3（方案生成）：综合所有维度信息
+- Agent4（方案评估）：用知识库信息作为评估基准
 
-**已有客户**：
-- 国家电网
-- 沈阳铁路局
-- 国家电投
-- 山东信联
+---
 
-### 收入结构
+## 七、历史方案
 
-| 收入来源 | 占比 | 内容 |
+### 7.1 功能
+
+```
+历史方案 → 整个方案的生成流程
+```
+
+展示用户所有已完成的任务及其完整分析流程回溯。
+
+### 7.2 实现
+
+| 项 | 文件 | 变更 |
+|----|------|------|
+| 新增端点 | `backend/app/api/solutions.py` | `GET /api/solutions/history`（按任务分组，含工作流步骤、评估结果） |
+| 新增页面 | `frontend/src/pages/HistoryPage.tsx` | 任务卡片列表 → 点击展开显示完整工作流时间线 + 方案 + 评估 |
+| 新增 Store | `frontend/src/store/useHistoryStore.ts` | **新增**：历史方案数据管理 |
+| 新增 API | `frontend/src/api/solutions.ts` | 新增 `getHistory()` |
+
+---
+
+## 八、专利转化
+
+### 8.1 功能
+
+```
+专利转化
+├── 对历史方案进行专利转化
+└── 详细对比高相关度专利的详细，避免违反专利法
+```
+
+### 8.2 实现
+
+| 项 | 文件 | 变更 |
+|----|------|------|
+| 新增 Router | `backend/app/api/patent_conversion.py` | **新增**：`POST /api/patent-conversion/analyze`（输入 solution_id → AI 分析侵权风险 + 规避建议） |
+| 注册路由 | `backend/app/main.py` | `app.include_router(patent_conversion.router, prefix="/api/patent-conversion", tags=["patent-conversion"])` |
+| 新增 API | `frontend/src/api/patentConversion.ts` | **新增**：`analyze(solutionId)` |
+| 新增页面 | `frontend/src/pages/PatentConversionPage.tsx` | 选择历史方案 → 左右对比（方案 vs 相关专利）→ 侵权风险指标 → AI 规避建议 |
+
+---
+
+## 九、管理员模块
+
+### 9.1 专利数据库管理
+
+```
+专利数据库管理 Admin (5 项功能)
+```
+
+| 项 | 文件 | 变更 |
+|----|------|------|
+| 新增端点 | `backend/app/api/patents.py` | `POST /api/patents`（创建）、`PUT /api/patents/{id}`（更新）、`DELETE /api/patents/{id}`（删除）、`POST /api/patents/import`（批量导入 JSON/CSV） |
+| 新增页面 | `frontend/src/pages/PatentManagementPage.tsx` | 数据表格 + 搜索排序分页 + 新增/编辑弹窗 + 批量导入 |
+| 修改 API | `frontend/src/api/patents.ts` | 新增 `createPatent()`、`updatePatent()`、`deletePatent()`、`importPatents()` |
+| 新增路由 | `frontend/src/routes/index.tsx` | `{ path: 'admin/patents', element: <PatentManagementPage /> }` |
+
+### 9.2 数据监控
+
+```
+数据监控 Admin
+├── 分析任务统计    ✅ MonitorPage + TaskStatsChart
+├── Apikey健康情况  ✅ KeyUsageChart
+├── 系统状态统计    ✅ SystemStatus
+└── 健康检查        ✅ HealthCheckPanel
+```
+
+全部已实现，无需变更。
+
+### 9.3 Key 管理
+
+```
+Key管理 Admin → 管理员管理添加 aikey  ✅ 已实现
+```
+
+`KeyManagementPage.tsx`：完整 CRUD + 测试连接 + 模型选择。
+
+### 9.4 用户管理
+
+```
+用户管理 Admin → 管理员管理用户账号  ✅ 已实现
+```
+
+`UserManagementPage.tsx`：列表 + 批量操作 + 发送通知 + 启用/禁用。
+
+---
+
+## 十、项目结构（重构后）
+
+### 10.1 后端
+
+```
+backend/app/
+├── main.py              # FastAPI 入口 + 17 个 Router 挂载
+├── auth.py              # JWT 认证
+├── database.py          # SQLite 连接与初始化
+├── seed.py              # 种子数据
+├── api/                 # 路由层
+│   ├── auth.py          # /api/auth（登录/注册/Profile/密码）
+│   ├── tasks.py         # /api/tasks
+│   ├── analysis.py      # /api/analysis（6-Agent 管线入口）
+│   ├── modeling.py      # /api/modeling
+│   ├── workflow.py      # /api/workflow
+│   ├── solutions.py     # /api/solutions + /history
+│   ├── evaluation.py    # /api/evaluation
+│   ├── feedback.py      # /api/feedback
+│   ├── patents.py       # /api/patents（含 Admin CRUD）
+│   ├── knowledge.py     # /api/knowledge（含文件上传 + AI 搜索）
+│   ├── notifications.py # /api/notifications（含撤销）
+│   ├── patent_conversion.py  # /api/patent-conversion ← 新增
+│   ├── monitor.py       # /api/monitor
+│   ├── keys.py          # /api/keys
+│   ├── users.py         # /api/users
+│   ├── principles.py    # /api/principles
+│   └── sidebar.py       # /api/sidebar
+├── algorithm/           # 算法层（借鉴 RootSeek 分层）
+│   ├── ai_client.py     # AI 通信客户端
+│   ├── key_manager.py   # Key 轮询管理
+│   ├── crypto.py        # AES 加密
+│   ├── base.py          # AIAnalyzer 分析器基类 ← 新增
+│   ├── analyzers/       # 专项分析器 ← 新增
+│   │   ├── need_analyzer.py
+│   │   ├── modeling_analyzer.py
+│   │   ├── patent_analyzer.py
+│   │   ├── solution_analyzer.py
+│   │   ├── evaluation_analyzer.py
+│   │   └── thinking_tools/
+│   │       ├── goldfish.py        # 金鱼法
+│   │       ├── nine_screens.py    # 九屏幕分析
+│   │       ├── stc_operator.py    # STC 算子
+│   │       └── resource_analyzer.py # 七维度资源分析
+│   ├── prompts/         # AI 提示词模板 ← 新增
+│   │   ├── builder.py
+│   │   ├── need_insight.py
+│   │   ├── problem_modeling.py
+│   │   ├── solution_gen.py
+│   │   ├── evaluation.py
+│   │   ├── ifr.py
+│   │   ├── trimming.py
+│   │   └── evolution.py
+│   ├── file_parser.py   # 文件解析器（PDF/DOCX/TXT/MD）← 新增
+│   └── text_chunker.py  # 文本分块器 ← 新增
+├── models/              # Pydantic 模型
+├── tables/              # 13 张表定义
+├── services/            # 业务逻辑层 ← 新增
+│   ├── knowledge_service.py
+│   ├── patent_conversion.py
+│   └── workflow_service.py
+└── data/                # 静态数据
+```
+
+### 10.2 前端
+
+```
+frontend/src/
+├── main.tsx / App.tsx / index.css
+├── pages/               # 页面组件（路由级）← 重组
+│   ├── LoginPage.tsx
+│   ├── RegisterPage.tsx
+│   ├── GuidePage.tsx              ← 新增
+│   ├── AccountSettingsPage.tsx    ← 新增
+│   ├── DashboardPage.tsx          ← 迁移自 features/
+│   ├── KnowledgeBasePage.tsx      ← 迁移
+│   ├── KnowledgeDetailPage.tsx    ← 新增
+│   ├── PatentSearchPage.tsx       ← 迁移
+│   ├── HistoryPage.tsx            ← 新增
+│   ├── PatentConversionPage.tsx   ← 新增
+│   ├── MonitorPage.tsx            ← 迁移
+│   ├── PatentManagementPage.tsx   ← 新增
+│   ├── KeyManagementPage.tsx      ← 迁移
+│   └── UserManagementPage.tsx     ← 迁移
+├── components/          # 可复用组件
+│   ├── layout/
+│   │   ├── AppLayout.tsx          ← 修改（指南链接 + 账户菜单 + 通知撤销）
+│   │   ├── Sidebar.tsx            ← 修改（角色导航 + 状态机）
+│   │   ├── SidebarWorkflowProgress.tsx ← 新增
+│   │   └── ProtectedRoute.tsx
+│   ├── ui/              # GlassPanel, Modal, StatusBadge, EmptyState, FileUpload(新增)...
+│   ├── dashboard/       # TaskInput, TaskList, AnalysisResult, PatentStats,
+│   │                    # SolutionGeneration, KnowledgeRAGPanel(新), EvaluationResult(新)
+│   ├── knowledge/       # 知识库子组件
+│   └── workflow/        # 工作流可视化
+├── api/                 # API 客户端
+│   ├── client.ts, auth.ts, tasks.ts, analysis.ts, workflow.ts,
+│   ├── solutions.ts, evaluation.ts, feedback.ts, patents.ts,
+│   ├── knowledge.ts, notifications.ts, monitor.ts, keys.ts,
+│   ├── users.ts, principles.ts, sidebar.ts,
+│   └── patentConversion.ts        ← 新增
+├── store/               # Zustand Store
+│   ├── useAuthStore, useTaskStore, useAnalysisStore, useWorkflowStore,
+│   ├── useModelingStore, useSolutionStore, usePatentStore,
+│   ├── useMonitorStore, useEvaluationStore, useFeedbackStore,
+│   ├── useKnowledgeStore.ts       ← 新增
+│   ├── useNotificationStore.ts    ← 新增（从 AppLayout 本地 state 迁移）
+│   ├── useHistoryStore.ts         ← 新增
+│   └── useUIStore
+├── types/               # TypeScript 类型
+├── hooks/               # 自定义 Hooks
+├── routes/              # 路由配置
+└── utils/               # 工具函数（constants, cn, formatters）
+```
+
+---
+
+## 十一、数据库 Schema（13 张表）
+
+见 `DEVELOPMENT_GUIDE.md` 第三章完整 DDL。关键新增字段：
+
+| 表 | 新增字段 | 用途 |
+|----|---------|------|
+| `notifications` | `is_recalled INTEGER DEFAULT 0` | 管理员撤销标记 |
+| `knowledge_docs` | `file_name`, `file_size`, `chunk_index`, `parent_id`, `chunk_count` | 文件上传与分块 |
+
+---
+
+## 十二、API 端点总览（17 个 Router）
+
+完整端点清单见 `DEVELOPMENT_GUIDE.md` 第四章。本次新增：
+
+| Router | 端点 | 说明 |
 |--------|------|------|
-| InnovOS系统订阅 | **60%** | SaaS订阅服务、企业账号授权、私有化部署 |
-| 创新方法培训 | **30%** | 创新方法培训、AI创新应用培训、企业创新能力提升 |
-| 企业创新服务 | **10%** | 创新项目辅导、技术路线分析、创新咨询服务 |
-
-### 核心成本
-
-- 大模型API与算力成本
-- 系统研发与维护成本
-- 知识库建设成本
-- 市场推广成本
-
-**商业模式**：通过技术与模式创新，提供系统化创新解决方案
-
-**使命**：构建可持续的创新服务生态，助力新质生产力的发展
+| auth | `PUT /api/auth/profile` | 修改用户名 |
+| auth | `PUT /api/auth/password` | 修改密码 |
+| notifications | `DELETE /api/notifications/{id}/recall` | 撤销发送 |
+| notifications | `GET /api/notifications/sent` | 已发送列表 |
+| knowledge | `POST /api/knowledge/upload` | 文件上传导入 |
+| knowledge | `GET /api/knowledge/docs/{id}/chunks` | 分块内容 |
+| knowledge | `POST /api/knowledge/ai-search` | AI 结构化搜索 |
+| solutions | `GET /api/solutions/history` | 历史方案汇总 |
+| patent-conversion | `POST /api/patent-conversion/analyze` | 专利转化分析 |
+| patents | `POST/PUT/DELETE /api/patents` | Admin CRUD |
+| patents | `POST /api/patents/import` | 批量导入 |
 
 ---
 
-## 典型案例
+## 十三、实施计划
 
-### 案例1：赋能中国电科院与国网山东电力
+### Phase 1：基础设施（算法层重构 + 项目结构迁移）
 
-**项目**：《变电主设备局放电的调控量子检测机理及特性研究》
+- [ ] 后端：创建 `algorithm/base.py` 分析器基类
+- [ ] 后端：从 `zr_ipm.py` 拆分 `algorithm/analyzers/` 专项分析器
+- [ ] 后端：抽取 `algorithm/prompts/` 提示词模板
+- [ ] 后端：创建 `services/` 业务逻辑层
+- [ ] 后端：创建 `algorithm/file_parser.py` + `text_chunker.py`
+- [ ] 前端：创建 `pages/` 目录，从 `features/` 迁移页面组件
+- [ ] 前端：重组 `components/dashboard/` 子组件
+- [ ] 前端：删除 PlaceholderPage 和占位路由
 
-**关键技术攻关**：
-- 变压器局放电检测
-- GIS局放电检测
-- 调控量子检测机理
-- 高灵敏宽频检测技术
+### Phase 2：侧边栏 + 导航 + 状态机
 
-**项目难点**：
-1. 调控量子局放检测：灵敏度与带宽难以兼顾
-2. 复杂局放场景下：宽频检测能力不足
-3. 高压环境下：量子传感稳定性不足
+- [ ] 前端：重构 `constants.ts`（角色导航配置）
+- [ ] 前端：重构 `Sidebar.tsx`（新导航）
+- [ ] 前端：新建 `SidebarWorkflowProgress.tsx`
+- [ ] 前端：Dashboard 移除右侧面板，全宽布局
 
-**InnovOS赋能**：
-- 高灵敏宽频量子检测
-- 宽频带协同优化
-- 量子局放测量方法
-- 小型化量子探头设计
+### Phase 3：账户 + 通知
 
-**项目成果**：
-- 500kV变压器与1000kV GIS量子局放检测验证
-- 已申报专利3项
-- **国家电网总部科技项目，经费2285万元**
+- [ ] 后端：auth 增加 profile/password 端点
+- [ ] 后端：notifications 增加 is_recalled + recall 端点
+- [ ] 前端：新建 `AccountSettingsPage.tsx`
+- [ ] 前端：通知面板增加撤销功能
 
----
+### Phase 4：知识库增强
 
-### 案例2：赋能国家电网陕西电力
+- [ ] 后端：knowledge_docs 表扩展字段
+- [ ] 后端：文件上传 + 分块 + AI 搜索端点
+- [ ] 前端：`FileUpload.tsx` + `KnowledgeDetailPage.tsx`
+- [ ] 前端：`useKnowledgeStore.ts`
 
-**应用单位**：国网陕西省电力公司
+### Phase 5：新页面（历史方案 + 专利转化 + 专利管理）
 
-**应用场景**：
-- 班组长能力提升
-- 创新方法推广
-- 现场问题解决
-- 基层创新实践
+- [ ] 后端：solutions/history 端点
+- [ ] 后端：patent_conversion Router
+- [ ] 后端：patents Admin CRUD
+- [ ] 前端：`HistoryPage.tsx`、`PatentConversionPage.tsx`、`PatentManagementPage.tsx`
 
-**InnovOS系统赋能**：
-```
-试用 → 体验 → 培训
-```
+### Phase 6：Dashboard 增强
 
-**系统试用阶段**：
-- 重点试用内容：创新问题建模、工具辅助分析、创新方案生成、创新成果输出
+- [ ] 后端：分析管线集成知识库 RAG
+- [ ] 后端：评估端点对接真实 AI
+- [ ] 前端：`KnowledgeRAGPanel.tsx`、`EvaluationResult.tsx`
 
-**使用反馈**：
-- 用户认可重点：降低创新方法使用门槛，从依赖个人经验转向智能辅助创新
+### Phase 7：使用指南 + 收尾
 
-**应用成果**：
-- 当前进展：国网陕西电力已邀请团队开展专项培训
-- 采购进展：系统采购合同正在审批中
-
-**价值**：创新能力从少数专家掌握走向基层班组普遍可用
+- [ ] 前端：`GuidePage.tsx`
+- [ ] 更新 CLAUDE.md + docs/
+- [ ] 清理废弃代码
 
 ---
 
-### 案例3：高精度磁性电子皮肤
-
-**应用项目**：高精度磁性电子皮肤技术方案设计与优化
-
-**客户类型**：山东中先技术有限公司（新材料与智能传感研发企业）
-
-**应用目标**：
-- 提升传感精度
-- 优化结构设计
-- 加快方案迭代
-- 提升系统稳定性
-
-**InnovOS系统赋能路径**：
-```
-需求分析 → 矛盾建模 → 问题求解 → AI方案生成 → 方案优化与输出
-```
-
-**关键性能指标提升**：
-- 测量范围扩大：提升 **53%**
-- 分辨率提升：提升 **89%**
-- 响应时间缩短：提升 **43%**
-- 测量误差降低：降低至 **1%**
-
-**使用寿命**：达到行业领先水平
-
----
-
-## 研发过程
-
-### 五个发展阶段
-
-#### 阶段一：创新实践与问题发现（2024.01-2024.10）
-- 传统创新方法一学就会
-- 实际应用效果不佳
-
-#### 阶段二：创新智能化方向探索（2024.10-2025.01）
-- AI与中国场景融合
-
-#### 阶段三：InnovOS原型系统开发（2025.01-2025.03）
-- 响应速度、方案质量不稳定
-
-#### 阶段四：InnovOS系统形成（2025.03-2025.06）
-- 一个核心算法 + 四大核心机制
-
-#### 阶段五：持续迭代与知识壁垒构建（2025.06-至今）
-- 真实创新案例，动态迭代与知识增强
-- 基于TRIZ理论，解决排水管网检查难的问题
-
-**核心理念**：不只是算法能力，更是长期积累形成的知识壁垒
-
----
-
-## 开发路线图
-
-### 短期目标（0-3个月）
-
-- [ ] 完成核心算法ZR-IPM的工程化部署
-- [ ] 构建完整的基础API接口
-- [ ] 实现基本的多Agent协同工作流
-- [ ] 完成前端基础UI组件库
-
-### 中期目标（3-6个月）
-
-- [ ] 集成ZR-MoA多模型架构
-- [ ] 构建创新知识库（10万+专利案例）
-- [ ] 实现四维评估引擎
-- [ ] 完成用户反馈与学习系统
-
-### 长期目标（6-12个月）
-
-- [ ] 实现完整的7大功能模块
-- [ ] 支持多租户企业级部署
-- [ ] 构建完整的数据导出系统
-- [ ] 实现生产级性能与可用性
-
----
-
-## 环境配置
-
-### 环境变量
+## 十四、开发命令
 
 ```bash
-# .env
-DATABASE_URL=sqlite:///InnovOS_ACCOUNTS.db
-REDIS_URL=redis://localhost:6379
-SECRET_KEY=your-secret-key-here
-JWT_EXPIRE_HOURS=24
-CORS_ORIGINS=http://localhost:5173
-LOG_LEVEL=INFO
-
-# AI模型配置
-DEEPSEEK_API_KEY=your-deepseek-key
-QWEN_API_KEY=your-qwen-key
-EMBEDDING_MODEL=BGE-M3
+make install   # 安装依赖
+make dev       # 启动开发环境（前端 :5173 + 后端 :8000）
+make build     # 生产构建
+make test      # 运行测试
+make lint      # 代码检查
 ```
 
-### 环境划分
+## 十五、开发规范
 
-| 环境 | 数据库 | 日志级别 | 调试模式 |
-|------|--------|----------|----------|
-| 开发 | SQLite | DEBUG | 开启 |
-| 测试 | SQLite测试库 | INFO | 开启 |
-| 生产 | PostgreSQL | WARNING | 关闭 |
-
----
-
-## 附录
-
-### A. 术语表
-
-| 术语 | 说明 |
-|------|------|
-| ZR-IPM | 智融创新问题映射算法 |
-| ZR-MoA | 智融多模型协同架构 |
-| RAG | 检索增强生成 |
-| TRIZ | 发明问题解决理论 |
-| Embedding | 向量嵌入 |
-| BGE-M3 | 向量化模型 |
-| Agent | 智能代理 |
-
-### B. 参考资源
-
-- TRIZ创新理论
-- 国家公开专利数据库
-- 中国创新方法研究会
-- 山东省创新方法研究会
+- **提交格式**：`<type>(<scope>): <description>` — feat / fix / refactor / docs / test
+- **分支策略**：main ← develop ← feature/xxx
+- **前端**：函数组件 + hooks，页面放 `pages/`，子组件放 `components/<domain>/`，样式用 CSS 变量 + TailwindCSS
+- **后端**：一领域一 Router，复杂逻辑放 `services/`，分析器继承 `AIAnalyzer`，提示词放 `prompts/`
+- **配置**：`.env`（`INNOVOS_ENCRYPT_KEY`、`INNOVOS_JWT_SECRET`、`DATABASE_URL`）
 
 ---
 
-**文档版本**：v1.0  
-**最后更新**：2026-06-05  
-**维护团队**：InnovOS开发团队
-
-**公司**：济南一竖光年人工智能科技有限公司  
-**使命**：创新驱动、智能赋能、价值创造
+**文档版本**：v3.0  
+**最后更新**：2026-06-07  
+**公司**：济南一竖光年人工智能科技有限公司

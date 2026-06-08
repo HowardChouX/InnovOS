@@ -11,22 +11,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
 };
 
 // 获取workflow当前运行步骤的标签
-function getWorkflowProgressLabel(workflow: { status: string; steps?: Array<{ agentId: string; agentLabel?: string; status: string }> } | null): string | null {
-  if (!workflow || workflow.status === 'completed' || workflow.status === 'failed') return null;
-
-  const runningStep = workflow.steps?.find(s => s.status === 'running');
-  if (runningStep) {
-    return runningStep.agentLabel || runningStep.agentId;
-  }
-
-  const lastCompleted = workflow.steps?.filter(s => s.status === 'completed').pop();
-  if (lastCompleted) {
-    return `已完成 ${lastCompleted.agentLabel || lastCompleted.agentId}`;
-  }
-
-  return null;
-}
-
 function formatDate(dateStr: string) {
   const d = new Date(dateStr.replace(' ', 'T') + 'Z');
   const now = new Date();
@@ -76,13 +60,6 @@ export function TaskList() {
     const t = setTimeout(() => setToast(null), 3000);
     return () => clearTimeout(t);
   }, [toast]);
-
-  // 计算当前workflow进度标签（仅对选中的analyzing task显示）
-  const progressLabel = selectedTaskId && workflow
-    ? getWorkflowProgressLabel(workflow)
-    : null;
-
-
 
   const filtered = tasks.filter((t) => {
     const matchSearch = !search || t.title.toLowerCase().includes(search.toLowerCase());

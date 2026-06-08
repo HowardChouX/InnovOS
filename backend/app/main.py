@@ -7,7 +7,9 @@ import time
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db, get_db
-from app.api import auth, tasks, analysis, patents, solutions, workflow, evaluation, feedback, keys, monitor, sidebar, principles, users, notifications, knowledge, modeling
+from app.api import auth, tasks, analysis, patents, solutions, workflow, evaluation, feedback, notifications, knowledge as knowledge_api, knowledge_bases as knowledge_bases_api, modeling, models as models_api
+from app.api.admin import router as admin_router
+from app.api.workflow_steps import router as workflow_steps_router
 from app.seed import seed_admin_user, seed_patents
 
 init_db()
@@ -18,7 +20,7 @@ app = FastAPI(title="InnovOS API", description="创新智能平台后端 API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174"],
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,14 +34,13 @@ app.include_router(solutions.router)
 app.include_router(workflow.router)
 app.include_router(evaluation.router)
 app.include_router(feedback.router)
-app.include_router(keys.router)
-app.include_router(monitor.router)
-app.include_router(sidebar.router)
-app.include_router(principles.router)
-app.include_router(users.router)
+app.include_router(admin_router)
 app.include_router(notifications.router)
-app.include_router(knowledge.router)
+app.include_router(knowledge_api.router)
+app.include_router(knowledge_bases_api.router)
+app.include_router(models_api.router)
 app.include_router(modeling.router)
+app.include_router(workflow_steps_router)
 
 
 @app.get("/api/health")

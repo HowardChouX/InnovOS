@@ -14,6 +14,8 @@ dependencies = [
     "bcrypt>=4.0.0",
     "openai>=2.41.0",
     "psutil>=5.9.0",
+    "numpy>=2.2.6",
+    "python-multipart>=0.0.32",
 ]
 
 [project.scripts]
