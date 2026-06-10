@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { WorkflowPanel } from './WorkflowPanel';
 import { useAuthStore } from '../../store/useAuthStore';
 import { notificationsApi, type Notification } from '../../api/notifications';
 
@@ -371,6 +372,7 @@ export function AppLayout() {
             <Outlet />
           </div>
         </main>
+        <WorkflowPanel />
       </div>
 
       {/* Notification Detail Modal */}

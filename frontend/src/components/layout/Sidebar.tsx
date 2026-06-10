@@ -2,30 +2,18 @@ import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { NAV_ITEMS } from '../../utils/constants';
 import { useAuthStore } from '../../store/useAuthStore';
-import { useWorkflowStore } from '../../store/useWorkflowStore';
 import { sidebarApi, type SidebarStats } from '../../api/sidebar';
-
-const _PHASE_LABELS: Record<string, string> = {
-  demand_portrait: '需求画像',
-  problem_modeling: '问题建模',
-  patent_search: '专利检索',
-  solution_gen: '方案生成',
-  evaluation: '方案评估',
-};
 
 export function Sidebar() {
   const location = useLocation();
   const isAdmin = useAuthStore((s) => s.isAdmin);
   const [stats, setStats] = useState<SidebarStats | null>(null);
-  const { currentPhase, isRunning } = useWorkflowStore();
 
   useEffect(() => {
     sidebarApi.getStats().then(setStats).catch(() => {});
   }, []);
 
-  const items = [
-    ...NAV_ITEMS.filter((item) => !((item.path as string) === '/monitor' && !isAdmin)),
-  ];
+  const items = [...NAV_ITEMS];
 
   return (
     <aside style={{
@@ -51,29 +39,6 @@ export function Sidebar() {
             </Link>
           );
         })}
-
-        {/* 工作流进度 */}
-        {isRunning && (
-          <div style={{ marginTop: 8, borderTop: '1px solid var(--border-light)', paddingTop: 8 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6, fontWeight: 600 }}>
-              流程进度
-            </div>
-            {Object.entries(_PHASE_LABELS).map(([phase, label]) => {
-              const isCurrent = phase === currentPhase;
-              const isDone = Object.keys(_PHASE_LABELS).indexOf(phase) < Object.keys(_PHASE_LABELS).indexOf(currentPhase);
-              return (
-                <div key={phase} style={{
-                  display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px',
-                  fontSize: 11, color: isCurrent ? 'var(--accent-blue)' : isDone ? 'var(--accent-green)' : 'var(--text-tertiary)',
-                }}>
-                  <i className={`fa-solid ${isDone ? 'fa-check-circle' : isCurrent ? 'fa-spinner fa-spin' : 'fa-circle'}`}
-                    style={{ fontSize: 8 }} />
-                  <span>{label}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
 
         {/* 管理员模块 */}
         {isAdmin && (
