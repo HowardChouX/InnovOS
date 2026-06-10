@@ -111,7 +111,7 @@ function DefaultStateView() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
         {WORKFLOW_STEPS.map((agent, i) => (
           <TimelineStep
-            key={agent.agentId}
+            key={agent.phaseId}
             agent={agent}
             step={defaultSteps[i]}
             index={i}
@@ -126,8 +126,8 @@ function DefaultStateView() {
 function WorkflowProgressView({ workflow }: { workflow: NonNullable<ReturnType<typeof useWorkflowStore.getState>['workflow']> }) {
   const steps = workflow.steps || [];
 
-  const getStepForAgent = (agentId: string) => {
-    return steps.find(s => s.agentId === agentId) || {
+  const getStepForAgent = (phaseId: string) => {
+    return steps.find(s => s.agentId === phaseId) || {
       status: 'pending' as AgentStatus,
       description: undefined,
       duration: undefined,
@@ -139,9 +139,9 @@ function WorkflowProgressView({ workflow }: { workflow: NonNullable<ReturnType<t
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
         {WORKFLOW_STEPS.map((agent, i) => (
           <TimelineStep
-            key={agent.agentId}
+            key={agent.phaseId}
             agent={agent}
-            step={getStepForAgent(agent.agentId)}
+            step={getStepForAgent(agent.phaseId)}
             index={i}
             isLast={i === WORKFLOW_STEPS.length - 1}
           />
@@ -156,8 +156,8 @@ export function AgentWorkflowPanel() {
 
   const wrap = (content: ReactNode) => (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', minHeight: 0 }}>
-      <div className="card-title">
-        多Agent协同工作流
+<div className="card-title">
+         流程步骤状态
         {workflow && (
           <span style={{
             marginLeft: 'auto',

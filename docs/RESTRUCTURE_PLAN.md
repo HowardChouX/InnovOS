@@ -53,7 +53,7 @@ backend/app/
 │   │   ├── monitor.py
 │   │   └── patent_db.py
 │   └── workflow_steps/        # 流程步骤路由
-│       ├── demand_portrait.py  # 需求画像
+│       ├── demand_portrait.py  # 需求洞察
 │       ├── problem_modeling.py # 问题建模
 │       ├── patent_search.py    # 专利检索
 │       ├── solution_gen.py     # 方案生成
@@ -224,7 +224,7 @@ frontend/src/
 4. 侧边栏状态同步基础架构
 
 ### Phase 2：核心功能完善（2-3 周）
-5. 需求画像模块（RootSeek 分析器接入）
+5. 需求洞察模块（RootSeek 分析器接入）
 6. 问题建模模块（功能分析、因果链、矛盾分析）
 7. 专利检索模块增强
 8. 方案生成模块

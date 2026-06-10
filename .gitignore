@@ -9,3 +9,6 @@ venv
 *.egg-info
 .DS_Store
 *.db
+.zshenv
+*.zshenv
+backend/data/uploads/
