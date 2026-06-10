@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { KnowledgeQAPanel } from './KnowledgeQAPanel';
 import { TaskInputPanel } from './TaskInputPanel';
 import { TaskList } from './TaskList';
 import { AnalysisResult } from './AnalysisResult';
@@ -90,6 +91,7 @@ export function DashboardPage() {
     <div style={{ display: 'flex', gap: 14, minWidth: 800, minHeight: 0, height: '100%' }}>
       {/* Left main area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+        <div className="card-enter"><KnowledgeQAPanel /></div>
         <div className="card-enter"><TaskInputPanel /></div>
         <div className="card-enter"><TaskList /></div>
         <div className="card-enter" style={{ flex: 1, minHeight: 0 }}><AnalysisResult modeling={modeling} /></div>

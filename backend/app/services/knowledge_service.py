@@ -67,12 +67,13 @@ class KnowledgeService:
         db = get_db()
         cursor = db.execute(
             """INSERT INTO knowledge_docs (title, content, category, tags, source, doc_type, user_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id""",
             (data["title"], data.get("content", ""), data.get("category", "未分类"),
              json.dumps(data.get("tags", [])), data.get("source", ""), data.get("doc_type", "text"), user_id),
         )
         db.commit()
-        row = db.execute("SELECT * FROM knowledge_docs WHERE id=?", (cursor.lastrowid,)).fetchone()
+        inserted_id = cursor.fetchone()["id"]
+        row = db.execute("SELECT * FROM knowledge_docs WHERE id=?", (inserted_id,)).fetchone()
         db.close()
         return KnowledgeService._row_to_doc(row)
 
@@ -96,7 +97,7 @@ class KnowledgeService:
             params.append(json.dumps(data["tags"]))
 
         if updates:
-            updates.append("updated_at = datetime('now')")
+            updates.append("updated_at = to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')")
             params.extend([doc_id, user_id])
             db.execute(f"UPDATE knowledge_docs SET {', '.join(updates)} WHERE id = ? AND user_id = ?", params)
             db.commit()

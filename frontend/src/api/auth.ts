@@ -1,4 +1,8 @@
-const BASE = 'http://localhost:8000';
+/// <reference types="vite/client" />
+
+// In production (nginx reverse proxy), API is same origin → empty string.
+// In development, Vite proxy or explicit URL.
+const BASE = import.meta.env.VITE_API_URL ?? '';
 
 interface AuthUser {
   id: number;

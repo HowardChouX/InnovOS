@@ -91,12 +91,13 @@ def create_workflow(task_id: int, user: dict = Depends(get_current_user)):
         })
 
     cursor = db.execute(
-        "INSERT INTO workflows (task_id, status, steps) VALUES (?, ?, ?)",
+        "INSERT INTO workflows (task_id, status, steps) VALUES (?, ?, ?) RETURNING id",
         (task_id, "idle", json.dumps(steps)),
     )
     db.commit()
 
-    row = db.execute("SELECT * FROM workflows WHERE id=?", (cursor.lastrowid,)).fetchone()
+    inserted_id = cursor.fetchone()["id"]
+    row = db.execute("SELECT * FROM workflows WHERE id=?", (inserted_id,)).fetchone()
     db.close()
 
     return {

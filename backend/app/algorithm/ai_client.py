@@ -51,8 +51,14 @@ async def chat_completion(
     response_format: type = str,
     max_retries: int = 3,
     provider_id: str = "",
+    model_id: str = "",
 ) -> Any:
     """带自动Key切换的AI调用（Provider 感知）
+
+    解析优先级：
+    1. model_id 被设置 → 从 model_resolver 解析 "providerId:modelId"
+    2. provider_id 被设置 → 从 key_manager + 该 provider 的 key
+    3. 都未设置 → 轮询所有可用 Key
 
     Args:
         system_prompt: 系统提示词
@@ -60,7 +66,8 @@ async def chat_completion(
         temperature: 温度参数
         response_format: 返回格式（str 或 dict）
         max_retries: 最大重试次数
-        provider_id: 指定供应商ID，为空则轮询所有可用Key
+        provider_id: 指定供应商ID
+        model_id: 指定完整模型ID（格式 "providerId:modelId"）
 
     Returns:
         AI返回的内容
@@ -68,6 +75,91 @@ async def chat_completion(
     Raises:
         RuntimeError: 所有Key都不可用时抛出
     """
+    # 如果传了 model_id（"providerId:modelId"），使用模型分配路径
+    if model_id:
+        return await _chat_with_model(
+            model_id=model_id,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            temperature=temperature,
+            response_format=response_format,
+            max_retries=max_retries,
+        )
+
+    # 否则走旧路径：key_manager 轮询
+    return await _chat_with_key_manager(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        temperature=temperature,
+        response_format=response_format,
+        max_retries=max_retries,
+        provider_id=provider_id,
+    )
+
+
+async def _chat_with_model(
+    model_id: str,
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float,
+    response_format: type,
+    max_retries: int,
+) -> Any:
+    """使用 model_resolver 解析模型配置并发起调用"""
+    from app.algorithm.model_resolver import model_resolver
+
+    resolved = model_resolver.resolve(model_id)
+    if not resolved:
+        raise RuntimeError(f"模型 '{model_id}' 解析失败：供应商不存在或未配置")
+
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            from app.algorithm.model_runtime import ModelRuntime
+            client = OpenAI(
+                api_key=resolved.api_key,
+                base_url=ModelRuntime.ensure_v1_url(resolved.api_host),
+            )
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": user_prompt})
+
+            kwargs = {
+                "model": resolved.model_id,
+                "messages": messages,
+                "temperature": temperature,
+            }
+            if response_format == dict:
+                kwargs["response_format"] = {"type": "json_object"}
+
+            resp = client.chat.completions.create(**kwargs)
+            content = resp.choices[0].message.content
+
+            if response_format == dict:
+                return json.loads(content)
+            return content
+
+        except Exception as e:
+            last_error = e
+            error_msg = str(e).lower()
+            if attempt < max_retries - 1:
+                await asyncio.sleep(1)
+                continue
+            raise
+
+    raise RuntimeError(f"AI调用失败: {last_error}")
+
+
+async def _chat_with_key_manager(
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float,
+    response_format: type,
+    max_retries: int,
+    provider_id: str = "",
+) -> Any:
+    """旧的 Key 池轮询路径"""
     last_error = None
 
     for attempt in range(max_retries):
@@ -75,8 +167,6 @@ async def chat_completion(
         key_config = None
         try:
             key_config = await key_manager.get_key_for_request(provider_id)
-
-            # Provider 感知路由：解析 base_url
             base_url = _resolve_base_url(key_config, provider_id)
 
             client = OpenAI(

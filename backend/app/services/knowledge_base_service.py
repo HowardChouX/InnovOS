@@ -28,11 +28,20 @@ def _validate_config(config: dict) -> dict:
     return field_errors
 
 
+def _validate_model_id(val: str | None, key: str) -> None:
+    """校验模型 ID 格式 — 禁止双冒号。"""
+    if val and "::" in val:
+        raise ValueError(
+            f"Validation errors: {{'{key}': ['Model ID must use single colon (e.g. provider:model), "
+            f"got {val!r}']}}"
+        )
+
+
 class KnowledgeBaseService:
     """知识库服务 — 完全对齐 CherryStudio KnowledgeBaseService"""
 
     @staticmethod
-    def list(page: int = 1, limit: int = 20) -> dict:
+    def list(user_id: int, page: int = 1, limit: int = 20) -> dict:
         """分页列出知识库"""
         db = get_db()
         offset = (page - 1) * limit
@@ -41,12 +50,13 @@ class KnowledgeBaseService:
             SELECT kb.*, COUNT(ki.id) AS item_count
             FROM knowledge_bases kb
             LEFT JOIN knowledge_items ki ON ki.base_id = kb.id AND ki.status != 'deleting'
+            WHERE kb.user_id=?
             GROUP BY kb.id
             ORDER BY kb.created_at DESC, kb.id DESC
             LIMIT ? OFFSET ?
-        """, (limit, offset)).fetchall()
+        """, (user_id, limit, offset)).fetchall()
 
-        total = db.execute("SELECT COUNT(*) FROM knowledge_bases").fetchone()[0]
+        total = db.execute("SELECT COUNT(*) FROM knowledge_bases WHERE user_id=?", (user_id,)).fetchone()[0]
         db.close()
 
         items = [KnowledgeBaseService._row_to_base(r) for r in rows]
@@ -56,17 +66,17 @@ class KnowledgeBaseService:
         return {"items": items, "total": total, "page": page}
 
     @staticmethod
-    def get_by_id(base_id: str) -> Optional[dict]:
+    def get_by_id(user_id: int, base_id: str) -> Optional[dict]:
         """获取单个知识库"""
         db = get_db()
-        row = db.execute("SELECT * FROM knowledge_bases WHERE id=?", (base_id,)).fetchone()
+        row = db.execute("SELECT * FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id)).fetchone()
         db.close()
         if not row:
             return None
         return KnowledgeBaseService._row_to_base(row)
 
     @staticmethod
-    def create(dto: dict) -> dict:
+    def create(user_id: int, dto: dict) -> dict:
         """创建知识库"""
         create_config = {
             "chunkSize": dto.get("chunkSize", DEFAULT_CHUNK_SIZE),
@@ -77,6 +87,8 @@ class KnowledgeBaseService:
         field_errors = _validate_config(create_config)
         if field_errors:
             raise ValueError(f"Validation errors: {field_errors}")
+        _validate_model_id(dto.get("embeddingModelId"), "embeddingModelId")
+        _validate_model_id(dto.get("rerankModelId"), "rerankModelId")
 
         db = get_db()
         base_id = str(uuid.uuid4())
@@ -84,12 +96,12 @@ class KnowledgeBaseService:
 
         db.execute("""
             INSERT INTO knowledge_bases
-            (id, name, group_id, dimensions, embedding_model_id, status, error,
+            (id, user_id, name, group_id, dimensions, embedding_model_id, status, error,
              rerank_model_id, file_processor_id, chunk_size, chunk_overlap, threshold,
              document_count, search_mode, hybrid_alpha, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            base_id, dto["name"].strip(), dto.get("groupId"),
+            base_id, user_id, dto["name"].strip(), dto.get("groupId"),
             dto.get("dimensions"), dto.get("embeddingModelId"),
             dto.get("status", "completed"), dto.get("error"),
             dto.get("rerankModelId"), dto.get("fileProcessorId"),
@@ -104,9 +116,9 @@ class KnowledgeBaseService:
         return KnowledgeBaseService._row_to_base(row)
 
     @staticmethod
-    def update(base_id: str, dto: dict) -> Optional[dict]:
+    def update(user_id: int, base_id: str, dto: dict) -> Optional[dict]:
         """更新知识库"""
-        existing = KnowledgeBaseService.get_by_id(base_id)
+        existing = KnowledgeBaseService.get_by_id(user_id, base_id)
         if not existing:
             return None
 
@@ -123,6 +135,8 @@ class KnowledgeBaseService:
         field_errors = _validate_config(next_config)
         if field_errors:
             raise ValueError(f"Validation errors: {field_errors}")
+        _validate_model_id(dto.get("embeddingModelId"), "embeddingModelId")
+        _validate_model_id(dto.get("rerankModelId"), "rerankModelId")
 
         updates = {}
         field_map = {
@@ -152,28 +166,66 @@ class KnowledgeBaseService:
         updates["updated_at"] = datetime.now(timezone.utc).isoformat()
         set_clause = ", ".join(f"{k}=?" for k in updates)
         db.execute(
-            f"UPDATE knowledge_bases SET {set_clause} WHERE id=?",
-            [*updates.values(), base_id],
+            f"UPDATE knowledge_bases SET {set_clause} WHERE id=? AND user_id=?",
+            [*updates.values(), base_id, user_id],
         )
         db.commit()
-        row = db.execute("SELECT * FROM knowledge_bases WHERE id=?", (base_id,)).fetchone()
+        row = db.execute("SELECT * FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id)).fetchone()
         db.close()
         return KnowledgeBaseService._row_to_base(row)
 
     @staticmethod
-    def delete(base_id: str) -> bool:
+    def delete(user_id: int, base_id: str) -> bool:
         """删除知识库"""
         db = get_db()
-        row = db.execute("SELECT id FROM knowledge_bases WHERE id=?", (base_id,)).fetchone()
-        if not row:
-            db.close()
-            return False
+        try:
+            row = db.execute("SELECT id FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id)).fetchone()
+            if not row:
+                return False
 
-        db.execute("DELETE FROM knowledge_items WHERE base_id=?", (base_id,))
-        db.execute("DELETE FROM knowledge_bases WHERE id=?", (base_id,))
+            db.execute("DELETE FROM knowledge_items WHERE base_id=?", (base_id,))
+            db.execute("DELETE FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id))
+            db.commit()
+            return True
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    @staticmethod
+    def restore(user_id: int, source_base_id: str, new_base_id: str, dto: dict) -> dict:
+        """从失败的知识库恢复：读取源配置，创建新知识库记录"""
+        db = get_db()
+        source = db.execute(
+            "SELECT * FROM knowledge_bases WHERE id=? AND user_id=?", (source_base_id, user_id)
+        ).fetchone()
+        if not source:
+            db.close()
+            raise ValueError("源知识库不存在")
+
+        now = datetime.now(timezone.utc).isoformat()
+        db.execute("""
+            INSERT INTO knowledge_bases
+            (id, user_id, name, group_id, dimensions, embedding_model_id, status, error,
+             rerank_model_id, file_processor_id, chunk_size, chunk_overlap, threshold,
+             document_count, search_mode, hybrid_alpha, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            new_base_id, user_id, dto["name"].strip(), source["group_id"],
+            dto.get("dimensions", source["dimensions"]),
+            dto.get("embeddingModelId", source["embedding_model_id"]),
+            "completed", None,
+            source["rerank_model_id"], source["file_processor_id"],
+            source["chunk_size"], source["chunk_overlap"],
+            source["threshold"], source["document_count"],
+            source["search_mode"], source["hybrid_alpha"],
+            now, now,
+        ))
         db.commit()
+        row = db.execute("SELECT * FROM knowledge_bases WHERE id=?", (new_base_id,)).fetchone()
         db.close()
-        return True
+        return KnowledgeBaseService._row_to_base(row)
 
     @staticmethod
     def _row_to_base(r) -> dict:

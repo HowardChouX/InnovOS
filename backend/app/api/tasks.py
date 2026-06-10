@@ -78,11 +78,12 @@ def list_tasks(
 def create_task(body: CreateTaskInput, user: dict = Depends(get_current_user)):
     db = get_db()
     cursor = db.execute(
-        "INSERT INTO tasks (user_id, title, description, tags) VALUES (?, ?, ?, ?)",
+        "INSERT INTO tasks (user_id, title, description, tags) VALUES (?, ?, ?, ?) RETURNING id",
         (user["id"], body.title, body.description, json.dumps(body.tags)),
     )
     db.commit()
-    row = db.execute("SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)).fetchone()
+    inserted_id = cursor.fetchone()["id"]
+    row = db.execute("SELECT * FROM tasks WHERE id = ?", (inserted_id,)).fetchone()
     db.close()
     return {"data": row_to_dict(row), "message": "success", "code": 200}
 
@@ -130,7 +131,7 @@ def update_task(task_id: int, body: UpdateTaskInput, user: dict = Depends(get_cu
         params.append(body.status)
 
     if updates:
-        updates.append("updated_at = datetime('now')")
+        updates.append("updated_at = to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')")
         params.extend([task_id, user["id"]])
         db.execute(
             f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND user_id = ?",

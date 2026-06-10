@@ -1,7 +1,7 @@
 import os
 import time
 import platform
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends
 from app.auth import get_current_user, require_admin
 from app.database import get_db
@@ -69,6 +69,7 @@ def get_overview(user: dict = Depends(get_current_user)):
 def get_task_stats(user: dict = Depends(get_current_user)):
     """任务统计（数据隔离）"""
     db = get_db()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
 
     if user["role"] == "admin":
         by_status = db.execute(
@@ -76,7 +77,8 @@ def get_task_stats(user: dict = Depends(get_current_user)):
         ).fetchall()
         recent = db.execute(
             "SELECT date(created_at) as d, COUNT(*) as cnt FROM tasks "
-            "WHERE created_at >= date('now', '-7 days') GROUP BY date(created_at) ORDER BY d"
+            "WHERE created_at >= ? GROUP BY date(created_at) ORDER BY d",
+            (cutoff,)
         ).fetchall()
     else:
         by_status = db.execute(
@@ -85,8 +87,8 @@ def get_task_stats(user: dict = Depends(get_current_user)):
         ).fetchall()
         recent = db.execute(
             "SELECT date(created_at) as d, COUNT(*) as cnt FROM tasks "
-            "WHERE user_id=? AND created_at >= date('now', '-7 days') GROUP BY date(created_at) ORDER BY d",
-            (user["id"],)
+            "WHERE user_id=? AND created_at >= ? GROUP BY date(created_at) ORDER BY d",
+            (user["id"], cutoff)
         ).fetchall()
 
     db.close()
@@ -149,14 +151,25 @@ def get_system_status(user: dict = Depends(require_admin)):
     uptime_str = f"{days}d {hours}h {mins}m"
 
     # 数据库大小
-    db_path = os.path.join(os.path.dirname(__file__), "..", "..", "InnovOS_ACCOUNTS.db")
-    db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
-    if db_size > 1024 * 1024:
-        db_size_str = f"{db_size / 1024 / 1024:.1f} MB"
-    elif db_size > 1024:
-        db_size_str = f"{db_size / 1024:.1f} KB"
-    else:
-        db_size_str = f"{db_size} B"
+    from app.database import get_db, is_postgres, get_sqlite_path
+    db = get_db()
+    try:
+        if is_postgres():
+            row = db.execute("SELECT pg_database_size(current_database()) AS size").fetchone()
+            db_size = row["size"] if row else 0
+        else:
+            db_path = get_sqlite_path()
+            if not os.path.isabs(db_path):
+                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", db_path)
+            db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+        if db_size > 1024 * 1024:
+            db_size_str = f"{db_size / 1024 / 1024:.1f} MB"
+        elif db_size > 1024:
+            db_size_str = f"{db_size / 1024:.1f} KB"
+        else:
+            db_size_str = f"{db_size} B"
+    finally:
+        db.close()
 
     # 内存使用（Linux /proc/meminfo）
     memory_info = {"total": 0, "used": 0, "percent": 0}

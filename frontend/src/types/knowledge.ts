@@ -102,4 +102,4 @@ export interface OffsetPaginationResponse<T> {
   page: number
 }
 
-export type KnowledgeTabKey = 'file' | 'note' | 'directory' | 'url' | 'website'
+export type KnowledgeTabKey = 'file' | 'note' | 'directory' | 'url'

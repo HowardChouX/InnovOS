@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+@theme {
+  --color-background: var(--bg-dark);
+  --color-background-muted: var(--bg-card);
+  --color-foreground: var(--text-primary);
+  --color-foreground-muted: var(--text-secondary);
+  --color-foreground-secondary: var(--text-secondary);
+  --color-muted: var(--text-secondary);
+  --color-secondary: var(--text-secondary);
+  --color-tertiary: var(--text-tertiary);
+  --color-border: var(--border);
+  --color-border-muted: var(--border-light);
+  --color-border-light: var(--border-light);
+  --color-border-subtle: var(--border-light);
+  --color-border-active: var(--accent);
+  --color-border-hover: var(--border);
+  --color-card: var(--bg-card);
+  --color-panel: var(--bg-panel);
+  --color-dark: var(--bg-dark);
+  --color-glass: var(--bg-glass);
+  --color-accent: var(--bg-card);
+  --color-accent-foreground: var(--text-primary);
+  --color-primary: var(--accent);
+  --color-primary-foreground: #ffffff;
+  --color-destructive: var(--accent-red);
+  --color-popover: var(--bg-card);
+  --color-ring: var(--accent);
+}
+
 :root {
   /* Dark theme (default) - deep blue professional dark */
   --bg-dark: #0b1120;
@@ -142,4 +170,56 @@ body {
 }
 [data-placeholder]:focus:empty::before {
   content: attr(data-placeholder);
+}
+
+/* ── Select / Dropdown dark theme ── */
+select {
+  color-scheme: dark;
+  appearance: auto;
+}
+select option {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+}
+
+/* ── Accent status text classes ── */
+.text-accent-success { color: var(--accent-green); }
+.text-accent-danger { color: var(--accent-red); }
+.text-accent-info { color: var(--accent-blue); }
+.text-accent-warning { color: var(--accent-yellow); }
+.text-accent-purple { color: var(--accent-purple); }
+.text-accent-cyan { color: var(--accent-cyan); }
+.text-accent-violet { color: #a78bfa; }
+.text-accent-amber { color: #f59e0b; }
+
+/* ── Badge status classes (border + bg + text) ── */
+.badge-success {
+  border-color: color-mix(in srgb, var(--accent-green) 30%, transparent);
+  background: color-mix(in srgb, var(--accent-green) 10%, transparent);
+  color: var(--accent-green);
+}
+.badge-danger {
+  border-color: color-mix(in srgb, var(--accent-red) 30%, transparent);
+  background: color-mix(in srgb, var(--accent-red) 10%, transparent);
+  color: var(--accent-red);
+}
+.badge-warning {
+  border-color: color-mix(in srgb, var(--accent-yellow) 30%, transparent);
+  background: color-mix(in srgb, var(--accent-yellow) 10%, transparent);
+  color: var(--accent-yellow);
+}
+.badge-info {
+  border-color: color-mix(in srgb, var(--accent-blue) 30%, transparent);
+  background: color-mix(in srgb, var(--accent-blue) 10%, transparent);
+  color: var(--accent-blue);
+}
+.badge-purple {
+  border-color: color-mix(in srgb, var(--accent-purple) 30%, transparent);
+  background: color-mix(in srgb, var(--accent-purple) 10%, transparent);
+  color: var(--accent-purple);
+}
+
+/* ── Hover state helpers ── */
+.hover-danger-subtle:hover {
+  background-color: color-mix(in srgb, var(--accent-red) 10%, transparent);
 }

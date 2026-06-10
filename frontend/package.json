@@ -7,12 +7,35 @@
     "dev": "NODE_OPTIONS='--no-deprecation' vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@tiptap/core": "^3.2.0",
+    "@tiptap/extension-drag-handle-react": "^3.26.0",
+    "@tiptap/extension-image": "^3.26.0",
+    "@tiptap/extension-link": "^3.2.0",
+    "@tiptap/extension-list": "^3.2.0",
+    "@tiptap/extension-mathematics": "^3.2.0",
+    "@tiptap/extension-mention": "^3.26.0",
+    "@tiptap/extension-placeholder": "^3.26.0",
+    "@tiptap/extension-table": "^3.2.0",
+    "@tiptap/extension-table-cell": "^3.2.0",
+    "@tiptap/extension-table-header": "^3.2.0",
+    "@tiptap/extension-table-of-contents": "^3.26.0",
+    "@tiptap/extension-table-row": "^3.2.0",
+    "@tiptap/extension-typography": "^3.26.0",
+    "@tiptap/extension-underline": "^3.2.0",
+    "@tiptap/pm": "^3.2.0",
+    "@tiptap/react": "^3.2.0",
+    "@tiptap/starter-kit": "^3.2.0",
     "clsx": "^2.1.1",
+    "i18next": "^26.3.1",
+    "lucide-react": "^1.17.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-hotkeys-hook": "^5.3.2",
+    "react-i18next": "^17.0.8",
     "react-router-dom": "^7.15.1",
     "tailwind-merge": "^3.6.0",
     "zustand": "^5.0.13"
@@ -20,6 +43,10 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.3.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jsdom": "^28.0.3",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -28,9 +55,11 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4.3.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "vitest": "^4.1.8"
   }
 }

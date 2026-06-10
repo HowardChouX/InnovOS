@@ -102,7 +102,24 @@ export const knowledgeApi = {
     formData.append('file', file);
     if (baseId) formData.append('base_id', baseId);
     const token = localStorage.getItem('token');
-    const res = await fetch('http://localhost:8000/api/knowledge/upload', {
+    const base = import.meta.env.VITE_API_URL ?? '';
+    const res = await fetch(`${base}/api/knowledge/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    return res.json();
+  },
+
+  // ─── 文件夹导入（生产环境：上传文件列表）─────────────────
+  async importDirectory(baseId: string, files: File[]): Promise<{ data: { id: string } }> {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('files', file);
+    }
+    const token = localStorage.getItem('token');
+    const base = import.meta.env.VITE_API_URL ?? '';
+    const res = await fetch(`${base}/api/knowledge-bases/${baseId}/items/import-directory`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
@@ -128,7 +145,7 @@ export const knowledgeApi = {
     return apiRequest('/api/models/rerank');
   },
 
-  // ─── 分组 ─�────────────────────────────────────────────
+  // ─── 分组 ─────────────────────────────────────────────
   async listGroups(): Promise<{ data: KnowledgeGroup[] }> {
     return apiRequest('/api/knowledge/groups');
   },
@@ -139,6 +156,23 @@ export const knowledgeApi = {
 
   async deleteGroup(id: string): Promise<void> {
     await apiRequest(`/api/knowledge/groups/${id}`, { method: 'DELETE' });
+  },
+
+  async updateGroup(id: string, data: { name: string }): Promise<{ data: KnowledgeGroup }> {
+    return apiRequest(`/api/knowledge/groups/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  },
+
+  async reindexItem(baseId: string, itemId: string): Promise<void> {
+    await apiRequest(`/api/knowledge-bases/${baseId}/items/${itemId}/reindex`, { method: 'POST' });
+  },
+
+  async restoreBase(sourceBaseId: string, data: { name: string; embeddingModelId: string; dimensions?: number }): Promise<{ data: KnowledgeBase }> {
+    return apiRequest(`/api/knowledge-bases/${sourceBaseId}/restore`, { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  // ─── 多知识库搜索 ────────────────────────────────────
+  async multiBaseSearch(params: { query: string; baseIds: string[]; topK?: number }): Promise<{ data: Array<{ text: string; score: number; source: string; baseId: string }> }> {
+    return apiRequest('/api/knowledge-bases/search', { method: 'POST', body: JSON.stringify(params) });
   },
 };
 

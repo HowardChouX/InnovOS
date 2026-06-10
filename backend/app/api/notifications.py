@@ -139,12 +139,13 @@ def create_notification(body: CreateNotificationInput, user: dict = Depends(requ
         raise HTTPException(status_code=404, detail="User not found")
 
     cursor = db.execute(
-        "INSERT INTO notifications (user_id, title, content, type) VALUES (?, ?, ?, ?)",
+        "INSERT INTO notifications (user_id, title, content, type) VALUES (?, ?, ?, ?) RETURNING id",
         (body.user_id, body.title, body.content, body.type),
     )
     db.commit()
+    result_id = cursor.fetchone()["id"]
     db.close()
-    return {"data": {"id": cursor.lastrowid}, "message": "sent", "code": 200}
+    return {"data": {"id": result_id}, "message": "sent", "code": 200}
 
 
 @router.post("/batch")

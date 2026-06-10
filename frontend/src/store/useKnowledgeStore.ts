@@ -14,11 +14,13 @@ interface KnowledgeStore {
   loading: boolean;
   activeTab: KnowledgeTabKey;
   searchQuery: string;
-  isAddSourceOpen: boolean;
-  isRagConfigOpen: boolean;
   isRecallTestOpen: boolean;
   isCreateBaseOpen: boolean;
+  createBaseGroupId: string | undefined;
+  isCreateGroupOpen: boolean;
   editingName: { id: string; name: string; type: 'base' | 'group' } | null;
+  restoringBase: KnowledgeBase | null;
+  isRestoringBase: boolean;
 
   fetchBases: () => Promise<void>;
   fetchGroups: () => Promise<void>;
@@ -26,26 +28,31 @@ interface KnowledgeStore {
   createBase: (name: string, groupId?: string, extra?: Record<string, any>) => Promise<void>;
   updateBase: (id: string, data: Partial<KnowledgeBase>) => Promise<void>;
   deleteBase: (id: string) => Promise<void>;
+  createGroup: (name: string) => Promise<void>;
+  deleteGroup: (id: string) => Promise<void>;
   renameBase: (id: string, name: string) => Promise<void>;
   renameGroup: (id: string, name: string) => Promise<void>;
   fetchItems: (baseId?: string, page?: number) => Promise<void>;
   uploadFile: (file: File) => Promise<void>;
   addItem: (type: 'file' | 'url' | 'note' | 'directory', data: Record<string, any>) => Promise<void>;
+  importDirectory: (files: File[]) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   setActiveTab: (tab: KnowledgeTabKey) => void;
   setSearchQuery: (q: string) => void;
   openItemChunks: (id: string) => void;
   closeItemChunks: () => void;
-  openAddSource: () => void;
-  closeAddSource: () => void;
-  openRagConfig: () => void;
-  closeRagConfig: () => void;
   openRecallTest: () => void;
   closeRecallTest: () => void;
   openCreateBase: (groupId?: string) => void;
   closeCreateBase: () => void;
+  openCreateGroup: () => void;
+  closeCreateGroup: () => void;
   openRename: (id: string, name: string, type: 'base' | 'group') => void;
   closeRename: () => void;
+  openRestoreBase: (base: KnowledgeBase) => void;
+  closeRestoreBase: () => void;
+  restoreBase: (input: { sourceBaseId: string; name: string; embeddingModelId: string; dimensions?: number }) => Promise<KnowledgeBase>;
+  reindexItem: (itemId: string) => Promise<void>;
 }
 
 export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
@@ -56,15 +63,17 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
   items: [],
   itemsTotal: 0,
   itemsPage: 1,
-  tabCounts: { file: 0, note: 0, directory: 0, url: 0, website: 0 },
+  tabCounts: { file: 0, note: 0, directory: 0, url: 0 },
   loading: false,
   activeTab: 'file',
   searchQuery: '',
-  isAddSourceOpen: false,
-  isRagConfigOpen: false,
   isRecallTestOpen: false,
   isCreateBaseOpen: false,
+  createBaseGroupId: undefined,
+  isCreateGroupOpen: false,
   editingName: null,
+  restoringBase: null,
+  isRestoringBase: false,
 
   fetchBases: async () => {
     set({ loading: true });
@@ -125,9 +134,20 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
 
   deleteBase: async (id) => {
     await knowledgeApi.deleteBase(id);
-    if (get().selectedBaseId === id) {
-      set({ selectedBaseId: '', selectedItemId: null, items: [], itemsTotal: 0, tabCounts: { file: 0, note: 0, directory: 0, url: 0, website: 0 } });
-    }
+      if (get().selectedBaseId === id) {
+        set({ selectedBaseId: '', selectedItemId: null, items: [], itemsTotal: 0, tabCounts: { file: 0, note: 0, directory: 0, url: 0 } });
+      }
+    await get().fetchBases();
+  },
+
+  createGroup: async (name) => {
+    await knowledgeApi.createGroup(name);
+    await get().fetchGroups();
+  },
+
+  deleteGroup: async (id) => {
+    await knowledgeApi.deleteGroup(id);
+    await get().fetchGroups();
     await get().fetchBases();
   },
 
@@ -136,23 +156,24 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
     await get().fetchBases();
   },
 
-  renameGroup: async (_id, _name) => {
+  renameGroup: async (id, name) => {
+    await knowledgeApi.updateGroup(id, { name });
     await get().fetchGroups();
     await get().fetchBases();
   },
 
-  fetchItems: async (baseId, page = 1) => {
+  fetchItems: async (baseId, page = 1, skipLoading = false) => {
     const bid = baseId || get().selectedBaseId;
     if (!bid) return;
-    set({ loading: true });
+    if (!skipLoading) set({ loading: true });
     try {
-      const type = get().activeTab === 'website' ? undefined : get().activeTab;
+      const type = get().activeTab;
       const [filteredRes, allRes] = await Promise.all([
         knowledgeApi.listItems(bid, { page, limit: 20, type }),
         knowledgeApi.listItems(bid, { page: 1, limit: 9999, type: undefined }),
       ]);
       const allItems = allRes.data?.items || [];
-      const counts: Record<KnowledgeTabKey, number> = { file: 0, note: 0, directory: 0, url: 0, website: 0 };
+      const counts: Record<KnowledgeTabKey, number> = { file: 0, note: 0, directory: 0, url: 0 };
       for (const item of allItems) {
         if (item.type in counts) counts[item.type as KnowledgeTabKey]++;
       }
@@ -163,7 +184,7 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
         tabCounts: counts,
       });
     } catch {
-      set({ items: [], itemsTotal: 0, tabCounts: { file: 0, note: 0, directory: 0, url: 0, website: 0 } });
+      set({ items: [], itemsTotal: 0, tabCounts: { file: 0, note: 0, directory: 0, url: 0 } });
     } finally {
       set({ loading: false });
     }
@@ -185,6 +206,14 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
     await get().fetchBases();
   },
 
+  importDirectory: async (files) => {
+    const baseId = get().selectedBaseId;
+    if (!baseId) return;
+    await knowledgeApi.importDirectory(baseId, files);
+    await get().fetchItems(baseId);
+    await get().fetchBases();
+  },
+
   deleteItem: async (id) => {
     await knowledgeApi.deleteItem(id);
     const { selectedBaseId } = get();
@@ -200,14 +229,36 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
   setSearchQuery: (q) => set({ searchQuery: q }),
   openItemChunks: (id) => set({ selectedItemId: id }),
   closeItemChunks: () => set({ selectedItemId: null }),
-  openAddSource: () => set({ isAddSourceOpen: true }),
-  closeAddSource: () => set({ isAddSourceOpen: false }),
-  openRagConfig: () => set({ isRagConfigOpen: true }),
-  closeRagConfig: () => set({ isRagConfigOpen: false }),
   openRecallTest: () => set({ isRecallTestOpen: true }),
   closeRecallTest: () => set({ isRecallTestOpen: false }),
-  openCreateBase: () => set({ isCreateBaseOpen: true }),
-  closeCreateBase: () => set({ isCreateBaseOpen: false }),
+  openCreateBase: (groupId) => set({ isCreateBaseOpen: true, createBaseGroupId: groupId }),
+  closeCreateBase: () => set({ isCreateBaseOpen: false, createBaseGroupId: undefined }),
+  openCreateGroup: () => set({ isCreateGroupOpen: true }),
+  closeCreateGroup: () => set({ isCreateGroupOpen: false }),
   openRename: (id, name, type) => set({ editingName: { id, name, type } }),
   closeRename: () => set({ editingName: null }),
+  openRestoreBase: (base) => set({ restoringBase: base }),
+  closeRestoreBase: () => set({ restoringBase: null }),
+  restoreBase: async (input) => {
+    set({ isRestoringBase: true });
+    try {
+      const res = await knowledgeApi.restoreBase(input.sourceBaseId, {
+        name: input.name,
+        embeddingModelId: input.embeddingModelId,
+        dimensions: input.dimensions,
+      });
+      await get().fetchBases();
+      return res.data as KnowledgeBase;
+    } finally {
+      set({ isRestoringBase: false });
+    }
+  },
+
+  reindexItem: async (itemId) => {
+    const { selectedBaseId } = get();
+    if (!selectedBaseId) return;
+    await knowledgeApi.reindexItem(selectedBaseId, itemId);
+    await get().fetchItems(selectedBaseId);
+    await get().fetchBases();
+  },
 }));

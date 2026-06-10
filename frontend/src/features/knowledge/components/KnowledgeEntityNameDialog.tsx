@@ -45,7 +45,7 @@ export default function KnowledgeEntityNameDialog({ title, open, onClose, onSubm
             placeholder="名称"
             style={{
               width: '100%', padding: '8px 12px', borderRadius: 6, fontSize: 13,
-              background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)',
+              background: 'var(--bg-panel)', border: '1px solid var(--border)',
               color: 'var(--text-primary)', outline: 'none', fontFamily: 'inherit',
             }}
           />

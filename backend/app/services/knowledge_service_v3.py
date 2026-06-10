@@ -143,7 +143,7 @@ class KnowledgeBaseService:
                 params.append(val)
 
         if updates:
-            updates.append("updated_at=datetime('now')")
+            updates.append("updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')")
             params.append(base_id)
             params.append(user_id)
             db.execute(
@@ -324,7 +324,7 @@ class KnowledgeItemService:
 
         err = error.strip() if status == "failed" else None
         db.execute(
-            "UPDATE knowledge_items SET status=?, error=?, updated_at=datetime('now') WHERE id=?",
+            "UPDATE knowledge_items SET status=?, error=?, updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
             (status, err, item_id),
         )
         db.commit()
