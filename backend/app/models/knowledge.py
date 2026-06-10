@@ -4,7 +4,7 @@
 使用 Pydantic 定义类型，确保类型安全和数据验证。
 """
 from enum import Enum
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 from pydantic import BaseModel, Field, field_validator
 
 

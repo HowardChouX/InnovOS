@@ -5,16 +5,23 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from app.auth import get_current_user
 from app.database import get_db
 from app.utils import utc_iso
-from app.algorithm.file_parser import parse_file
 from app.algorithm.knowledge.retriever import get_retriever
-from app.algorithm.knowledge.pipeline import KnowledgePipeline, get_embedding_api_config
+from app.algorithm.knowledge.pipeline import KnowledgePipeline
 from app.services.knowledge_service_v2 import KnowledgeItemService
+from app.services.file_storage_service import file_storage
+from app.services.knowledge_job_manager import (
+    JOB_TYPE_INDEX_DOCUMENTS,
+    knowledge_queue_name,
+    knowledge_idempotency_key,
+)
 from pydantic import BaseModel
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-UPLOAD_DIR = "/tmp/innovos-knowledge-uploads"
+# 生产环境持久化上传目录
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "data", "uploads")
+UPLOAD_DIR = os.path.abspath(UPLOAD_DIR)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
@@ -40,36 +47,52 @@ async def upload_file(
     base_id: str = Form(""),
     user: dict = Depends(get_current_user)
 ):
-    """上传文件 → 解析 → 存储为知识项"""
-    file_path = os.path.join(UPLOAD_DIR, f"{user['id']}_{file.filename}")
+    """上传文件 → 持久化存储 → 解析 → 存储为知识项"""
     content_bytes = await file.read()
+    filename = file.filename or "untitled"
+
+    # 1. 持久化存储到 MinIO/S3（如果已配置）
+    s3_key = await file_storage.upload(user["id"], filename, content_bytes)
+
+    # 2. 写入持久化目录用于解析
+    user_upload_dir = os.path.join(UPLOAD_DIR, str(user["id"]))
+    os.makedirs(user_upload_dir, exist_ok=True)
+    file_path = os.path.join(user_upload_dir, f"{base_id or 'default'}_{filename}")
     with open(file_path, "wb") as f:
         f.write(content_bytes)
 
-    pipeline = KnowledgePipeline(user["id"], base_id=base_id)
-    result = await pipeline.process_file(file_path, file.filename or "untitled")
+    # 3. 创建 knowledge_item 记录
+    if not base_id:
+        return {"data": {"path": file_path}, "message": "文件已保存", "code": 200}
 
-    try:
-        os.remove(file_path)
-    except:
-        pass
+    item_data = {
+        "source": filename,
+        "path": file_path,
+    }
+    if s3_key:
+        item_data["s3Key"] = s3_key
 
-    # 创建 knowledge_item 记录
-    if base_id:
-        item = KnowledgeItemService.create_item(
-            user["id"], base_id,
-            {
-                "type": "file",
-                "data": {
-                    "source": file.filename or "untitled",
-                    "fileEntryId": result.get("doc_id", ""),
-                },
-                "status": "completed",
-            }
-        )
-        return {"data": item, "message": "导入成功", "code": 200}
+    item = KnowledgeItemService.create_item(
+        user["id"], base_id,
+        {
+            "type": "file",
+            "data": item_data,
+            "status": "processing",
+        }
+    )
 
-    return {"data": result, "message": "导入成功", "code": 200}
+    # 4. 异步索引（通过 job queue，与 URL/Note 统一）
+    from app.services.knowledge_orchestration_service import knowledge_orchestration_service
+
+    await knowledge_orchestration_service.job_manager.enqueue(
+        JOB_TYPE_INDEX_DOCUMENTS,
+        {"baseId": base_id, "itemId": item["id"]},
+        queue=knowledge_queue_name(base_id),
+        idempotency_key=knowledge_idempotency_key("add", base_id, item["id"]),
+    )
+    logger.info(f"文件 {filename} 已入队异步索引: item_id={item['id']}")
+
+    return {"data": item, "message": "导入成功", "code": 200}
 
 
 # ─── 知识项 CRUD ─────────────────────────────────────
@@ -93,11 +116,16 @@ def list_items(
 
 
 @router.post("/bases/{base_id}/items")
-def create_item(base_id: str, body: CreateItemInput, user: dict = Depends(get_current_user)):
-    result = KnowledgeItemService.create_item(user["id"], base_id, body.model_dump())
-    if not result:
-        raise HTTPException(status_code=404, detail="知识库不存在")
-    return {"data": result, "message": "created", "code": 200}
+async def create_item(base_id: str, body: CreateItemInput, user: dict = Depends(get_current_user)):
+    """创建知识项 — 通过编排服务统一管理生命周期（对齐 cherry-studio workflow）"""
+    from app.services.knowledge_orchestration_service import knowledge_orchestration_service
+
+    item_dict = body.model_dump()
+    items_list = [item_dict]
+
+    await knowledge_orchestration_service.add_items(user["id"], base_id, items_list)
+
+    return {"data": items_list, "message": "created", "code": 200}
 
 
 @router.get("/items/{item_id}")
@@ -137,15 +165,40 @@ async def search_knowledge(user: dict = Depends(get_current_user), q: str = "", 
     """RAG 检索"""
     db = get_db()
     if q:
-        pipeline = KnowledgePipeline(user["id"])
-        results = []
+        from app.services.knowledge_item_service import KnowledgeItemService
+
+        pipeline = KnowledgePipeline(user["id"], base_id=base_id)
+        raw_results = []
         try:
-            results = await pipeline.search(q, limit)
-        except Exception:
-            pass
-        if results:
+            raw_results = await pipeline.search(q, limit)
+        except Exception as e:
+            logger.warning("向量检索失败: %s", e)
+        if raw_results:
+            # 映射为前端期望的 KnowledgeSearchResult 格式
+            mapped = []
+            for i, r in enumerate(raw_results):
+                item_id = r.get("item_id", "")
+                # 获取知识项信息
+                item = KnowledgeItemService.get_by_id(user["id"], item_id) if item_id else None
+                source = ""
+                if item:
+                    item_data = json.loads(item["data"]) if isinstance(item["data"], str) else item["data"]
+                    source = (item_data.get("url") or item_data.get("source") or item_data.get("originalName") or "")
+
+                mapped.append({
+                    "chunkId": r.get("id", ""),
+                    "pageContent": r.get("text", ""),
+                    "score": r.get("score", 0),
+                    "scoreKind": "relevance",
+                    "rank": i + 1,
+                    "metadata": {
+                        "source": source,
+                        "chunkIndex": r.get("chunk_index", 0),
+                        "tokenCount": len(r.get("text", "").split()),
+                    },
+                })
             db.close()
-            return {"data": results, "total": len(results), "message": "success", "code": 200}
+            return {"data": mapped, "total": len(mapped), "message": "success", "code": 200}
 
     # LIKE 降级
     rows = db.execute(
@@ -161,6 +214,41 @@ async def search_knowledge(user: dict = Depends(get_current_user), q: str = "", 
 
     data = [{"id": str(r["id"]), "title": r["title"], "content": r["content"], "category": r["category"], "tags": json.loads(r["tags"]), "source": r["source"], "docType": r["doc_type"], "relevance": 0, "updatedAt": utc_iso(r["updated_at"])} for r in rows]
     return {"data": data, "total": len(data), "message": "success", "code": 200}
+
+
+# ─── 文件下载 ─────────────────────────────────────────
+
+@router.get("/files/{item_id}/download")
+async def download_item_file(
+    item_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """下载知识项关联的原始文件（从 MinIO 获取）。"""
+    # 查找知识项，获取 S3 key
+    item = KnowledgeItemService.get_by_id(user["id"], item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="知识项不存在")
+
+    data = item.get("data", {})
+    if isinstance(data, str):
+        data = json.loads(data)
+    s3_key = data.get("s3Key") if isinstance(data, dict) else None
+
+    if not s3_key or not file_storage.enabled:
+        raise HTTPException(status_code=404, detail="文件不存在或未持久化存储")
+
+    content = await file_storage.download(s3_key)
+    if content is None:
+        raise HTTPException(status_code=404, detail="文件不存在或无法访问")
+
+    filename = data.get("source", "download")
+    from fastapi.responses import Response
+
+    return Response(
+        content=content,
+        media_type=file_storage._guess_mime(filename),
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ─── 嵌入模型配置 ─────────────────────────────────────

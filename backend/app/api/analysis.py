@@ -1,7 +1,9 @@
 import json
 import asyncio
 import sys
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from pydantic import BaseModel
 from app.auth import get_current_user
 from app.database import get_db
 from app.algorithm.zr_ipm import ZRIPMEngine
@@ -34,11 +36,11 @@ def create_workflow(db, task_id: int):
         })
 
     cursor = db.execute(
-        "INSERT INTO workflows (task_id, status, steps) VALUES (?, ?, ?)",
+        "INSERT INTO workflows (task_id, status, steps) VALUES (?, ?, ?) RETURNING id",
         (task_id, "idle", json.dumps(steps)),
     )
     db.commit()
-    return cursor.lastrowid
+    return cursor.fetchone()["id"]
 
 
 def update_workflow_step(db, task_id: int, agent_id: str, status: str, description: str = None, duration: str = None, output: str = None):
@@ -269,11 +271,61 @@ async def _update_problem_modeling(db, task_id: int, task_description: str, anal
         pass
 
 
-async def run_analysis_background(task_id: int, user_id: int, task_description: str):
+async def _search_knowledge_bases(user_id: int, base_ids: list[str], query: str, top_k: int = 5) -> str:
+    """搜索多个知识库，返回格式化的参考内容。"""
+    from app.algorithm.knowledge.pipeline import KnowledgePipeline
+
+    all_results = []
+    for base_id in base_ids:
+        try:
+            pipeline = KnowledgePipeline(user_id, base_id)
+            results = await pipeline.search(query, top_k=top_k, use_rerank=True)
+            for r in results:
+                all_results.append({
+                    "base_id": base_id,
+                    "item_id": r.get("item_id", ""),
+                    "content": r.get("text", ""),
+                    "score": r.get("score", 0),
+                })
+        except Exception as e:
+            print(f"[WARN] KB search failed for base {base_id}: {e}", flush=True)
+
+    if not all_results:
+        return ""
+
+    # 按分数降序排列，取前 10 条
+    all_results.sort(key=lambda x: x["score"], reverse=True)
+    all_results = all_results[:10]
+
+    lines = ["【知识库参考内容】"]
+    for i, r in enumerate(all_results, 1):
+        score_pct = round(r["score"] * 100)
+        lines.append(f"{i}. 来源: {r['item_id']} (相关度 {score_pct}%)")
+        lines.append(f"   {r['content'][:300]}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+async def run_analysis_background(task_id: int, user_id: int, task_description: str, knowledge_base_ids: Optional[list[str]] = None):
     """后台执行分析任务"""
     print(f"[DEBUG] Background task started for task_id={task_id}", flush=True)
     db = get_db()
     engine = ZRIPMEngine()
+
+    # 如果选择了知识库，先搜索并注入上下文
+    kb_context = ""
+    if knowledge_base_ids:
+        print(f"[DEBUG] Searching knowledge bases: {knowledge_base_ids}", flush=True)
+        update_workflow_step(db, task_id, "agent1", "running",
+                           description="正在检索知识库...")
+        kb_context = await _search_knowledge_bases(user_id, knowledge_base_ids, task_description)
+        print(f"[DEBUG] KB context length: {len(kb_context)}", flush=True)
+
+    # 构建带知识库上下文的任务描述
+    enriched_description = task_description
+    if kb_context:
+        enriched_description = f"{kb_context}\n\n【用户问题】\n{task_description}"
 
     try:
         # Step 1: 需求洞察 - AI分析问题
@@ -281,7 +333,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
         update_workflow_step(db, task_id, "agent1", "running")
         print(f"[DEBUG] Agent1 set to running successfully", flush=True)
         
-        analysis_result = await engine.analyze(task_description)
+        analysis_result = await engine.analyze(enriched_description)
         
         # 增量更新：问题要素
         await _update_problem_modeling(db, task_id, task_description, analysis_result, "agent1")
@@ -352,7 +404,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
         # Step 4: 方案生成 - AI生成解决方案
         update_workflow_step(db, task_id, "agent3", "running")
         
-        solutions = await engine.generate_solutions(task_description)
+        solutions = await engine.generate_solutions(enriched_description)
 
         for sol in solutions:
             db.execute(
@@ -370,7 +422,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
             )
 
         # 增量更新：创新方向
-        await _update_problem_modeling(db, task_id, task_description, analysis_result, "agent3",
+        await _update_problem_modeling(db, task_id, enriched_description, analysis_result, "agent3",
                                        extra_data={"solutions": solutions})
         
         update_workflow_step(db, task_id, "agent3", "completed",
@@ -439,7 +491,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
 
         # 更新任务状态
         db.execute(
-            "UPDATE tasks SET status='completed', updated_at=datetime('now') WHERE id=?",
+            "UPDATE tasks SET status='completed', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
             (task_id,)
         )
         db.commit()
@@ -447,7 +499,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
     except Exception as e:
         print(f"[ERROR] Background task failed for task_id={task_id}: {e}")
         db.execute(
-            "UPDATE tasks SET status='failed', updated_at=datetime('now') WHERE id=?",
+            "UPDATE tasks SET status='failed', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
             (task_id,)
         )
         db.commit()
@@ -494,8 +546,12 @@ def get_analysis(task_id: int, user: dict = Depends(get_current_user)):
     }
 
 
+class TriggerAnalysisInput(BaseModel):
+    knowledgeBaseIds: Optional[list[str]] = None
+
+
 @router.post("/{task_id}/trigger")
-async def trigger_analysis(task_id: int, user: dict = Depends(get_current_user)):
+async def trigger_analysis(task_id: int, body: Optional[TriggerAnalysisInput] = None, user: dict = Depends(get_current_user)):
     db = get_db()
 
     task = db.execute(
@@ -528,7 +584,7 @@ async def trigger_analysis(task_id: int, user: dict = Depends(get_current_user))
         }
 
     db.execute(
-        "UPDATE tasks SET status='analyzing', updated_at=datetime('now') WHERE id=?",
+        "UPDATE tasks SET status='analyzing', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
         (task_id,)
     )
     db.commit()
@@ -541,7 +597,8 @@ async def trigger_analysis(task_id: int, user: dict = Depends(get_current_user))
 
     # 后台启动分析任务
     # 使用 BackgroundTasks 确保任务在响应发送后继续执行
-    task = asyncio.create_task(run_analysis_background(task_id, user["id"], task["description"]))
+    kb_ids = body.knowledgeBaseIds if body else None
+    task = asyncio.create_task(run_analysis_background(task_id, user["id"], task["description"], kb_ids))
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
 

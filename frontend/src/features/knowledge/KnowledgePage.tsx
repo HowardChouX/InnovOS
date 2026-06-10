@@ -1,56 +1,132 @@
-import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useState, useCallback, createContext, useContext, useMemo } from 'react';
 import { useKnowledgeStore } from '../../store/useKnowledgeStore';
+import type { KnowledgeBase } from '../../types/knowledge';
 import { KnowledgeNavigator } from './KnowledgeNavigator';
 import { KnowledgeDetail } from './KnowledgeDetail';
-import { AddKnowledgeItemDialog } from './AddKnowledgeItemDialog';
-import { RagConfigPanel } from './RagConfigPanel';
+
 import { RecallTestPanel } from './RecallTestPanel';
 import CreateKnowledgeBaseDialog from './CreateKnowledgeBaseDialog';
+import CreateKnowledgeGroupDialog from './components/CreateKnowledgeGroupDialog';
+import KnowledgeBaseNameDialog from './components/KnowledgeBaseNameDialog';
+import RestoreKnowledgeBaseDialog from './components/RestoreKnowledgeBaseDialog';
+import RenameKnowledgeGroupDialog from './components/RenameKnowledgeGroupDialog';
 
+// ─── Context for dialog coordination ─────────────────────────
+interface KnowledgePageContextValue {
+  openRenameBaseDialog: (base: Pick<KnowledgeBase, 'id' | 'name'>) => void;
+  openRestoreBaseDialog: (base: KnowledgeBase) => void;
+}
+
+const KnowledgePageContext = createContext<KnowledgePageContextValue | null>(null);
+
+export const useKnowledgePage = () => {
+  const ctx = useContext(KnowledgePageContext);
+  if (!ctx) {
+    throw new Error('useKnowledgePage must be used within KnowledgePage');
+  }
+  return ctx;
+};
+
+// ─── Main Page ──────────────────────────────────────────────
 export default function KnowledgePage() {
   const {
     fetchBases, fetchGroups, selectedBaseId,
-    isAddSourceOpen, closeAddSource,
-    isRagConfigOpen, closeRagConfig,
     isRecallTestOpen, closeRecallTest,
     isCreateBaseOpen, closeCreateBase,
-    editingName, closeRename, renameBase, renameGroup,
+    isCreateGroupOpen, closeCreateGroup,
+    createGroup,
+    editingName, closeRename,
+    isRestoringBase, restoreBase,
   } = useKnowledgeStore();
+
+  // Dialog state for rename base and restore
+  const [renameBaseDialog, setRenameBaseDialog] = useState<{ id: string; name: string } | null>(null);
+  const [restoreDialogBase, setRestoreDialogBase] = useState<KnowledgeBase | null>(null);
+  const [renameGroupDialog, setRenameGroupDialog] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     fetchBases();
     fetchGroups();
   }, []);
 
+  const handleRenameBaseSubmit = useCallback(async (name: string) => {
+    if (!renameBaseDialog) return;
+    const { renameBase } = useKnowledgeStore.getState();
+    await renameBase(renameBaseDialog.id, name);
+    setRenameBaseDialog(null);
+  }, [renameBaseDialog]);
+
+  const handleRestoreBaseRestored = useCallback((base: KnowledgeBase) => {
+    setRestoreDialogBase(null);
+    // Select the restored base
+    const { selectBase, fetchBases } = useKnowledgeStore.getState();
+    fetchBases().then(() => selectBase(base.id));
+  }, []);
+
+  const ctxValue = useMemo<KnowledgePageContextValue>(() => ({
+    openRenameBaseDialog: (base) => setRenameBaseDialog(base),
+    openRestoreBaseDialog: (base) => setRestoreDialogBase(base),
+  }), []);
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
-        <KnowledgeNavigator />
-        {selectedBaseId ? <KnowledgeDetail /> : <KnowledgeEmptyState />}
-      </div>
+    <KnowledgePageContext value={ctxValue}>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
+          <KnowledgeNavigator
+            onOpenRenameGroup={(group) => setRenameGroupDialog(group)}
+          />
+          {selectedBaseId ? <KnowledgeDetail /> : <KnowledgeEmptyState />}
+        </div>
 
-      <AddKnowledgeItemDialog open={isAddSourceOpen} onClose={closeAddSource} />
-      <RagConfigPanel open={isRagConfigOpen} onClose={closeRagConfig} />
-      <RecallTestPanel open={isRecallTestOpen} onClose={closeRecallTest} />
-      <CreateKnowledgeBaseDialog open={isCreateBaseOpen} onClose={closeCreateBase} />
+        {/* Dialogs */}
+        <RecallTestPanel open={isRecallTestOpen} onClose={closeRecallTest} />
+        <CreateKnowledgeBaseDialog open={isCreateBaseOpen} onClose={closeCreateBase} />
 
-      {editingName && (
-        <RenameDialog
-          title={editingName.type === 'base' ? '重命名知识库' : '重命名分组'}
-          open={!!editingName}
-          onClose={closeRename}
-          initialName={editingName.name}
-          onSubmit={(name) => {
-            if (editingName.type === 'base') {
-              renameBase(editingName.id, name);
-            } else {
-              renameGroup(editingName.id, name);
-            }
+        <CreateKnowledgeGroupDialog
+          open={isCreateGroupOpen}
+          onSubmit={async (name) => {
+            await createGroup(name);
           }}
+          onOpenChange={closeCreateGroup}
         />
-      )}
-    </div>
+
+        <KnowledgeBaseNameDialog
+          open={!!renameBaseDialog}
+          initialName={renameBaseDialog?.name ?? ''}
+          onSubmit={handleRenameBaseSubmit}
+          onOpenChange={(open) => { if (!open) setRenameBaseDialog(null); }}
+        />
+
+        <RenameKnowledgeGroupDialog
+          open={!!renameGroupDialog}
+          group={renameGroupDialog}
+          onClose={() => setRenameGroupDialog(null)}
+        />
+
+        <RestoreKnowledgeBaseDialog
+          open={!!restoreDialogBase}
+          base={restoreDialogBase}
+          isRestoring={isRestoringBase}
+          onRestore={restoreBase}
+          onOpenChange={(open) => { if (!open) setRestoreDialogBase(null); }}
+          onRestored={handleRestoreBaseRestored}
+        />
+
+        {/* Legacy rename (from store) */}
+        {editingName && editingName.type === 'base' && (
+          <KnowledgeBaseNameDialog
+            open
+            initialName={editingName.name}
+            onSubmit={async (name) => {
+              const { renameBase } = useKnowledgeStore.getState();
+              await renameBase(editingName.id, name);
+              closeRename();
+            }}
+            onOpenChange={(open) => { if (!open) closeRename(); }}
+          />
+        )}
+      </div>
+    </KnowledgePageContext>
   );
 }
 
@@ -68,30 +144,5 @@ function KnowledgeEmptyState() {
         创建知识库
       </button>
     </div>
-  );
-}
-
-function RenameDialog({ title, open, onClose, initialName, onSubmit }: {
-  title: string; open: boolean; onClose: () => void;
-  initialName: string; onSubmit: (name: string) => void;
-}) {
-  const [name, setName] = useState(initialName);
-  if (!open) return null;
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="w-[360px] rounded-xl border border-border bg-card p-5" onClick={e => e.stopPropagation()}>
-        <div className="mb-3 text-base font-semibold text-foreground">{title}</div>
-        <input
-          autoFocus value={name} onChange={e => setName(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && name.trim()) { onSubmit(name.trim()); onClose(); } }}
-          className="w-full rounded-md border border-border bg-background-muted px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
-        />
-        <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-md border border-border px-3.5 py-1.5 text-xs text-foreground-secondary hover:bg-accent">取消</button>
-          <button onClick={() => { if (name.trim()) { onSubmit(name.trim()); onClose(); } }} className="rounded-md bg-primary px-3.5 py-1.5 text-xs text-primary-foreground hover:bg-primary/90">确认</button>
-        </div>
-      </div>
-    </div>,
-    document.body
   );
 }

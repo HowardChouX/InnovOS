@@ -88,12 +88,12 @@ def seed_patents():
 
 def seed_demo_task(db, user_id: int):
     cursor = db.execute(
-        "INSERT INTO tasks (user_id, title, description, tags, status) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO tasks (user_id, title, description, tags, status) VALUES (?, ?, ?, ?, ?) RETURNING id",
          (user_id, "[Demo] 新能源汽车电池热管理技术改进",
           "如何在保证电池能量密度的同时，提高其安全性并延长循环寿命？",
           json.dumps(["电池安全", "能量密度", "循环寿命", "demo"]), "completed"),
     )
-    task_id = cursor.lastrowid
+    task_id = cursor.fetchone()["id"]
 
     db.execute(
         "INSERT INTO analyses (task_id, center_node, satellite_nodes, edges, principles) VALUES (?,?,?,?,?)",

@@ -237,9 +237,10 @@ class AIBase:
 
     def _init_client(self) -> None:
         try:
+            from app.algorithm.model_runtime import ModelRuntime
             self.client = OpenAI(
                 api_key=self.api_key,
-                base_url=self.base_url,
+                base_url=ModelRuntime.ensure_v1_url(self.base_url),
                 timeout=600.0,
             )
             logger.info(f"AI客户端初始化成功: base_url={self.base_url}, model={self.model}")

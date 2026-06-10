@@ -9,6 +9,7 @@ ZR-IPM (智融创新问题映射) 算法引擎
 """
 
 from .ai_client import chat_completion
+from .model_resolver import model_resolver
 
 SYSTEM_PROMPT = """你是一个创新问题分析专家。分析用户的技术问题，输出JSON：
 {
@@ -31,12 +32,19 @@ EVALUATE_SYSTEM = "你是一个创新评估专家。返回JSON: scores(innovatio
 
 class ZRIPMEngine:
 
+    @staticmethod
+    def _get_model_id() -> str:
+        """从全局设置中获取分配的对话模型 ID"""
+        s = model_resolver.get_assigned_settings()
+        return s.get("chat_model") or ""
+
     async def analyze(self, task_description: str) -> dict:
         """分析问题，返回冲突图谱"""
         result = await chat_completion(
             system_prompt=SYSTEM_PROMPT,
             user_prompt=task_description,
             response_format=dict,
+            model_id=self._get_model_id(),
         )
         return self._build_conflict_graph(result)
 
@@ -46,6 +54,7 @@ class ZRIPMEngine:
             system_prompt=SOLUTION_SYSTEM,
             user_prompt=f"{SOLUTION_PROMPT}：\n{task_description}",
             response_format=dict,
+            model_id=self._get_model_id(),
         )
         if isinstance(result, dict) and "solutions" in result:
             return result["solutions"]
@@ -59,6 +68,7 @@ class ZRIPMEngine:
             system_prompt=EVALUATE_SYSTEM,
             user_prompt=f"{EVALUATE_PROMPT}：\n{solution_description}",
             response_format=dict,
+            model_id=self._get_model_id(),
         )
 
     @staticmethod

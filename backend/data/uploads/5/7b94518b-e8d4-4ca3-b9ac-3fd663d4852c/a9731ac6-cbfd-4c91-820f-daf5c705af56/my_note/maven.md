@@ -1,0 +1,6 @@
+mvn compile
+
+mvn test
+
+
+

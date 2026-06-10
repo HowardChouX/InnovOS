@@ -24,11 +24,11 @@ def register(body: UserRegister):
 
     pw_hash = hash_password(password)
     cursor = db.execute(
-        "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+        "INSERT INTO users (username, password_hash) VALUES (?, ?) RETURNING id",
         (username, pw_hash),
     )
     db.commit()
-    user_id = cursor.lastrowid
+    user_id = cursor.fetchone()["id"]
 
     user = db.execute("SELECT id, username, role, created_at FROM users WHERE id = ?", (user_id,)).fetchone()
     db.close()

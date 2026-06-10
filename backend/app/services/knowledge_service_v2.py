@@ -109,7 +109,9 @@ class KnowledgeBaseService:
                 params.append(val)
 
         if updates:
-            updates.append("updated_at=datetime('now')")
+            from datetime import datetime, timezone
+            updates.append("updated_at=?")
+            params.append(datetime.now(timezone.utc).isoformat())
             params.append(base_id)
             params.append(user_id)
             db.execute(
@@ -137,6 +139,41 @@ class KnowledgeBaseService:
         db.commit()
         db.close()
         return True
+
+    @staticmethod
+    def restore(user_id: int, source_base_id: str, new_base_id: str, dto: dict) -> dict:
+        """从失败的知识库恢复：读取源配置，创建新知识库记录"""
+        from datetime import datetime, timezone
+        db = get_db()
+        source = db.execute(
+            "SELECT * FROM knowledge_bases WHERE id=? AND user_id=?", (source_base_id, user_id)
+        ).fetchone()
+        if not source:
+            db.close()
+            raise ValueError("源知识库不存在")
+
+        now = datetime.now(timezone.utc).isoformat()
+        db.execute("""
+            INSERT INTO knowledge_bases
+            (id, user_id, name, group_id, dimensions, embedding_model_id, status, error,
+             rerank_model_id, file_processor_id, chunk_size, chunk_overlap, threshold,
+             document_count, search_mode, hybrid_alpha, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            new_base_id, user_id, dto["name"].strip(), source["group_id"],
+            dto.get("dimensions", source["dimensions"]),
+            dto.get("embeddingModelId", source["embedding_model_id"]),
+            "completed", None,
+            source["rerank_model_id"], source["file_processor_id"],
+            source["chunk_size"], source["chunk_overlap"],
+            source["threshold"], source["document_count"],
+            source["search_mode"], source["hybrid_alpha"],
+            now, now,
+        ))
+        db.commit()
+        row = db.execute("SELECT * FROM knowledge_bases WHERE id=?", (new_base_id,)).fetchone()
+        db.close()
+        return KnowledgeBaseService._row_to_base(row)
 
     @staticmethod
     def _row_to_base(r) -> dict:
@@ -270,9 +307,11 @@ class KnowledgeItemService:
             return None
 
         err = error.strip() if status == "failed" else None
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
         db.execute(
-            "UPDATE knowledge_items SET status=?, error=?, updated_at=datetime('now') WHERE id=?",
-            (status, err, item_id),
+            "UPDATE knowledge_items SET status=?, error=?, updated_at=? WHERE id=?",
+            (status, err, now, item_id),
         )
         db.commit()
         row = db.execute("SELECT * FROM knowledge_items WHERE id=?", (item_id,)).fetchone()

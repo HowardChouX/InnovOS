@@ -44,7 +44,7 @@ class APIKeyManager:
 
         db = get_db()
         keys = db.execute(
-            "SELECT * FROM api_keys WHERE is_active=1 ORDER BY priority ASC, id ASC"
+            "SELECT * FROM api_keys WHERE is_active=1 ORDER BY id ASC"
         ).fetchall()
         db.close()
 
@@ -93,14 +93,14 @@ class APIKeyManager:
                 last_reset = datetime.fromisoformat(key["last_reset_at"])
                 if datetime.now() - last_reset > timedelta(minutes=1):
                     db.execute(
-                        "UPDATE api_keys SET current_rpm=0, last_reset_at=datetime('now') WHERE id=?",
+                        "UPDATE api_keys SET current_rpm=0, last_reset_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
                         (key["id"],)
                     )
                     db.commit()
                     key["current_rpm"] = 0
             except (ValueError, TypeError):
                 db.execute(
-                    "UPDATE api_keys SET current_rpm=0, last_reset_at=datetime('now') WHERE id=?",
+                    "UPDATE api_keys SET current_rpm=0, last_reset_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
                     (key["id"],)
                 )
                 db.commit()
@@ -121,12 +121,12 @@ class APIKeyManager:
                 """UPDATE api_keys
                    SET request_count = request_count + 1,
                        current_rpm = current_rpm + 1,
-                       last_used_at = datetime('now'),
-                       last_reset_at = CASE
-                           WHEN last_reset_at IS NULL OR datetime(last_reset_at) < datetime('now', '-1 minute')
-                           THEN datetime('now')
-                           ELSE last_reset_at
-                       END
+                        last_used_at = to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
+                        last_reset_at = CASE
+                            WHEN last_reset_at IS NULL OR last_reset_at::timestamp < NOW() - INTERVAL '1 minute'
+                             THEN to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')
+                            ELSE last_reset_at
+                        END
                    WHERE id=?""",
                 (key_id,)
             )
@@ -187,11 +187,11 @@ class APIKeyManager:
         db = get_db()
         if provider_id:
             rows = db.execute(
-                "SELECT * FROM api_keys WHERE provider_id=? ORDER BY priority ASC, id ASC",
+                "SELECT * FROM api_keys WHERE provider_id=? ORDER BY id ASC",
                 (provider_id,)
             ).fetchall()
         else:
-            rows = db.execute("SELECT * FROM api_keys ORDER BY priority ASC, id ASC").fetchall()
+            rows = db.execute("SELECT * FROM api_keys ORDER BY id ASC").fetchall()
         db.close()
         return [dict(r) for r in rows]
 
@@ -203,11 +203,12 @@ class APIKeyManager:
         encrypted_key = encrypt_key(api_key)
         cursor = db.execute(
             """INSERT INTO api_keys (provider_id, key_name, api_key, api_base_url, api_model, priority, max_rpm)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id""",
             (provider_id, key_name, encrypted_key, api_base_url, api_model, priority, max_rpm)
         )
         db.commit()
-        row = db.execute("SELECT * FROM api_keys WHERE id=?", (cursor.lastrowid,)).fetchone()
+        inserted_id = cursor.fetchone()["id"]
+        row = db.execute("SELECT * FROM api_keys WHERE id=?", (inserted_id,)).fetchone()
         db.close()
         self._cache_updated_at = 0
         return dict(row)

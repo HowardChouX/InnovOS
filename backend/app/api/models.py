@@ -1,25 +1,11 @@
 """嵌入模型和重排模型列表 API — 从 model_providers 表获取可用模型"""
+import json
 from fastapi import APIRouter, Depends
 from app.auth import get_current_user
 from app.database import get_db
-import json
+from app.algorithm.providers_registry import CAPABILITY_EMBEDDING, CAPABILITY_RERANK, normalize_model
 
 router = APIRouter(prefix="/api/models", tags=["models"])
-
-EMBEDDING_KEYWORDS = ["embedding", "embed", "bge-embed", "e5-", "text-embedding", "gte-", "e5_small", "e5_large"]
-RERANK_KEYWORDS = ["rerank", "re-rank", "cross-encoder", "bge-reranker"]
-
-
-def _is_embedding_model(model_name: str) -> bool:
-    name_lower = model_name.lower()
-    if any(kw in name_lower for kw in RERANK_KEYWORDS):
-        return False
-    return any(kw in name_lower for kw in EMBEDDING_KEYWORDS)
-
-
-def _is_rerank_model(model_name: str) -> bool:
-    name_lower = model_name.lower()
-    return any(kw in name_lower for kw in RERANK_KEYWORDS)
 
 
 @router.get("/embedding")
@@ -45,13 +31,14 @@ def list_embedding_models(user: dict = Depends(get_current_user)):
             models_raw = []
 
         for model_id in models_raw:
-            if _is_embedding_model(model_id):
+            normalized = normalize_model(model_id)
+            if CAPABILITY_EMBEDDING in normalized["capabilities"]:
                 result.append({
-                    "id": f"{provider_id}::{model_id}",
+                    "id": f"{provider_id}::{normalized['id']}",
                     "providerId": provider_id,
                     "providerName": provider_name,
-                    "modelId": model_id,
-                    "label": f"{model_id} · {provider_name}",
+                    "modelId": normalized["id"],
+                    "label": f"{normalized['id']} · {provider_name}",
                 })
 
     return {"data": result, "message": "success", "code": 200}
@@ -80,13 +67,14 @@ def list_rerank_models(user: dict = Depends(get_current_user)):
             models_raw = []
 
         for model_id in models_raw:
-            if _is_rerank_model(model_id):
+            normalized = normalize_model(model_id)
+            if CAPABILITY_RERANK in normalized["capabilities"]:
                 result.append({
-                    "id": f"{provider_id}::{model_id}",
+                    "id": f"{provider_id}::{normalized['id']}",
                     "providerId": provider_id,
                     "providerName": provider_name,
-                    "modelId": model_id,
-                    "label": f"{model_id} · {provider_name}",
+                    "modelId": normalized["id"],
+                    "label": f"{normalized['id']} · {provider_name}",
                 })
 
     return {"data": result, "message": "success", "code": 200}

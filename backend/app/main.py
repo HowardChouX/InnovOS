@@ -1,26 +1,54 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 import os
+from dotenv import load_dotenv
+
+# 从 backend/ 目录加载 .env，不依赖 CWD
+dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+load_dotenv(dotenv_path=dotenv_path)
+import logging
+import sys
+
+# 日志配置：INFO 及以上输出到终端（让知识库索引等后台 job 日志可见）
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+    stream=sys.stdout,
+    force=True,
+)
+
 import shutil
 import time
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db, get_db
-from app.api import auth, tasks, analysis, patents, solutions, workflow, evaluation, feedback, notifications, knowledge as knowledge_api, knowledge_bases as knowledge_bases_api, modeling, models as models_api
+from app.api import auth, tasks, analysis, patents, solutions, workflow, evaluation, feedback, notifications, knowledge as knowledge_api, knowledge_bases as knowledge_bases_api, modeling, models as models_api, kb_tools as kb_tools_api
+from app.api.sidebar import router as sidebar_router
 from app.api.admin import router as admin_router
 from app.api.workflow_steps import router as workflow_steps_router
 from app.seed import seed_admin_user, seed_patents
+from app.algorithm.model_registry import model_registry
 
 init_db()
 seed_admin_user()
 seed_patents()
+model_registry.load()  # 加载全量模型注册表
 
 app = FastAPI(title="InnovOS API", description="创新智能平台后端 API")
 
+
+@app.on_event("startup")
+async def startup():
+    """启动时初始化知识库作业系统（崩溃恢复）"""
+    from app.services.knowledge_orchestration_service import knowledge_orchestration_service
+    await knowledge_orchestration_service.start()
+    logger = logging.getLogger(__name__)
+    logger.info("Knowledge job system started — recovered stalled jobs")
+
+# 开发环境 CORS（生产环境通过 nginx 同源代理，无需 CORS）
+dev_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
+    allow_origins=[o.strip() for o in dev_origins if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,8 +64,10 @@ app.include_router(evaluation.router)
 app.include_router(feedback.router)
 app.include_router(admin_router)
 app.include_router(notifications.router)
+app.include_router(sidebar_router)
 app.include_router(knowledge_api.router)
 app.include_router(knowledge_bases_api.router)
+app.include_router(kb_tools_api.router)
 app.include_router(models_api.router)
 app.include_router(modeling.router)
 app.include_router(workflow_steps_router)
@@ -60,10 +90,10 @@ def health_check():
         checks["database"] = {"status": "error", "message": str(e)}
         overall = "degraded"
 
-    # Disk space check
+    # Disk space check (PostgreSQL data volume)
     try:
-        db_path = os.path.join(os.path.dirname(__file__), "..", "InnovOS_ACCOUNTS.db")
-        disk = shutil.disk_usage(os.path.dirname(db_path))
+        cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        disk = shutil.disk_usage(cwd)
         used_pct = round(disk.used / disk.total * 100, 1)
         free_gb = round(disk.free / (1024**3), 2)
         status = "ok" if used_pct < 90 else "warning" if used_pct < 95 else "error"

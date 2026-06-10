@@ -1,0 +1,1307 @@
+{
+  "/home/chou/InnovOS/.claude/settings.json": {
+    "mtime": 1780889083.6930633,
+    "ast_hash": "101c05b77f825dad5f4c5b775c140d8a",
+    "semantic_hash": "101c05b77f825dad5f4c5b775c140d8a"
+  },
+  "/home/chou/InnovOS/.opencode/package.json": {
+    "mtime": 1780907560.1826787,
+    "ast_hash": "c9442b1dfba4cd254e8dc712cf2d3da8",
+    "semantic_hash": "c9442b1dfba4cd254e8dc712cf2d3da8"
+  },
+  "/home/chou/InnovOS/backend/app/__init__.py": {
+    "mtime": 1780889083.695063,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/__init__.py": {
+    "mtime": 1780889083.695063,
+    "ast_hash": "7e8fedb0a569b3c4b12d5bf6d1b87463",
+    "semantic_hash": "7e8fedb0a569b3c4b12d5bf6d1b87463"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/ai_client.py": {
+    "mtime": 1780889083.695063,
+    "ast_hash": "995b36e7b6e1e8b6896124a4b1bc5f74",
+    "semantic_hash": "995b36e7b6e1e8b6896124a4b1bc5f74"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/analyzers/__init__.py": {
+    "mtime": 1780889083.695063,
+    "ast_hash": "feea45ac6df1287d21f736c1e55ffad3",
+    "semantic_hash": "feea45ac6df1287d21f736c1e55ffad3"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/analyzers/demand_portrait.py": {
+    "mtime": 1780889083.695063,
+    "ast_hash": "795bada6002e385c7985369e85448707",
+    "semantic_hash": "795bada6002e385c7985369e85448707"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/analyzers/evolution_analyzer.py": {
+    "mtime": 1780889083.695063,
+    "ast_hash": "151145226833d71dcea630c22165c035",
+    "semantic_hash": "151145226833d71dcea630c22165c035"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/analyzers/ifr_generator.py": {
+    "mtime": 1780889083.695063,
+    "ast_hash": "8faa5e2bc62a2f0fb27e716b948c1f4a",
+    "semantic_hash": "8faa5e2bc62a2f0fb27e716b948c1f4a"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/analyzers/problem_modeling.py": {
+    "mtime": 1780889083.695063,
+    "ast_hash": "383647a1058f5525c095099256e6bb55",
+    "semantic_hash": "383647a1058f5525c095099256e6bb55"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/analyzers/resource_analyzer.py": {
+    "mtime": 1780889083.695063,
+    "ast_hash": "dd6722ef95054acde2de13b87c34490d",
+    "semantic_hash": "dd6722ef95054acde2de13b87c34490d"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/analyzers/sufield_analyzer.py": {
+    "mtime": 1780889083.695063,
+    "ast_hash": "e18b2b9733ed3b0afd321d5de5138d80",
+    "semantic_hash": "e18b2b9733ed3b0afd321d5de5138d80"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/analyzers/thinking_tools/__init__.py": {
+    "mtime": 1780889083.695063,
+    "ast_hash": "f02352310107e1b9749bd299546e6e09",
+    "semantic_hash": "f02352310107e1b9749bd299546e6e09"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/analyzers/thinking_tools/goldfish_analyzer.py": {
+    "mtime": 1780889083.695063,
+    "ast_hash": "2ac015113a595c076232433b4052c0b7",
+    "semantic_hash": "2ac015113a595c076232433b4052c0b7"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/analyzers/thinking_tools/nine_screens.py": {
+    "mtime": 1780889083.695063,
+    "ast_hash": "d04fa2cf7f70074e46faefcae67868a5",
+    "semantic_hash": "d04fa2cf7f70074e46faefcae67868a5"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/analyzers/thinking_tools/stc_operator.py": {
+    "mtime": 1780889083.696063,
+    "ast_hash": "8ff4e86524a925f0a85aa898199a66b9",
+    "semantic_hash": "8ff4e86524a925f0a85aa898199a66b9"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/base.py": {
+    "mtime": 1780889083.696063,
+    "ast_hash": "708d3fc29043c4c80c22960c726576ce",
+    "semantic_hash": "708d3fc29043c4c80c22960c726576ce"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/crypto.py": {
+    "mtime": 1780889083.696063,
+    "ast_hash": "521380cd4bfe47c8f1da41d5a2030339",
+    "semantic_hash": "521380cd4bfe47c8f1da41d5a2030339"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/data/models.json": {
+    "mtime": 1780908812.7904117,
+    "ast_hash": "6741bdfe29514e7f1d913ae60eff0052",
+    "semantic_hash": "6741bdfe29514e7f1d913ae60eff0052"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/data/provider-models.json": {
+    "mtime": 1780908812.7924116,
+    "ast_hash": "7c5012f5efe302d5e7c7ac4e7929c0ce",
+    "semantic_hash": "7c5012f5efe302d5e7c7ac4e7929c0ce"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/file_parser.py": {
+    "mtime": 1780889083.696063,
+    "ast_hash": "365425621359aecf331a62e24d6538fb",
+    "semantic_hash": "365425621359aecf331a62e24d6538fb"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/key_manager.py": {
+    "mtime": 1780908970.8323066,
+    "ast_hash": "8aa7aa3d29331badbaa5c13d058b04e0",
+    "semantic_hash": "8aa7aa3d29331badbaa5c13d058b04e0"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/knowledge/__init__.py": {
+    "mtime": 1780889083.696063,
+    "ast_hash": "88f5527403576efc17cb209b0bc6465c",
+    "semantic_hash": "88f5527403576efc17cb209b0bc6465c"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/knowledge/chunker.py": {
+    "mtime": 1780889083.696063,
+    "ast_hash": "47ca714226eea900b7638ab91c4d1faf",
+    "semantic_hash": "47ca714226eea900b7638ab91c4d1faf"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/knowledge/embedder.py": {
+    "mtime": 1780889083.696063,
+    "ast_hash": "3781211254d134e2e5fb0703a42733e0",
+    "semantic_hash": "3781211254d134e2e5fb0703a42733e0"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/knowledge/pipeline.py": {
+    "mtime": 1780911573.688517,
+    "ast_hash": "b9afe3a6734e89337c13491490cef079",
+    "semantic_hash": "b9afe3a6734e89337c13491490cef079"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/knowledge/reranker.py": {
+    "mtime": 1780917220.63743,
+    "ast_hash": "7f6ee1a3bc6718a4dc57f69db15a1c7e",
+    "semantic_hash": "7f6ee1a3bc6718a4dc57f69db15a1c7e"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/knowledge/retriever.py": {
+    "mtime": 1780909564.491408,
+    "ast_hash": "6e00a145321aafb0ddcc0c4dff0447ad",
+    "semantic_hash": "6e00a145321aafb0ddcc0c4dff0447ad"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/knowledge/vector_store.py": {
+    "mtime": 1780909536.8483925,
+    "ast_hash": "f518be4add51b6510b46d7152c69f00e",
+    "semantic_hash": "f518be4add51b6510b46d7152c69f00e"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/knowledge/workflow_processor.py": {
+    "mtime": 1780915708.499463,
+    "ast_hash": "33c66c3692cbfc6cd772cc72e9365928",
+    "semantic_hash": "33c66c3692cbfc6cd772cc72e9365928"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/model_registry.py": {
+    "mtime": 1780917196.1864216,
+    "ast_hash": "2001f31907f6523d855dd3dc247be01d",
+    "semantic_hash": "2001f31907f6523d855dd3dc247be01d"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/model_runtime.py": {
+    "mtime": 1780908996.2512968,
+    "ast_hash": "1b366bf0f7baae387c6ee021351d692f",
+    "semantic_hash": "1b366bf0f7baae387c6ee021351d692f"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/model_service.py": {
+    "mtime": 1780917581.1001058,
+    "ast_hash": "05d36d81954490680c2ae5639905ad88",
+    "semantic_hash": "05d36d81954490680c2ae5639905ad88"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/models_crud.py": {
+    "mtime": 1780916766.4341562,
+    "ast_hash": "08e6c54e0d0bda0c7438a90b61b4daf6",
+    "semantic_hash": "08e6c54e0d0bda0c7438a90b61b4daf6"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/providers_registry.py": {
+    "mtime": 1780908318.200541,
+    "ast_hash": "1dd560d3ccaf257e426cff176198c6f9",
+    "semantic_hash": "1dd560d3ccaf257e426cff176198c6f9"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/workflow_state_machine.py": {
+    "mtime": 1780889083.6970627,
+    "ast_hash": "66a9b0aa7212907968d18bd50fb46237",
+    "semantic_hash": "66a9b0aa7212907968d18bd50fb46237"
+  },
+  "/home/chou/InnovOS/backend/app/algorithm/zr_ipm.py": {
+    "mtime": 1780889083.6970627,
+    "ast_hash": "32aef9faca113bb6fe66cc86eabd9adf",
+    "semantic_hash": "32aef9faca113bb6fe66cc86eabd9adf"
+  },
+  "/home/chou/InnovOS/backend/app/api/__init__.py": {
+    "mtime": 1780889083.6970627,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/chou/InnovOS/backend/app/api/admin/__init__.py": {
+    "mtime": 1780889083.6970627,
+    "ast_hash": "d2f1412921170c39e769d009f2ccdfbc",
+    "semantic_hash": "d2f1412921170c39e769d009f2ccdfbc"
+  },
+  "/home/chou/InnovOS/backend/app/api/admin/keys.py": {
+    "mtime": 1780889083.6970627,
+    "ast_hash": "f180698ac79ede3b103567db28015c6a",
+    "semantic_hash": "f180698ac79ede3b103567db28015c6a"
+  },
+  "/home/chou/InnovOS/backend/app/api/admin/knowledge.py": {
+    "mtime": 1780889083.6970627,
+    "ast_hash": "bae4a725c641c1fb6b4c535cc25456bc",
+    "semantic_hash": "bae4a725c641c1fb6b4c535cc25456bc"
+  },
+  "/home/chou/InnovOS/backend/app/api/admin/monitor.py": {
+    "mtime": 1780889083.6970627,
+    "ast_hash": "c4758f26a8d6d627584d7ad89d9f274e",
+    "semantic_hash": "c4758f26a8d6d627584d7ad89d9f274e"
+  },
+  "/home/chou/InnovOS/backend/app/api/admin/providers.py": {
+    "mtime": 1780917588.711308,
+    "ast_hash": "e8526eb6d934f4dd6ec3140cb8967856",
+    "semantic_hash": "e8526eb6d934f4dd6ec3140cb8967856"
+  },
+  "/home/chou/InnovOS/backend/app/api/admin/users.py": {
+    "mtime": 1780889083.6980627,
+    "ast_hash": "abe09d64ede4536830cd1f3f5ea14fae",
+    "semantic_hash": "abe09d64ede4536830cd1f3f5ea14fae"
+  },
+  "/home/chou/InnovOS/backend/app/api/analysis.py": {
+    "mtime": 1780908870.8183634,
+    "ast_hash": "537ca24a3ba5e7c201bd7d5f1658980f",
+    "semantic_hash": "537ca24a3ba5e7c201bd7d5f1658980f"
+  },
+  "/home/chou/InnovOS/backend/app/api/auth.py": {
+    "mtime": 1780908865.0653677,
+    "ast_hash": "50528ec0ffc76280e929e73720102894",
+    "semantic_hash": "50528ec0ffc76280e929e73720102894"
+  },
+  "/home/chou/InnovOS/backend/app/api/evaluation.py": {
+    "mtime": 1780889083.6980627,
+    "ast_hash": "2330c1c9306816d54640fd28c6621200",
+    "semantic_hash": "2330c1c9306816d54640fd28c6621200"
+  },
+  "/home/chou/InnovOS/backend/app/api/feedback.py": {
+    "mtime": 1780889083.6980627,
+    "ast_hash": "a8a1248d04841cb829c4a797055eb011",
+    "semantic_hash": "a8a1248d04841cb829c4a797055eb011"
+  },
+  "/home/chou/InnovOS/backend/app/api/keys.py": {
+    "mtime": 1780889083.6980627,
+    "ast_hash": "5beb2188d0e23b4364615e8a05a97370",
+    "semantic_hash": "5beb2188d0e23b4364615e8a05a97370"
+  },
+  "/home/chou/InnovOS/backend/app/api/knowledge.py": {
+    "mtime": 1780909696.4814906,
+    "ast_hash": "3916075710f8622964cb0146fc66ad53",
+    "semantic_hash": "3916075710f8622964cb0146fc66ad53"
+  },
+  "/home/chou/InnovOS/backend/app/api/knowledge_bases.py": {
+    "mtime": 1780889083.6980627,
+    "ast_hash": "c508dda8f1c2713f526cc584c5107290",
+    "semantic_hash": "c508dda8f1c2713f526cc584c5107290"
+  },
+  "/home/chou/InnovOS/backend/app/api/knowledge_bases_v2.py": {
+    "mtime": 1780889083.6990626,
+    "ast_hash": "cacc0e04a5faa88e7a7dc13c7a6c456d",
+    "semantic_hash": "cacc0e04a5faa88e7a7dc13c7a6c456d"
+  },
+  "/home/chou/InnovOS/backend/app/api/knowledge_bases_v3.py": {
+    "mtime": 1780909295.0192924,
+    "ast_hash": "8a53188624b023457f96d3d54e5924bd",
+    "semantic_hash": "8a53188624b023457f96d3d54e5924bd"
+  },
+  "/home/chou/InnovOS/backend/app/api/modeling.py": {
+    "mtime": 1780889083.6990626,
+    "ast_hash": "8229b8fa2e233ba67c2dcae1dae8b656",
+    "semantic_hash": "8229b8fa2e233ba67c2dcae1dae8b656"
+  },
+  "/home/chou/InnovOS/backend/app/api/models.py": {
+    "mtime": 1780908361.2973719,
+    "ast_hash": "34bf3b3fc0700b6c08719a90d44c82aa",
+    "semantic_hash": "34bf3b3fc0700b6c08719a90d44c82aa"
+  },
+  "/home/chou/InnovOS/backend/app/api/monitor.py": {
+    "mtime": 1780889083.6990626,
+    "ast_hash": "1e4db97ce24bebdffcbb85d7de8d7a60",
+    "semantic_hash": "1e4db97ce24bebdffcbb85d7de8d7a60"
+  },
+  "/home/chou/InnovOS/backend/app/api/notifications.py": {
+    "mtime": 1780908864.2423682,
+    "ast_hash": "7def0fbdcb9216abadc91329dc0ff6f5",
+    "semantic_hash": "7def0fbdcb9216abadc91329dc0ff6f5"
+  },
+  "/home/chou/InnovOS/backend/app/api/patents.py": {
+    "mtime": 1780889083.6990626,
+    "ast_hash": "69f47648a8e2a9e73b1579a51030e062",
+    "semantic_hash": "69f47648a8e2a9e73b1579a51030e062"
+  },
+  "/home/chou/InnovOS/backend/app/api/principles.py": {
+    "mtime": 1780889083.6990626,
+    "ast_hash": "8aaa35d201264fce35adaf2222733def",
+    "semantic_hash": "8aaa35d201264fce35adaf2222733def"
+  },
+  "/home/chou/InnovOS/backend/app/api/sidebar.py": {
+    "mtime": 1780889083.6990626,
+    "ast_hash": "34ca3315afe05c07dae7b8855c25c7f3",
+    "semantic_hash": "34ca3315afe05c07dae7b8855c25c7f3"
+  },
+  "/home/chou/InnovOS/backend/app/api/solutions.py": {
+    "mtime": 1780889083.6990626,
+    "ast_hash": "9b5f09687b89a2959083874c9d2e54fe",
+    "semantic_hash": "9b5f09687b89a2959083874c9d2e54fe"
+  },
+  "/home/chou/InnovOS/backend/app/api/tasks.py": {
+    "mtime": 1780908868.8613648,
+    "ast_hash": "271f21207c61a57669fff537cb404bd4",
+    "semantic_hash": "271f21207c61a57669fff537cb404bd4"
+  },
+  "/home/chou/InnovOS/backend/app/api/workflow.py": {
+    "mtime": 1780908861.4413702,
+    "ast_hash": "8b3ccfbabd810ca997c912b708e3caf6",
+    "semantic_hash": "8b3ccfbabd810ca997c912b708e3caf6"
+  },
+  "/home/chou/InnovOS/backend/app/api/workflow_steps/__init__.py": {
+    "mtime": 1780889083.7000625,
+    "ast_hash": "4f827054372d96f566e2d31ce34dec12",
+    "semantic_hash": "4f827054372d96f566e2d31ce34dec12"
+  },
+  "/home/chou/InnovOS/backend/app/api/workflow_steps/demand_portrait.py": {
+    "mtime": 1780889083.7000625,
+    "ast_hash": "f521fb612b2baad963d5c5eaa09de827",
+    "semantic_hash": "f521fb612b2baad963d5c5eaa09de827"
+  },
+  "/home/chou/InnovOS/backend/app/api/workflow_steps/problem_modeling.py": {
+    "mtime": 1780889083.7000625,
+    "ast_hash": "54a4cd51c65fd1ca7c261f21dd6464c3",
+    "semantic_hash": "54a4cd51c65fd1ca7c261f21dd6464c3"
+  },
+  "/home/chou/InnovOS/backend/app/auth.py": {
+    "mtime": 1780889083.7000625,
+    "ast_hash": "304a343c622acbfbd67d75d73e438bc5",
+    "semantic_hash": "304a343c622acbfbd67d75d73e438bc5"
+  },
+  "/home/chou/InnovOS/backend/app/data/__init__.py": {
+    "mtime": 1780889083.7000625,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/chou/InnovOS/backend/app/data/triz_constants.py": {
+    "mtime": 1780889083.7000625,
+    "ast_hash": "faf362e3617c2744d6414ac233ceb14f",
+    "semantic_hash": "faf362e3617c2744d6414ac233ceb14f"
+  },
+  "/home/chou/InnovOS/backend/app/database.py": {
+    "mtime": 1780922513.397747,
+    "ast_hash": "f2b9f64f54f74160439e8ec5dcf362dc",
+    "semantic_hash": "f2b9f64f54f74160439e8ec5dcf362dc"
+  },
+  "/home/chou/InnovOS/backend/app/main.py": {
+    "mtime": 1780909760.0105348,
+    "ast_hash": "a0c5604b16732f342b9e735d1b744d3b",
+    "semantic_hash": "a0c5604b16732f342b9e735d1b744d3b"
+  },
+  "/home/chou/InnovOS/backend/app/models/__init__.py": {
+    "mtime": 1780889083.7000625,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/chou/InnovOS/backend/app/models/analysis.py": {
+    "mtime": 1780889083.7000625,
+    "ast_hash": "bb9f0d0a34be3409564260d77af6662b",
+    "semantic_hash": "bb9f0d0a34be3409564260d77af6662b"
+  },
+  "/home/chou/InnovOS/backend/app/models/evaluation.py": {
+    "mtime": 1780889083.7000625,
+    "ast_hash": "ab0c974687a9174c44afcd461d514e8c",
+    "semantic_hash": "ab0c974687a9174c44afcd461d514e8c"
+  },
+  "/home/chou/InnovOS/backend/app/models/feedback.py": {
+    "mtime": 1780889083.7000625,
+    "ast_hash": "20ce9842c3f3a3f58e7ee1e5b237f839",
+    "semantic_hash": "20ce9842c3f3a3f58e7ee1e5b237f839"
+  },
+  "/home/chou/InnovOS/backend/app/models/knowledge.py": {
+    "mtime": 1780906909.30471,
+    "ast_hash": "b0af9fd08310a92499d1dc54f6c8537b",
+    "semantic_hash": "b0af9fd08310a92499d1dc54f6c8537b"
+  },
+  "/home/chou/InnovOS/backend/app/models/patent.py": {
+    "mtime": 1780889083.7000625,
+    "ast_hash": "18854714944f79a72a0a85c41a88ad83",
+    "semantic_hash": "18854714944f79a72a0a85c41a88ad83"
+  },
+  "/home/chou/InnovOS/backend/app/models/solution.py": {
+    "mtime": 1780889083.7000625,
+    "ast_hash": "ab3844754dd93e6014589bd60d30b806",
+    "semantic_hash": "ab3844754dd93e6014589bd60d30b806"
+  },
+  "/home/chou/InnovOS/backend/app/models/task.py": {
+    "mtime": 1780889083.7010624,
+    "ast_hash": "ef6e0a975eacf547bc9cb56b195897df",
+    "semantic_hash": "ef6e0a975eacf547bc9cb56b195897df"
+  },
+  "/home/chou/InnovOS/backend/app/models/user.py": {
+    "mtime": 1780889083.7010624,
+    "ast_hash": "e06ccc4ad133ae48f8618c2c647bff3b",
+    "semantic_hash": "e06ccc4ad133ae48f8618c2c647bff3b"
+  },
+  "/home/chou/InnovOS/backend/app/models/workflow.py": {
+    "mtime": 1780889083.7010624,
+    "ast_hash": "a16d4bcc245951cfabfdeb98a45b75ba",
+    "semantic_hash": "a16d4bcc245951cfabfdeb98a45b75ba"
+  },
+  "/home/chou/InnovOS/backend/app/seed.py": {
+    "mtime": 1780908858.5263727,
+    "ast_hash": "c9e68e8bbdd9c4ab708fea0002ae3b1b",
+    "semantic_hash": "c9e68e8bbdd9c4ab708fea0002ae3b1b"
+  },
+  "/home/chou/InnovOS/backend/app/services/__init__.py": {
+    "mtime": 1780889083.7010624,
+    "ast_hash": "5a4eed06e6a8956c61ba9bf57641b0d0",
+    "semantic_hash": "5a4eed06e6a8956c61ba9bf57641b0d0"
+  },
+  "/home/chou/InnovOS/backend/app/services/file_storage_service.py": {
+    "mtime": 1780909629.6824472,
+    "ast_hash": "8604f87eebc0cf874598269fd0d0ac98",
+    "semantic_hash": "8604f87eebc0cf874598269fd0d0ac98"
+  },
+  "/home/chou/InnovOS/backend/app/services/knowledge_base_service.py": {
+    "mtime": 1780916265.8612962,
+    "ast_hash": "ad3b6ebcd868a1eb42fe86b3ee83b750",
+    "semantic_hash": "ad3b6ebcd868a1eb42fe86b3ee83b750"
+  },
+  "/home/chou/InnovOS/backend/app/services/knowledge_item_service.py": {
+    "mtime": 1780911030.5176973,
+    "ast_hash": "c26c7c3532ba9907446f1bbd1f730709",
+    "semantic_hash": "c26c7c3532ba9907446f1bbd1f730709"
+  },
+  "/home/chou/InnovOS/backend/app/services/knowledge_lock_manager.py": {
+    "mtime": 1780889760.3955176,
+    "ast_hash": "49c44da1403e218be5d9ff1601cf981c",
+    "semantic_hash": "49c44da1403e218be5d9ff1601cf981c"
+  },
+  "/home/chou/InnovOS/backend/app/services/knowledge_orchestration.py": {
+    "mtime": 1780889083.7010624,
+    "ast_hash": "b4d86460f412b2f15e9ac3be3fc26a85",
+    "semantic_hash": "b4d86460f412b2f15e9ac3be3fc26a85"
+  },
+  "/home/chou/InnovOS/backend/app/services/knowledge_orchestration_service.py": {
+    "mtime": 1780915623.7696867,
+    "ast_hash": "98fe2996fb2ba36910b40d38098359c0",
+    "semantic_hash": "98fe2996fb2ba36910b40d38098359c0"
+  },
+  "/home/chou/InnovOS/backend/app/services/knowledge_service.py": {
+    "mtime": 1780908868.0973654,
+    "ast_hash": "2f9e0a723f870636a186addc3da4e7b2",
+    "semantic_hash": "2f9e0a723f870636a186addc3da4e7b2"
+  },
+  "/home/chou/InnovOS/backend/app/services/knowledge_service_v2.py": {
+    "mtime": 1780908867.6123657,
+    "ast_hash": "cdcb18be2c19e59064d92b6ba4cf0951",
+    "semantic_hash": "cdcb18be2c19e59064d92b6ba4cf0951"
+  },
+  "/home/chou/InnovOS/backend/app/services/knowledge_service_v3.py": {
+    "mtime": 1780908866.2603667,
+    "ast_hash": "91cf425a7284d8b7c55c7641442e5532",
+    "semantic_hash": "91cf425a7284d8b7c55c7641442e5532"
+  },
+  "/home/chou/InnovOS/backend/app/services/knowledge_workflow_service.py": {
+    "mtime": 1780915790.9981039,
+    "ast_hash": "2c17eefa31c9534d132f4193e4293115",
+    "semantic_hash": "2c17eefa31c9534d132f4193e4293115"
+  },
+  "/home/chou/InnovOS/backend/app/services/notification_service.py": {
+    "mtime": 1780889083.7010624,
+    "ast_hash": "095eb858ffaaa69d68984eca77794edb",
+    "semantic_hash": "095eb858ffaaa69d68984eca77794edb"
+  },
+  "/home/chou/InnovOS/backend/app/tables/__init__.py": {
+    "mtime": 1780910129.5210412,
+    "ast_hash": "34217222e92be3907660671e7c2962f3",
+    "semantic_hash": "34217222e92be3907660671e7c2962f3"
+  },
+  "/home/chou/InnovOS/backend/app/tables/analyses.py": {
+    "mtime": 1780889083.7010624,
+    "ast_hash": "0847d2f739a31a17376021279e3a26b0",
+    "semantic_hash": "0847d2f739a31a17376021279e3a26b0"
+  },
+  "/home/chou/InnovOS/backend/app/tables/api_keys.py": {
+    "mtime": 1780889083.7020624,
+    "ast_hash": "4fada2cbbf386efb530f6b2ab8717d6e",
+    "semantic_hash": "4fada2cbbf386efb530f6b2ab8717d6e"
+  },
+  "/home/chou/InnovOS/backend/app/tables/audit_logs.py": {
+    "mtime": 1780889083.7020624,
+    "ast_hash": "e341a04efc13393197380403c1513348",
+    "semantic_hash": "e341a04efc13393197380403c1513348"
+  },
+  "/home/chou/InnovOS/backend/app/tables/evaluations.py": {
+    "mtime": 1780889083.7020624,
+    "ast_hash": "37aa5d77af766586ddd880d4badeed42",
+    "semantic_hash": "37aa5d77af766586ddd880d4badeed42"
+  },
+  "/home/chou/InnovOS/backend/app/tables/feedbacks.py": {
+    "mtime": 1780889083.7020624,
+    "ast_hash": "66947bf22e33699be6285c540deb70b0",
+    "semantic_hash": "66947bf22e33699be6285c540deb70b0"
+  },
+  "/home/chou/InnovOS/backend/app/tables/knowledge.py": {
+    "mtime": 1780889083.7020624,
+    "ast_hash": "fd1847bee42015a460d949918bf1dda8",
+    "semantic_hash": "fd1847bee42015a460d949918bf1dda8"
+  },
+  "/home/chou/InnovOS/backend/app/tables/knowledge_bases.py": {
+    "mtime": 1780909577.1214154,
+    "ast_hash": "3e50d6ac3668ce6bb0de5594e63c01c5",
+    "semantic_hash": "3e50d6ac3668ce6bb0de5594e63c01c5"
+  },
+  "/home/chou/InnovOS/backend/app/tables/model_providers.py": {
+    "mtime": 1780916241.079226,
+    "ast_hash": "256ce953af8bf99dc6e102b5f0c0357b",
+    "semantic_hash": "256ce953af8bf99dc6e102b5f0c0357b"
+  },
+  "/home/chou/InnovOS/backend/app/tables/models.py": {
+    "mtime": 1780916751.162141,
+    "ast_hash": "24713c55330514dbbf3a32918015312a",
+    "semantic_hash": "24713c55330514dbbf3a32918015312a"
+  },
+  "/home/chou/InnovOS/backend/app/tables/notifications.py": {
+    "mtime": 1780889083.7020624,
+    "ast_hash": "6759098cbf27135837531a6bf16cd966",
+    "semantic_hash": "6759098cbf27135837531a6bf16cd966"
+  },
+  "/home/chou/InnovOS/backend/app/tables/patents.py": {
+    "mtime": 1780889083.7020624,
+    "ast_hash": "c722ab9a346cb18cd79b9bc170abda8a",
+    "semantic_hash": "c722ab9a346cb18cd79b9bc170abda8a"
+  },
+  "/home/chou/InnovOS/backend/app/tables/pg_schema.py": {
+    "mtime": 1780922375.674445,
+    "ast_hash": "a0a3935214cd88ac81dc5b8e5847b67e",
+    "semantic_hash": "a0a3935214cd88ac81dc5b8e5847b67e"
+  },
+  "/home/chou/InnovOS/backend/app/tables/problem_modelings.py": {
+    "mtime": 1780889083.7020624,
+    "ast_hash": "f3687b8c72c80f56be12774b00571b3d",
+    "semantic_hash": "f3687b8c72c80f56be12774b00571b3d"
+  },
+  "/home/chou/InnovOS/backend/app/tables/solutions.py": {
+    "mtime": 1780889083.7020624,
+    "ast_hash": "2a59049482057a6a0d19f145eb06ca69",
+    "semantic_hash": "2a59049482057a6a0d19f145eb06ca69"
+  },
+  "/home/chou/InnovOS/backend/app/tables/tasks.py": {
+    "mtime": 1780889083.7020624,
+    "ast_hash": "fc5144c7a77c0ef9b9e78cd8014a2e3e",
+    "semantic_hash": "fc5144c7a77c0ef9b9e78cd8014a2e3e"
+  },
+  "/home/chou/InnovOS/backend/app/tables/users.py": {
+    "mtime": 1780889083.7020624,
+    "ast_hash": "c7a0f6c94ec7e64f18c53cb0956caba5",
+    "semantic_hash": "c7a0f6c94ec7e64f18c53cb0956caba5"
+  },
+  "/home/chou/InnovOS/backend/app/tables/workflows.py": {
+    "mtime": 1780889083.7020624,
+    "ast_hash": "fa6989a05abdf65fcc5cde24497ab490",
+    "semantic_hash": "fa6989a05abdf65fcc5cde24497ab490"
+  },
+  "/home/chou/InnovOS/backend/app/utils.py": {
+    "mtime": 1780889083.7020624,
+    "ast_hash": "f68a82f91e6e7d26d6a9156add9e3178",
+    "semantic_hash": "f68a82f91e6e7d26d6a9156add9e3178"
+  },
+  "/home/chou/InnovOS/backend/scripts/migrate_data.py": {
+    "mtime": 1780909810.5687912,
+    "ast_hash": "f0bd9d943155ebca7d3be43dc7372c08",
+    "semantic_hash": "f0bd9d943155ebca7d3be43dc7372c08"
+  },
+  "/home/chou/InnovOS/backend/tests/__init__.py": {
+    "mtime": 1780889083.7030623,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/chou/InnovOS/backend/tests/conftest.py": {
+    "mtime": 1780911522.3121986,
+    "ast_hash": "1fc5892bfb3dde2e8640c38656d659b2",
+    "semantic_hash": "1fc5892bfb3dde2e8640c38656d659b2"
+  },
+  "/home/chou/InnovOS/backend/tests/test_api_models.py": {
+    "mtime": 1780910991.7663705,
+    "ast_hash": "2e36f99521f3ab8364683ad3c1c03895",
+    "semantic_hash": "2e36f99521f3ab8364683ad3c1c03895"
+  },
+  "/home/chou/InnovOS/backend/tests/test_embedder.py": {
+    "mtime": 1780911051.5868707,
+    "ast_hash": "029926036fbbc77df8086095d4fc597a",
+    "semantic_hash": "029926036fbbc77df8086095d4fc597a"
+  },
+  "/home/chou/InnovOS/backend/tests/test_model_reconcile.py": {
+    "mtime": 1780915770.4039536,
+    "ast_hash": "9f4dcafacfbae026164236a14a488498",
+    "semantic_hash": "9f4dcafacfbae026164236a14a488498"
+  },
+  "/home/chou/InnovOS/backend/tests/test_model_registry.py": {
+    "mtime": 1780911351.4210885,
+    "ast_hash": "2615faaddaa5088f32b6e8ec9e885207",
+    "semantic_hash": "2615faaddaa5088f32b6e8ec9e885207"
+  },
+  "/home/chou/InnovOS/backend/tests/test_model_runtime.py": {
+    "mtime": 1780910852.4651034,
+    "ast_hash": "b48c220ec1d749ace2b67ba8eb6b5995",
+    "semantic_hash": "b48c220ec1d749ace2b67ba8eb6b5995"
+  },
+  "/home/chou/InnovOS/backend/tests/test_models_crud.py": {
+    "mtime": 1780916859.8812377,
+    "ast_hash": "4d1dbe60fe0496383ed91100ba020a54",
+    "semantic_hash": "4d1dbe60fe0496383ed91100ba020a54"
+  },
+  "/home/chou/InnovOS/backend/tests/test_orchestration_service.py": {
+    "mtime": 1780915580.2362342,
+    "ast_hash": "1a4e58be64d3305eff42769afcedb6eb",
+    "semantic_hash": "1a4e58be64d3305eff42769afcedb6eb"
+  },
+  "/home/chou/InnovOS/backend/tests/test_providers_registry.py": {
+    "mtime": 1780910746.0450177,
+    "ast_hash": "32b237e0718320ce9ff285e605be18fd",
+    "semantic_hash": "32b237e0718320ce9ff285e605be18fd"
+  },
+  "/home/chou/InnovOS/backend/tests/test_reranker.py": {
+    "mtime": 1780917245.746438,
+    "ast_hash": "084ceca6d8d0bc04fea8eb05f4a4e581",
+    "semantic_hash": "084ceca6d8d0bc04fea8eb05f4a4e581"
+  },
+  "/home/chou/InnovOS/frontend/eslint.config.js": {
+    "mtime": 1780889083.707062,
+    "ast_hash": "0355276bc79439afe3c53e3a2470ca1e",
+    "semantic_hash": "0355276bc79439afe3c53e3a2470ca1e"
+  },
+  "/home/chou/InnovOS/frontend/package.json": {
+    "mtime": 1780889083.7087324,
+    "ast_hash": "d1d99964412b24180c87ee7536b4ce6e",
+    "semantic_hash": "d1d99964412b24180c87ee7536b4ce6e"
+  },
+  "/home/chou/InnovOS/frontend/src/App.tsx": {
+    "mtime": 1780889083.7087324,
+    "ast_hash": "67b05a36585b7132e60852eaa94339d5",
+    "semantic_hash": "67b05a36585b7132e60852eaa94339d5"
+  },
+  "/home/chou/InnovOS/frontend/src/api/admin/index.ts": {
+    "mtime": 1780890429.0126774,
+    "ast_hash": "8dc19a5a7fc386f8f418907fdba146c4",
+    "semantic_hash": "8dc19a5a7fc386f8f418907fdba146c4"
+  },
+  "/home/chou/InnovOS/frontend/src/api/admin/providers.ts": {
+    "mtime": 1780917605.518745,
+    "ast_hash": "1ad4c10d1e0179eada0ef27c08904184",
+    "semantic_hash": "1ad4c10d1e0179eada0ef27c08904184"
+  },
+  "/home/chou/InnovOS/frontend/src/api/analysis.ts": {
+    "mtime": 1780889083.7087324,
+    "ast_hash": "8b80c799c993500ba28a9376a6b0786f",
+    "semantic_hash": "8b80c799c993500ba28a9376a6b0786f"
+  },
+  "/home/chou/InnovOS/frontend/src/api/auth.ts": {
+    "mtime": 1780910301.021703,
+    "ast_hash": "6c83be29e52ad885f4ada82c6da7db40",
+    "semantic_hash": "6c83be29e52ad885f4ada82c6da7db40"
+  },
+  "/home/chou/InnovOS/frontend/src/api/client.ts": {
+    "mtime": 1780908490.0449638,
+    "ast_hash": "02e4f0d9cbe8d8851340aa90df467884",
+    "semantic_hash": "02e4f0d9cbe8d8851340aa90df467884"
+  },
+  "/home/chou/InnovOS/frontend/src/api/evaluation.ts": {
+    "mtime": 1780889083.7090619,
+    "ast_hash": "44df2cdacf3e2c0a1613a66893188ea1",
+    "semantic_hash": "44df2cdacf3e2c0a1613a66893188ea1"
+  },
+  "/home/chou/InnovOS/frontend/src/api/feedback.ts": {
+    "mtime": 1780889083.7090619,
+    "ast_hash": "56d39c8fb3cf3dead574f457f55d73b5",
+    "semantic_hash": "56d39c8fb3cf3dead574f457f55d73b5"
+  },
+  "/home/chou/InnovOS/frontend/src/api/keys.ts": {
+    "mtime": 1780889083.7090619,
+    "ast_hash": "47dc4d8f4d387ebf25889da8871903c6",
+    "semantic_hash": "47dc4d8f4d387ebf25889da8871903c6"
+  },
+  "/home/chou/InnovOS/frontend/src/api/knowledge.ts": {
+    "mtime": 1780908507.2939188,
+    "ast_hash": "58654a53999f80ea79e9663c6bad1b4a",
+    "semantic_hash": "58654a53999f80ea79e9663c6bad1b4a"
+  },
+  "/home/chou/InnovOS/frontend/src/api/modeling.ts": {
+    "mtime": 1780889083.7104838,
+    "ast_hash": "27deb022a3ec8d9ebff032ca78868f32",
+    "semantic_hash": "27deb022a3ec8d9ebff032ca78868f32"
+  },
+  "/home/chou/InnovOS/frontend/src/api/monitor.ts": {
+    "mtime": 1780889083.7104838,
+    "ast_hash": "cb7333519ac8113dbe03534a085f332e",
+    "semantic_hash": "cb7333519ac8113dbe03534a085f332e"
+  },
+  "/home/chou/InnovOS/frontend/src/api/notifications.ts": {
+    "mtime": 1780889083.7104838,
+    "ast_hash": "c82e670742375ab07e27688c864f208c",
+    "semantic_hash": "c82e670742375ab07e27688c864f208c"
+  },
+  "/home/chou/InnovOS/frontend/src/api/patents.ts": {
+    "mtime": 1780889083.7104838,
+    "ast_hash": "12fedc1b131ad9041a58aa100a874336",
+    "semantic_hash": "12fedc1b131ad9041a58aa100a874336"
+  },
+  "/home/chou/InnovOS/frontend/src/api/principles.ts": {
+    "mtime": 1780889083.7112076,
+    "ast_hash": "d57d60b23284bd358d4ff82cd38bc878",
+    "semantic_hash": "d57d60b23284bd358d4ff82cd38bc878"
+  },
+  "/home/chou/InnovOS/frontend/src/api/sidebar.ts": {
+    "mtime": 1780889083.7113094,
+    "ast_hash": "96f228d4762f07d12de0d31b2dd5da24",
+    "semantic_hash": "96f228d4762f07d12de0d31b2dd5da24"
+  },
+  "/home/chou/InnovOS/frontend/src/api/solutions.ts": {
+    "mtime": 1780889083.7113094,
+    "ast_hash": "f8e89b373dd7b959144c2c8aa9666fd6",
+    "semantic_hash": "f8e89b373dd7b959144c2c8aa9666fd6"
+  },
+  "/home/chou/InnovOS/frontend/src/api/tasks.ts": {
+    "mtime": 1780889083.7113094,
+    "ast_hash": "396b9b44be0cb85657a69c5defac7db2",
+    "semantic_hash": "396b9b44be0cb85657a69c5defac7db2"
+  },
+  "/home/chou/InnovOS/frontend/src/api/users.ts": {
+    "mtime": 1780889083.7113094,
+    "ast_hash": "a4fa2420edbc23414378f20fb842fcec",
+    "semantic_hash": "a4fa2420edbc23414378f20fb842fcec"
+  },
+  "/home/chou/InnovOS/frontend/src/api/workflow.ts": {
+    "mtime": 1780890433.9501674,
+    "ast_hash": "6abfe79070967e4d261bad860dbc1bbb",
+    "semantic_hash": "6abfe79070967e4d261bad860dbc1bbb"
+  },
+  "/home/chou/InnovOS/frontend/src/components/diagram/ConflictDiagram.tsx": {
+    "mtime": 1780889083.7120614,
+    "ast_hash": "b4959655ca6bbc74eead318f155a36be",
+    "semantic_hash": "b4959655ca6bbc74eead318f155a36be"
+  },
+  "/home/chou/InnovOS/frontend/src/components/layout/AppLayout.tsx": {
+    "mtime": 1780889083.7120614,
+    "ast_hash": "d24515f09e1daa8ea8af9a170e33398c",
+    "semantic_hash": "d24515f09e1daa8ea8af9a170e33398c"
+  },
+  "/home/chou/InnovOS/frontend/src/components/layout/MainPanel.tsx": {
+    "mtime": 1780889083.7120614,
+    "ast_hash": "9932e6d77cd5336deb8be6453d082041",
+    "semantic_hash": "9932e6d77cd5336deb8be6453d082041"
+  },
+  "/home/chou/InnovOS/frontend/src/components/layout/ProtectedRoute.tsx": {
+    "mtime": 1780889083.7135818,
+    "ast_hash": "e73a5537e0208f7b519f356c01b287ca",
+    "semantic_hash": "e73a5537e0208f7b519f356c01b287ca"
+  },
+  "/home/chou/InnovOS/frontend/src/components/layout/Sidebar.tsx": {
+    "mtime": 1780890650.7209342,
+    "ast_hash": "b08c845375d74030f7fd540e83ca005f",
+    "semantic_hash": "b08c845375d74030f7fd540e83ca005f"
+  },
+  "/home/chou/InnovOS/frontend/src/components/ui/EmptyState.tsx": {
+    "mtime": 1780889083.71393,
+    "ast_hash": "36b5de792ed23c006e656402925ccf4c",
+    "semantic_hash": "36b5de792ed23c006e656402925ccf4c"
+  },
+  "/home/chou/InnovOS/frontend/src/components/ui/GlassPanel.tsx": {
+    "mtime": 1780889083.7142413,
+    "ast_hash": "4d51de74b40a2d23d3d22ad4f988a19b",
+    "semantic_hash": "4d51de74b40a2d23d3d22ad4f988a19b"
+  },
+  "/home/chou/InnovOS/frontend/src/components/ui/InlineConfirmModal.tsx": {
+    "mtime": 1780889083.7143066,
+    "ast_hash": "71422d61752431be2ccb1455ba63303e",
+    "semantic_hash": "71422d61752431be2ccb1455ba63303e"
+  },
+  "/home/chou/InnovOS/frontend/src/components/ui/LoadingSpinner.tsx": {
+    "mtime": 1780889083.7143066,
+    "ast_hash": "c5f11c953c5e8a814841cb0df02b696f",
+    "semantic_hash": "c5f11c953c5e8a814841cb0df02b696f"
+  },
+  "/home/chou/InnovOS/frontend/src/components/ui/Modal.tsx": {
+    "mtime": 1780889083.7147248,
+    "ast_hash": "219e63f2339bfa111cc7832a03e736d0",
+    "semantic_hash": "219e63f2339bfa111cc7832a03e736d0"
+  },
+  "/home/chou/InnovOS/frontend/src/components/ui/ModelEditDrawer.tsx": {
+    "mtime": 1780917288.0494504,
+    "ast_hash": "d8316bb1ea6b014876d0d6308505bac2",
+    "semantic_hash": "d8316bb1ea6b014876d0d6308505bac2"
+  },
+  "/home/chou/InnovOS/frontend/src/components/ui/ModelSelector.tsx": {
+    "mtime": 1780908475.9170022,
+    "ast_hash": "f9c3e19868f4e716bc47f4e6c8f7262d",
+    "semantic_hash": "f9c3e19868f4e716bc47f4e6c8f7262d"
+  },
+  "/home/chou/InnovOS/frontend/src/components/ui/StatusBadge.tsx": {
+    "mtime": 1780889083.7147248,
+    "ast_hash": "9f63ee68a962aa4e47ddebb0da3cb554",
+    "semantic_hash": "9f63ee68a962aa4e47ddebb0da3cb554"
+  },
+  "/home/chou/InnovOS/frontend/src/components/ui/Tag.tsx": {
+    "mtime": 1780889083.7147248,
+    "ast_hash": "ad6a419ec1b78df45288773e11bb3b5b",
+    "semantic_hash": "ad6a419ec1b78df45288773e11bb3b5b"
+  },
+  "/home/chou/InnovOS/frontend/src/features/PlaceholderPage.tsx": {
+    "mtime": 1780889083.7147248,
+    "ast_hash": "d16545f1722a029501ca1199f40e7647",
+    "semantic_hash": "d16545f1722a029501ca1199f40e7647"
+  },
+  "/home/chou/InnovOS/frontend/src/features/admin/KeyManagementPage.tsx": {
+    "mtime": 1780917654.9529593,
+    "ast_hash": "af4a8fbcdfe435923c279979271c4403",
+    "semantic_hash": "af4a8fbcdfe435923c279979271c4403"
+  },
+  "/home/chou/InnovOS/frontend/src/features/admin/UserManagementPage.tsx": {
+    "mtime": 1780889083.7150612,
+    "ast_hash": "554f2b37787116f8d33c9c9c085cb9cc",
+    "semantic_hash": "554f2b37787116f8d33c9c9c085cb9cc"
+  },
+  "/home/chou/InnovOS/frontend/src/features/analysis/AnalysisPage.tsx": {
+    "mtime": 1780889083.7150612,
+    "ast_hash": "f1c318386682781765fab8165d39977e",
+    "semantic_hash": "f1c318386682781765fab8165d39977e"
+  },
+  "/home/chou/InnovOS/frontend/src/features/auth/LoginPage.tsx": {
+    "mtime": 1780889083.7150612,
+    "ast_hash": "cbe23b9286da7062a3a80d5cd905f961",
+    "semantic_hash": "cbe23b9286da7062a3a80d5cd905f961"
+  },
+  "/home/chou/InnovOS/frontend/src/features/auth/RegisterPage.tsx": {
+    "mtime": 1780889083.7150612,
+    "ast_hash": "310acd7273ab6c3a23df133d9a561f40",
+    "semantic_hash": "310acd7273ab6c3a23df133d9a561f40"
+  },
+  "/home/chou/InnovOS/frontend/src/features/dashboard/AgentWorkflowPanel.tsx": {
+    "mtime": 1780889083.7150612,
+    "ast_hash": "431b24253b147f1a3a03f709be52be67",
+    "semantic_hash": "431b24253b147f1a3a03f709be52be67"
+  },
+  "/home/chou/InnovOS/frontend/src/features/dashboard/AnalysisResult.tsx": {
+    "mtime": 1780889083.716061,
+    "ast_hash": "5e15c90f57e40895a1015ae960c38324",
+    "semantic_hash": "5e15c90f57e40895a1015ae960c38324"
+  },
+  "/home/chou/InnovOS/frontend/src/features/dashboard/DashboardPage.tsx": {
+    "mtime": 1780889083.716061,
+    "ast_hash": "470628835c876ea65494be1a5f279f76",
+    "semantic_hash": "470628835c876ea65494be1a5f279f76"
+  },
+  "/home/chou/InnovOS/frontend/src/features/dashboard/PatentStatsPanel.tsx": {
+    "mtime": 1780889083.716061,
+    "ast_hash": "2ac295227a74b8b18af496f86be97b0b",
+    "semantic_hash": "2ac295227a74b8b18af496f86be97b0b"
+  },
+  "/home/chou/InnovOS/frontend/src/features/dashboard/SolutionGeneration.tsx": {
+    "mtime": 1780889083.716061,
+    "ast_hash": "a849689491889a87388269678fca0524",
+    "semantic_hash": "a849689491889a87388269678fca0524"
+  },
+  "/home/chou/InnovOS/frontend/src/features/dashboard/TaskInputPanel.tsx": {
+    "mtime": 1780889083.717061,
+    "ast_hash": "469c84a1b48af9fb84ff4e74c58aced3",
+    "semantic_hash": "469c84a1b48af9fb84ff4e74c58aced3"
+  },
+  "/home/chou/InnovOS/frontend/src/features/dashboard/TaskList.tsx": {
+    "mtime": 1780890653.9633508,
+    "ast_hash": "777b4607a53b43661f02be5dc0aa3e6b",
+    "semantic_hash": "777b4607a53b43661f02be5dc0aa3e6b"
+  },
+  "/home/chou/InnovOS/frontend/src/features/knowledge/AddKnowledgeItemDialog.tsx": {
+    "mtime": 1780889083.717061,
+    "ast_hash": "7bb85f1544ec09a873575b5d91164e52",
+    "semantic_hash": "7bb85f1544ec09a873575b5d91164e52"
+  },
+  "/home/chou/InnovOS/frontend/src/features/knowledge/CreateKnowledgeBaseDialog.tsx": {
+    "mtime": 1780889083.717061,
+    "ast_hash": "94daa4ed7a33f4db93fcf468448deaec",
+    "semantic_hash": "94daa4ed7a33f4db93fcf468448deaec"
+  },
+  "/home/chou/InnovOS/frontend/src/features/knowledge/KnowledgeBasePage.tsx": {
+    "mtime": 1780889083.718061,
+    "ast_hash": "678276518d9bab6f2cf55a50b4974926",
+    "semantic_hash": "678276518d9bab6f2cf55a50b4974926"
+  },
+  "/home/chou/InnovOS/frontend/src/features/knowledge/KnowledgeDetail.tsx": {
+    "mtime": 1780890054.375871,
+    "ast_hash": "82af8a56b799127cfa1b2232824d004a",
+    "semantic_hash": "82af8a56b799127cfa1b2232824d004a"
+  },
+  "/home/chou/InnovOS/frontend/src/features/knowledge/KnowledgeNavigator.tsx": {
+    "mtime": 1780890002.714328,
+    "ast_hash": "84304e42ff87ab5a4c758c380d3f298a",
+    "semantic_hash": "84304e42ff87ab5a4c758c380d3f298a"
+  },
+  "/home/chou/InnovOS/frontend/src/features/knowledge/KnowledgePage.tsx": {
+    "mtime": 1780889962.3289778,
+    "ast_hash": "940b4f054d7452f3f7d45459b84ecdba",
+    "semantic_hash": "940b4f054d7452f3f7d45459b84ecdba"
+  },
+  "/home/chou/InnovOS/frontend/src/features/knowledge/NoteEditorDialog.tsx": {
+    "mtime": 1780889083.718061,
+    "ast_hash": "ef80234ffebb2a7e913e1a7827dbd47d",
+    "semantic_hash": "ef80234ffebb2a7e913e1a7827dbd47d"
+  },
+  "/home/chou/InnovOS/frontend/src/features/knowledge/RagConfigPanel.tsx": {
+    "mtime": 1780889083.718061,
+    "ast_hash": "4b472a574a818f7cb1e754506ee51a0e",
+    "semantic_hash": "4b472a574a818f7cb1e754506ee51a0e"
+  },
+  "/home/chou/InnovOS/frontend/src/features/knowledge/RecallTestPanel.tsx": {
+    "mtime": 1780889083.719061,
+    "ast_hash": "a9d4ac1815c611a3546b6fa530c1a119",
+    "semantic_hash": "a9d4ac1815c611a3546b6fa530c1a119"
+  },
+  "/home/chou/InnovOS/frontend/src/features/knowledge/components/KnowledgeEntityNameDialog.tsx": {
+    "mtime": 1780889083.719061,
+    "ast_hash": "aebed971c96d983edc781caf0f02c6f5",
+    "semantic_hash": "aebed971c96d983edc781caf0f02c6f5"
+  },
+  "/home/chou/InnovOS/frontend/src/features/knowledge/utils.ts": {
+    "mtime": 1780889083.719061,
+    "ast_hash": "0db41b7a70d1d6a46a5e67c290a1b90e",
+    "semantic_hash": "0db41b7a70d1d6a46a5e67c290a1b90e"
+  },
+  "/home/chou/InnovOS/frontend/src/features/modeling/ProblemModelingPanel.tsx": {
+    "mtime": 1780889083.719061,
+    "ast_hash": "0f6c7ca1ad0f9e44a2c0fc6114660c8c",
+    "semantic_hash": "0f6c7ca1ad0f9e44a2c0fc6114660c8c"
+  },
+  "/home/chou/InnovOS/frontend/src/features/monitor/HealthCheckPanel.tsx": {
+    "mtime": 1780889083.7200608,
+    "ast_hash": "135f4abcfa551c9a50d0883ec5b3b28b",
+    "semantic_hash": "135f4abcfa551c9a50d0883ec5b3b28b"
+  },
+  "/home/chou/InnovOS/frontend/src/features/monitor/KeyUsageChart.tsx": {
+    "mtime": 1780889083.7200608,
+    "ast_hash": "8d259cb1171c805b35a4a057fbceed8d",
+    "semantic_hash": "8d259cb1171c805b35a4a057fbceed8d"
+  },
+  "/home/chou/InnovOS/frontend/src/features/monitor/MonitorPage.tsx": {
+    "mtime": 1780889083.7200608,
+    "ast_hash": "30a6030d3cac0fa140a47dc96491cd2c",
+    "semantic_hash": "30a6030d3cac0fa140a47dc96491cd2c"
+  },
+  "/home/chou/InnovOS/frontend/src/features/monitor/OverviewCards.tsx": {
+    "mtime": 1780889083.7200608,
+    "ast_hash": "07063edf602d6805cf0778c36a1c24b5",
+    "semantic_hash": "07063edf602d6805cf0778c36a1c24b5"
+  },
+  "/home/chou/InnovOS/frontend/src/features/monitor/SystemStatus.tsx": {
+    "mtime": 1780889083.7200608,
+    "ast_hash": "52c3450b0cbed23cc4afa921a7733248",
+    "semantic_hash": "52c3450b0cbed23cc4afa921a7733248"
+  },
+  "/home/chou/InnovOS/frontend/src/features/monitor/TaskStatsChart.tsx": {
+    "mtime": 1780889083.7200608,
+    "ast_hash": "aa8abf061422981427d8ce2d1046eed9",
+    "semantic_hash": "aa8abf061422981427d8ce2d1046eed9"
+  },
+  "/home/chou/InnovOS/frontend/src/features/patents/PatentSearchPage.tsx": {
+    "mtime": 1780889083.7210608,
+    "ast_hash": "15189665bc28706febd3bf6ef88154d0",
+    "semantic_hash": "15189665bc28706febd3bf6ef88154d0"
+  },
+  "/home/chou/InnovOS/frontend/src/main.tsx": {
+    "mtime": 1780889083.7210608,
+    "ast_hash": "e7f0b28d6fafc62b3bcdb6e3b779ed6a",
+    "semantic_hash": "e7f0b28d6fafc62b3bcdb6e3b779ed6a"
+  },
+  "/home/chou/InnovOS/frontend/src/routes/index.tsx": {
+    "mtime": 1780889083.7210608,
+    "ast_hash": "9515da37e361b039a2174c7118c05cdd",
+    "semantic_hash": "9515da37e361b039a2174c7118c05cdd"
+  },
+  "/home/chou/InnovOS/frontend/src/store/useAnalysisStore.ts": {
+    "mtime": 1780889083.7210608,
+    "ast_hash": "3e5752d6af76b18525b6b3b8e5e2f1ce",
+    "semantic_hash": "3e5752d6af76b18525b6b3b8e5e2f1ce"
+  },
+  "/home/chou/InnovOS/frontend/src/store/useAuthStore.ts": {
+    "mtime": 1780889083.7210608,
+    "ast_hash": "e0a4bf975ffe348e062563afe5c86faa",
+    "semantic_hash": "e0a4bf975ffe348e062563afe5c86faa"
+  },
+  "/home/chou/InnovOS/frontend/src/store/useEvaluationStore.ts": {
+    "mtime": 1780889083.7210608,
+    "ast_hash": "8e75e8acb462646c96573907dfd99913",
+    "semantic_hash": "8e75e8acb462646c96573907dfd99913"
+  },
+  "/home/chou/InnovOS/frontend/src/store/useFeedbackStore.ts": {
+    "mtime": 1780889083.7210608,
+    "ast_hash": "3fa9e51984b0e62bf601672429a10bdd",
+    "semantic_hash": "3fa9e51984b0e62bf601672429a10bdd"
+  },
+  "/home/chou/InnovOS/frontend/src/store/useKnowledgeStore.ts": {
+    "mtime": 1780890204.3162026,
+    "ast_hash": "b51f26ed37802a3eca0617938bc9c5b5",
+    "semantic_hash": "b51f26ed37802a3eca0617938bc9c5b5"
+  },
+  "/home/chou/InnovOS/frontend/src/store/useModelingStore.ts": {
+    "mtime": 1780889083.7220607,
+    "ast_hash": "c5b4fd1cc242e7f8c417348d42912727",
+    "semantic_hash": "c5b4fd1cc242e7f8c417348d42912727"
+  },
+  "/home/chou/InnovOS/frontend/src/store/useMonitorStore.ts": {
+    "mtime": 1780889083.7220607,
+    "ast_hash": "30f83bd367afef8479d6eed4b5ba3a3c",
+    "semantic_hash": "30f83bd367afef8479d6eed4b5ba3a3c"
+  },
+  "/home/chou/InnovOS/frontend/src/store/usePatentStore.ts": {
+    "mtime": 1780889083.7220607,
+    "ast_hash": "09d2ebc2029dc5074b3e450d0b8b8a82",
+    "semantic_hash": "09d2ebc2029dc5074b3e450d0b8b8a82"
+  },
+  "/home/chou/InnovOS/frontend/src/store/useSolutionStore.ts": {
+    "mtime": 1780889083.7220607,
+    "ast_hash": "fca9dd2aeb1e033d1df193a4f3a51cb0",
+    "semantic_hash": "fca9dd2aeb1e033d1df193a4f3a51cb0"
+  },
+  "/home/chou/InnovOS/frontend/src/store/useTaskStore.ts": {
+    "mtime": 1780889083.7220607,
+    "ast_hash": "01b3f99f95a923795cefe25d6ae89739",
+    "semantic_hash": "01b3f99f95a923795cefe25d6ae89739"
+  },
+  "/home/chou/InnovOS/frontend/src/store/useUIStore.ts": {
+    "mtime": 1780889083.7220607,
+    "ast_hash": "9df4057b56e36b2fe984d237e90fbe0c",
+    "semantic_hash": "9df4057b56e36b2fe984d237e90fbe0c"
+  },
+  "/home/chou/InnovOS/frontend/src/store/useWorkflowStore.ts": {
+    "mtime": 1780889083.7230604,
+    "ast_hash": "8013d741f10c0167149df2080451a274",
+    "semantic_hash": "8013d741f10c0167149df2080451a274"
+  },
+  "/home/chou/InnovOS/frontend/src/types/analysis.ts": {
+    "mtime": 1780889083.7230604,
+    "ast_hash": "170e640b8f40b4b3a9ae1003867b544c",
+    "semantic_hash": "170e640b8f40b4b3a9ae1003867b544c"
+  },
+  "/home/chou/InnovOS/frontend/src/types/common.ts": {
+    "mtime": 1780889083.7230604,
+    "ast_hash": "f73edfc2ce2a94af6279ec5a7c2b6a54",
+    "semantic_hash": "f73edfc2ce2a94af6279ec5a7c2b6a54"
+  },
+  "/home/chou/InnovOS/frontend/src/types/evaluation.ts": {
+    "mtime": 1780889083.7230604,
+    "ast_hash": "da87469bb64ccfa70a3faee70b270602",
+    "semantic_hash": "da87469bb64ccfa70a3faee70b270602"
+  },
+  "/home/chou/InnovOS/frontend/src/types/feedback.ts": {
+    "mtime": 1780889083.7230604,
+    "ast_hash": "20d86a3b302cddf1dbadd6bf1c367851",
+    "semantic_hash": "20d86a3b302cddf1dbadd6bf1c367851"
+  },
+  "/home/chou/InnovOS/frontend/src/types/knowledge.ts": {
+    "mtime": 1780889083.7230604,
+    "ast_hash": "44a9e847074a2b42f89851bef9b39609",
+    "semantic_hash": "44a9e847074a2b42f89851bef9b39609"
+  },
+  "/home/chou/InnovOS/frontend/src/types/modeling.ts": {
+    "mtime": 1780889083.7230604,
+    "ast_hash": "f149395d8c38a50fbc2c70944a25378d",
+    "semantic_hash": "f149395d8c38a50fbc2c70944a25378d"
+  },
+  "/home/chou/InnovOS/frontend/src/types/patent.ts": {
+    "mtime": 1780889083.7230604,
+    "ast_hash": "3ec5f7374186e3a1976127686347f74e",
+    "semantic_hash": "3ec5f7374186e3a1976127686347f74e"
+  },
+  "/home/chou/InnovOS/frontend/src/types/solution.ts": {
+    "mtime": 1780889083.7230604,
+    "ast_hash": "222ba13baac05afc14087017f511162f",
+    "semantic_hash": "222ba13baac05afc14087017f511162f"
+  },
+  "/home/chou/InnovOS/frontend/src/types/task.ts": {
+    "mtime": 1780889083.7240603,
+    "ast_hash": "31a468c2b3eb89bfe634e94f188b23b9",
+    "semantic_hash": "31a468c2b3eb89bfe634e94f188b23b9"
+  },
+  "/home/chou/InnovOS/frontend/src/types/workflow.ts": {
+    "mtime": 1780889083.7240603,
+    "ast_hash": "583e20e8dc0ae503f30ab85b802ed707",
+    "semantic_hash": "583e20e8dc0ae503f30ab85b802ed707"
+  },
+  "/home/chou/InnovOS/frontend/src/utils/cn.ts": {
+    "mtime": 1780889083.7240603,
+    "ast_hash": "9a4cc6f9f3155ffdc1fa7c2c097f6429",
+    "semantic_hash": "9a4cc6f9f3155ffdc1fa7c2c097f6429"
+  },
+  "/home/chou/InnovOS/frontend/src/utils/constants.ts": {
+    "mtime": 1780889083.7240603,
+    "ast_hash": "0f9fef44365fe68b9c000b4c8a87a308",
+    "semantic_hash": "0f9fef44365fe68b9c000b4c8a87a308"
+  },
+  "/home/chou/InnovOS/frontend/src/utils/formatters.ts": {
+    "mtime": 1780889083.7240603,
+    "ast_hash": "6f085f141f32903b1f9fecee7520a62c",
+    "semantic_hash": "6f085f141f32903b1f9fecee7520a62c"
+  },
+  "/home/chou/InnovOS/frontend/tsconfig.app.json": {
+    "mtime": 1780889083.7240603,
+    "ast_hash": "136630b5accce1ca50663df229534a26",
+    "semantic_hash": "136630b5accce1ca50663df229534a26"
+  },
+  "/home/chou/InnovOS/frontend/tsconfig.json": {
+    "mtime": 1780889083.7240603,
+    "ast_hash": "a3d39fa780ebff65444de257f291ce6c",
+    "semantic_hash": "a3d39fa780ebff65444de257f291ce6c"
+  },
+  "/home/chou/InnovOS/frontend/tsconfig.node.json": {
+    "mtime": 1780889083.7240603,
+    "ast_hash": "70bdd0a673bcfc0e828080b306e7c680",
+    "semantic_hash": "70bdd0a673bcfc0e828080b306e7c680"
+  },
+  "/home/chou/InnovOS/frontend/vite.config.ts": {
+    "mtime": 1780889083.7250602,
+    "ast_hash": "60b22c6831f3f0493394a9ffb67a7852",
+    "semantic_hash": "60b22c6831f3f0493394a9ffb67a7852"
+  },
+  "/home/chou/InnovOS/.opencode/memory/project.md": {
+    "mtime": 1780909887.16263,
+    "ast_hash": "c1fdc2f9141e26f84e4479e5e78ec719",
+    "semantic_hash": "c1fdc2f9141e26f84e4479e5e78ec719"
+  },
+  "/home/chou/InnovOS/AGENTS.md": {
+    "mtime": 1780889083.6940632,
+    "ast_hash": "246e52b662f4a24993621f58cbcd3539",
+    "semantic_hash": "246e52b662f4a24993621f58cbcd3539"
+  },
+  "/home/chou/InnovOS/CLAUDE.md": {
+    "mtime": 1780889083.6940632,
+    "ast_hash": "62949bfd6faeab5795de708fddfcd6f2",
+    "semantic_hash": "62949bfd6faeab5795de708fddfcd6f2"
+  },
+  "/home/chou/InnovOS/backend/requirements.txt": {
+    "mtime": 1780908487.68597,
+    "ast_hash": "89513e930cb9d6d13c5c69bb4b309c1c",
+    "semantic_hash": "89513e930cb9d6d13c5c69bb4b309c1c"
+  },
+  "/home/chou/InnovOS/docker-compose.yml": {
+    "mtime": 1780908464.4990342,
+    "ast_hash": "6aa8866fa11fad78662733da9378bf0a",
+    "semantic_hash": "6aa8866fa11fad78662733da9378bf0a"
+  },
+  "/home/chou/InnovOS/docs/DEVELOPMENT_GUIDE.md": {
+    "mtime": 1780889083.7040622,
+    "ast_hash": "15af9349eb5cf9d96593d9409297830d",
+    "semantic_hash": "15af9349eb5cf9d96593d9409297830d"
+  },
+  "/home/chou/InnovOS/docs/README.md": {
+    "mtime": 1780889083.7040622,
+    "ast_hash": "be2674b71cb0143169bf819deddb535b",
+    "semantic_hash": "be2674b71cb0143169bf819deddb535b"
+  },
+  "/home/chou/InnovOS/docs/RESTRUCTURE_PLAN.md": {
+    "mtime": 1780889083.7040622,
+    "ast_hash": "8ce063b3a129bbde4eb13cc15458daad",
+    "semantic_hash": "8ce063b3a129bbde4eb13cc15458daad"
+  },
+  "/home/chou/InnovOS/docs/ai-integration.md": {
+    "mtime": 1780889083.7040622,
+    "ast_hash": "4f61999474421a9aa0b88b0ab8415f75",
+    "semantic_hash": "4f61999474421a9aa0b88b0ab8415f75"
+  },
+  "/home/chou/InnovOS/docs/algorithm/evaluation.md": {
+    "mtime": 1780889083.7050622,
+    "ast_hash": "b07d719742de54f5bb19a326e6f9a1ba",
+    "semantic_hash": "b07d719742de54f5bb19a326e6f9a1ba"
+  },
+  "/home/chou/InnovOS/docs/developer/00-\u4f7f\u7528\u6307\u5357.md": {
+    "mtime": 1780889083.7050622,
+    "ast_hash": "2ae3e3a4d541c237740097fa304dae65",
+    "semantic_hash": "2ae3e3a4d541c237740097fa304dae65"
+  },
+  "/home/chou/InnovOS/docs/developer/01-\u8d26\u6237\u7cfb\u7edf.md": {
+    "mtime": 1780889083.7050622,
+    "ast_hash": "f957ce6be331d204455ad63b74873b0d",
+    "semantic_hash": "f957ce6be331d204455ad63b74873b0d"
+  },
+  "/home/chou/InnovOS/docs/developer/02-\u901a\u77e5\u7cfb\u7edf.md": {
+    "mtime": 1780889083.7050622,
+    "ast_hash": "68e77c5d340a981687cff8bc971edd49",
+    "semantic_hash": "68e77c5d340a981687cff8bc971edd49"
+  },
+  "/home/chou/InnovOS/docs/developer/03-\u77e5\u8bc6\u5e93.md": {
+    "mtime": 1780889083.7050622,
+    "ast_hash": "3faf4ca23b9a06e2c7d0d0a29153b833",
+    "semantic_hash": "3faf4ca23b9a06e2c7d0d0a29153b833"
+  },
+  "/home/chou/InnovOS/docs/developer/04-\u4fa7\u8fb9\u680f\u4e0e\u5bfc\u822a.md": {
+    "mtime": 1780889083.7050622,
+    "ast_hash": "a6c7c4419d93293caaa537a3b68fbbcf",
+    "semantic_hash": "a6c7c4419d93293caaa537a3b68fbbcf"
+  },
+  "/home/chou/InnovOS/docs/developer/05-\u9700\u6c42\u753b\u50cf.md": {
+    "mtime": 1780889083.7050622,
+    "ast_hash": "a8d300ac6a172be9f2efeea504272216",
+    "semantic_hash": "a8d300ac6a172be9f2efeea504272216"
+  },
+  "/home/chou/InnovOS/docs/developer/06-\u95ee\u9898\u5efa\u6a21.md": {
+    "mtime": 1780889083.7050622,
+    "ast_hash": "59f924389a87c19b020b49e486514fdb",
+    "semantic_hash": "59f924389a87c19b020b49e486514fdb"
+  },
+  "/home/chou/InnovOS/docs/developer/07-\u4e13\u5229\u68c0\u7d22\u4e0e\u8f6c\u5316.md": {
+    "mtime": 1780889083.7050622,
+    "ast_hash": "aec2d2ad9c5ad6073a52e3b493cff94b",
+    "semantic_hash": "aec2d2ad9c5ad6073a52e3b493cff94b"
+  },
+  "/home/chou/InnovOS/docs/developer/08-\u65b9\u6848\u751f\u6210\u4e0e\u8bc4\u4f30.md": {
+    "mtime": 1780889083.7050622,
+    "ast_hash": "b370ea216b909e2a2451354770ccda78",
+    "semantic_hash": "b370ea216b909e2a2451354770ccda78"
+  },
+  "/home/chou/InnovOS/docs/developer/09-\u5386\u53f2\u65b9\u6848.md": {
+    "mtime": 1780889083.706062,
+    "ast_hash": "52b66a27e651353ab31e31522e58fb10",
+    "semantic_hash": "52b66a27e651353ab31e31522e58fb10"
+  },
+  "/home/chou/InnovOS/docs/developer/10-\u5de5\u4f5c\u6d41\u72b6\u6001\u673a.md": {
+    "mtime": 1780889083.706062,
+    "ast_hash": "c27dcff58db2f80fb64b51c0ede226c7",
+    "semantic_hash": "c27dcff58db2f80fb64b51c0ede226c7"
+  },
+  "/home/chou/InnovOS/docs/developer/11-\u7ba1\u7406\u5458\u540e\u53f0.md": {
+    "mtime": 1780889083.706062,
+    "ast_hash": "1be6a3a42b1f2bb507ac43979a76d5de",
+    "semantic_hash": "1be6a3a42b1f2bb507ac43979a76d5de"
+  },
+  "/home/chou/InnovOS/docs/developer/12-API\u5bc6\u94a5\u7ba1\u7406.md": {
+    "mtime": 1780889083.706062,
+    "ast_hash": "29ac59f4ac3371a7051a8faf6b878f37",
+    "semantic_hash": "29ac59f4ac3371a7051a8faf6b878f37"
+  },
+  "/home/chou/InnovOS/docs/developer/INDEX.md": {
+    "mtime": 1780889083.706062,
+    "ast_hash": "1938196e09893ac1bf18d4ee0921c5d5",
+    "semantic_hash": "1938196e09893ac1bf18d4ee0921c5d5"
+  },
+  "/home/chou/InnovOS/docs/development.md": {
+    "mtime": 1780889083.706062,
+    "ast_hash": "dee84d36f25685385e5b51fe15928f73",
+    "semantic_hash": "dee84d36f25685385e5b51fe15928f73"
+  },
+  "/home/chou/InnovOS/docs/key-management.md": {
+    "mtime": 1780889083.706062,
+    "ast_hash": "1c1b5bcea803ea6711d28c054708b99a",
+    "semantic_hash": "1c1b5bcea803ea6711d28c054708b99a"
+  },
+  "/home/chou/InnovOS/docs/knowledge-comparison.md": {
+    "mtime": 1780889505.8356283,
+    "ast_hash": "83c8e4ef7f65e0d9ad2b74f69aa910dd",
+    "semantic_hash": "83c8e4ef7f65e0d9ad2b74f69aa910dd"
+  },
+  "/home/chou/InnovOS/docs/knowledge-refactor-summary.md": {
+    "mtime": 1780889083.706062,
+    "ast_hash": "ac9a42003f1761735c65d8d3012ef3d3",
+    "semantic_hash": "ac9a42003f1761735c65d8d3012ef3d3"
+  },
+  "/home/chou/InnovOS/docs/production.md": {
+    "mtime": 1780889083.706062,
+    "ast_hash": "56af1c8d3f2d719219c49c6453237d5f",
+    "semantic_hash": "56af1c8d3f2d719219c49c6453237d5f"
+  },
+  "/home/chou/InnovOS/frontend/README.md": {
+    "mtime": 1780889083.707062,
+    "ast_hash": "f6e3faf55d738cf2affe1b44195f27cf",
+    "semantic_hash": "f6e3faf55d738cf2affe1b44195f27cf"
+  },
+  "/home/chou/InnovOS/frontend/index.html": {
+    "mtime": 1780889083.708147,
+    "ast_hash": "dd648e0db7996679cbcf3a64863ab77a",
+    "semantic_hash": "dd648e0db7996679cbcf3a64863ab77a"
+  },
+  "/home/chou/InnovOS/.opencode/images/ses_159a2d76affe4XEI28uZiH97Vk/clipboard-f5d1d8d0.png": {
+    "mtime": 1780921999.7158992,
+    "ast_hash": "3236f08831c28a657d9e052fb2ddd062",
+    "semantic_hash": "3236f08831c28a657d9e052fb2ddd062"
+  },
+  "/home/chou/InnovOS/frontend/public/favicon.svg": {
+    "mtime": 1780889083.7087324,
+    "ast_hash": "7e840862161341271697daa99a40d76b",
+    "semantic_hash": "7e840862161341271697daa99a40d76b"
+  },
+  "/home/chou/InnovOS/frontend/public/icons.svg": {
+    "mtime": 1780889083.7087324,
+    "ast_hash": "3b4fcfcf393eca4d264dca4a4663bc37",
+    "semantic_hash": "3b4fcfcf393eca4d264dca4a4663bc37"
+  },
+  "/home/chou/InnovOS/frontend/src/assets/hero.png": {
+    "mtime": 1780889083.7113094,
+    "ast_hash": "aead493361b27e7510691c5d7072dfc1",
+    "semantic_hash": "aead493361b27e7510691c5d7072dfc1"
+  },
+  "/home/chou/InnovOS/frontend/src/assets/react.svg": {
+    "mtime": 1780889083.7113094,
+    "ast_hash": "f0402b67b6ce880f65666bb49e841696",
+    "semantic_hash": "f0402b67b6ce880f65666bb49e841696"
+  },
+  "/home/chou/InnovOS/frontend/src/assets/vite.svg": {
+    "mtime": 1780889083.7120614,
+    "ast_hash": "9960a24288958394ac50e57ff638b036",
+    "semantic_hash": "9960a24288958394ac50e57ff638b036"
+  }
+}
