@@ -13,6 +13,7 @@ export interface AssignedModels {
   chat_model: string | null;
   embedding_model: string | null;
   rerank_model: string | null;
+  ocr_model: string | null;
 }
 
 /** 按能力分组的可用模型 */
@@ -20,6 +21,7 @@ export interface AvailableModelsByCapability {
   chat: AvailableModel[];
   embedding: AvailableModel[];
   rerank: AvailableModel[];
+  vision: AvailableModel[];
 }
 
 /** 全局 RAG 配置 */
@@ -31,7 +33,6 @@ export interface RagConfig {
   threshold: string | null;
   document_count: string | null;
   file_processor: string | null;
-  rag_rerank_model: string | null;
 }
 
 export const settingsApi = {

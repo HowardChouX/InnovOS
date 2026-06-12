@@ -11,8 +11,10 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
 };
 
 // 获取workflow当前运行步骤的标签
-function formatDate(dateStr: string) {
+function formatDate(dateStr: string | null | undefined) {
+  if (!dateStr) return '';
   const d = new Date(dateStr.replace(' ', 'T') + 'Z');
+  if (isNaN(d.getTime())) return '';
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffMin = Math.floor(diffMs / 60000);

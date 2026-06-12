@@ -8,6 +8,8 @@ Knowledge Item Service — 完全复现 CherryStudio KnowledgeItemService
 - 子树操作 (递归 CTE)
 - 容器状态协调
 """
+from __future__ import annotations
+
 import json
 import uuid
 from datetime import datetime, timezone

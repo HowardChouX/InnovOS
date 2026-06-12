@@ -25,6 +25,7 @@ CAPABILITY_EMBEDDING = "embedding"
 CAPABILITY_RERANK = "rerank"
 CAPABILITY_REASONING = "reasoning"
 CAPABILITY_IMAGE_GENERATION = "image-generation"
+CAPABILITY_VISION = "vision"
 
 # ── 正则推断（cherry-style fallback，兼容旧字符串格式） ──
 EMBEDDING_REGEX = re.compile(
@@ -37,6 +38,12 @@ RERANK_REGEX = re.compile(
     re.I,
 )
 REASONING_REGEX = re.compile(r"(?:reasoner|reasoning|deepseek-r1|o1-|o3-)", re.I)
+VISION_REGEX = re.compile(
+    r"(?:vision|ocr|vl$|vlm|multimodal|qwen2\.5-vl|qwen-vl|"
+    r"deepseek-vl|deepseek-ocr|internvl|internlm-xcomposer|"
+    r"cogvlm|glm-4v|minicpm-v|yi-vision)",
+    re.I,
+)
 
 
 def infer_capabilities(model_id: str) -> list[str]:
@@ -53,6 +60,8 @@ def infer_capabilities(model_id: str) -> list[str]:
     caps = [CAPABILITY_CHAT]
     if REASONING_REGEX.search(model_id):
         caps.append(CAPABILITY_REASONING)
+    if VISION_REGEX.search(model_id):
+        caps.append(CAPABILITY_VISION)
     return caps
 
 

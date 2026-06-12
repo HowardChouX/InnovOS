@@ -1,5 +1,5 @@
 import json
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from app.database import get_db
 from app.auth import get_current_user
 from typing import Optional
@@ -117,3 +117,39 @@ def get_patent_stats():
         },
         "message": "success", "code": 200,
     }
+
+
+@router.get("/semantic-search")
+async def semantic_search(
+    q: str = "",
+    top_k: int = Query(10, ge=1, le=50),
+    user: dict = Depends(get_current_user),
+):
+    """语义检索相似专利（RAG 向量搜索）"""
+    if not q.strip():
+        return {"data": [], "total": 0}
+
+    from app.services.patent_rag_service import PatentRagService
+    svc = PatentRagService()
+    results = await svc.search(q, top_k=top_k)
+
+    # 补充专利元数据
+    if results:
+        patent_ids = [r["patentId"] for r in results if r["patentId"]]
+        if patent_ids:
+            db = get_db()
+            placeholders = ",".join("?" * len(patent_ids))
+            rows = db.execute(
+                f"SELECT * FROM patents WHERE id IN ({placeholders})",
+                patent_ids,
+            ).fetchall()
+            db.close()
+            patent_map = {str(r["id"]): r for r in rows}
+            for r in results:
+                pid = r["patentId"]
+                if pid in patent_map:
+                    p = patent_map[pid]
+                    r["title"] = p["title"]
+                    r["patentNumber"] = p["patent_number"]
+
+    return {"data": results, "total": len(results)}

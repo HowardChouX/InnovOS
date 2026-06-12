@@ -19,6 +19,16 @@ export interface PatentSearchResult {
   total_pages: number;
 }
 
+export interface SemanticResult {
+  itemId: string;
+  text: string;
+  patentId: string;
+  score: number;
+  chunkIndex: number;
+  title?: string;
+  patentNumber?: string;
+}
+
 export const patentsApi = {
   async search(params: PatentSearchParams): Promise<PatentSearchResult> {
     const searchParams = new URLSearchParams();
@@ -33,6 +43,11 @@ export const patentsApi = {
     const qs = searchParams.toString();
     const res = await apiRequest<PatentSearchResult>(`/api/patents/search${qs ? `?${qs}` : ''}`);
     return res;
+  },
+
+  async semanticSearch(query: string, topK: number = 10): Promise<{ data: SemanticResult[]; total: number }> {
+    const qs = new URLSearchParams({ q: query, top_k: String(topK) }).toString();
+    return apiRequest(`/api/patents/semantic-search?${qs}`);
   },
 
   async getDetail(patentId: string): Promise<Patent> {
