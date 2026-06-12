@@ -1,5 +1,6 @@
 import json
 import asyncio
+import logging
 import sys
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -7,6 +8,10 @@ from pydantic import BaseModel
 from app.auth import get_current_user
 from app.database import get_db
 from app.algorithm.zr_ipm import ZRIPMEngine
+from app.algorithm.base import AIBase
+from app.algorithm.analyzers.demand_portrait import DemandPortraitAnalyzer
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 
@@ -77,6 +82,7 @@ def update_workflow_step(db, task_id: int, agent_id: str, status: str, descripti
     has_running = any(s["status"] == "running" for s in steps)
     all_completed = all(s["status"] in ("completed", "failed") for s in steps)
     any_failed = any(s["status"] == "failed" for s in steps)
+    has_pending = any(s["status"] == "pending" for s in steps)
 
     if any_failed:
         workflow_status = "failed"
@@ -84,6 +90,9 @@ def update_workflow_step(db, task_id: int, agent_id: str, status: str, descripti
         workflow_status = "completed"
     elif has_running:
         workflow_status = "running"
+    elif has_pending:
+        # 有步骤已完成但还有待处理的 → 等待用户评分
+        workflow_status = "awaiting_rating"
     else:
         workflow_status = "idle"
 
@@ -307,99 +316,218 @@ async def _search_knowledge_bases(user_id: int, base_ids: list[str], query: str,
     return "\n".join(lines)
 
 
-async def run_analysis_background(task_id: int, user_id: int, task_description: str, knowledge_base_ids: Optional[list[str]] = None):
-    """后台执行分析任务"""
-    print(f"[DEBUG] Background task started for task_id={task_id}", flush=True)
-    db = get_db()
-    engine = ZRIPMEngine()
+def _create_ai_base() -> AIBase | None:
+    """从全局设置创建 AIBase 实例给分析器用"""
+    try:
+        from app.algorithm.model_resolver import model_resolver
+        s = model_resolver.get_assigned_settings()
+        chat_model = s.get("chat_model") or ""
+        if not chat_model or ":" not in chat_model:
+            return None
+        resolved = model_resolver.resolve(chat_model)
+        if not resolved:
+            return None
+        return AIBase(
+            api_key=resolved.api_key,
+            base_url=resolved.api_host,
+            model=resolved.model_id,
+        )
+    except Exception as e:
+        print(f"[WARN] Failed to create AIBase: {e}", flush=True)
+        return None
 
-    # 如果选择了知识库，先搜索并注入上下文
+
+async def run_demand_portrait(task_id: int, user_id: int, task_description: str, knowledge_base_ids: Optional[list[str]] = None):
+    """只运行需求洞察步骤，等待用户评分"""
+    print(f"[DEBUG] Demand portrait started for task_id={task_id}", flush=True)
+    db = get_db()
+
+    # 搜索知识库
     kb_context = ""
     if knowledge_base_ids:
         print(f"[DEBUG] Searching knowledge bases: {knowledge_base_ids}", flush=True)
         update_workflow_step(db, task_id, "agent1", "running",
                            description="正在检索知识库...")
         kb_context = await _search_knowledge_bases(user_id, knowledge_base_ids, task_description)
-        print(f"[DEBUG] KB context length: {len(kb_context)}", flush=True)
 
-    # 构建带知识库上下文的任务描述
-    enriched_description = task_description
+    enriched = task_description
     if kb_context:
-        enriched_description = f"{kb_context}\n\n【用户问题】\n{task_description}"
+        enriched = f"{kb_context}\n\n【用户问题】\n{task_description}"
 
     try:
-        # Step 1: 需求洞察 - AI分析问题
-        print(f"[DEBUG] Setting agent1 to running for task_id={task_id}", flush=True)
-        update_workflow_step(db, task_id, "agent1", "running")
-        print(f"[DEBUG] Agent1 set to running successfully", flush=True)
-        
-        analysis_result = await engine.analyze(enriched_description)
-        
-        # 增量更新：问题要素
-        await _update_problem_modeling(db, task_id, task_description, analysis_result, "agent1")
-        
+        update_workflow_step(db, task_id, "agent1", "running",
+                           description="正在进行需求分析...")
+
+        ai_base = _create_ai_base()
+        if not ai_base:
+            raise RuntimeError("AI 模型未配置，请在模型服务中配置 API Key")
+
+        analyzer = DemandPortraitAnalyzer(ai_base)
+        result = await analyzer.analyze(enriched)
+
+        demands = result.get("demands", [])
         update_workflow_step(db, task_id, "agent1", "completed",
-                           description="理解用户需求，提取关键要素",
-                           output=json.dumps(analysis_result, ensure_ascii=False))
+                           description=f"识别 {len(demands)} 个需求",
+                           output=json.dumps(result, ensure_ascii=False))
 
-        # Step 2: 问题建模 - 基于分析结果构建模型
-        update_workflow_step(db, task_id, "agent2", "running")
-        
-        conflict_graph = engine._build_conflict_graph({
-            "centerConflict": analysis_result.get("centerNode", {}).get("description", ""),
-            "satellites": [
-                {"label": s["label"], "sublabel": s.get("sublabel", ""), "description": s["description"]}
-                for s in analysis_result.get("satelliteNodes", [])
-            ],
-            "principles": analysis_result.get("principles", []),
-        })
-        
-        # 增量更新：冲突分析 + 模型结构
-        await _update_problem_modeling(db, task_id, task_description, analysis_result, "agent2")
-        
-        update_workflow_step(db, task_id, "agent2", "completed",
-                           description="构建问题模型，识别核心冲突",
-                           output=json.dumps(conflict_graph, ensure_ascii=False))
+        # 设置 workflow 为等待评分状态
+        db.execute(
+            "UPDATE workflows SET status=? WHERE task_id=?",
+            ("awaiting_rating", task_id),
+        )
+        db.commit()
 
-        # Step 3: 专利分析 - 检索相关专利
-        update_workflow_step(db, task_id, "agent5", "running")
-        
-        # 获取AI提取的关键词，如果没有则使用任务描述
-        patent_keywords = analysis_result.get("patentKeywords", [])
-        if not patent_keywords:
-            # 使用任务描述作为关键词（前50字）
-            patent_keywords = [task_description[:50]]
-        
-        # 使用多关键词 OR 检索（最多3个关键词）
-        search_keywords = patent_keywords[:3]
-        
-        # 构建 OR 条件
-        or_conditions = []
-        params = []
-        for keyword in search_keywords:
-            or_conditions.append("(title LIKE ? OR abstract LIKE ?)")
-            params.extend([f"%{keyword}%", f"%{keyword}%"])
-        
-        where_clause = " OR ".join(or_conditions) if or_conditions else "1=1"
-        
-        sql = f"SELECT * FROM patents WHERE {where_clause} ORDER BY relevance_score DESC LIMIT 10"
-        db_patents = db.execute(sql, params).fetchall()
+        print(f"[DEBUG] Demand portrait completed for task_id={task_id}, {len(demands)} demands", flush=True)
+        return result
 
-        patent_info = []
-        for p in db_patents:
-            patent_info.append({
-                "title": p["title"],
-                "abstract": p["abstract"],
-                "relevance": p["relevance_score"],
+    except Exception as e:
+        print(f"[ERROR] Demand portrait failed: {e}", flush=True)
+        update_workflow_step(db, task_id, "agent1", "failed",
+                           description=f"执行失败: {str(e)}")
+        return None
+    finally:
+        db.close()
+
+
+def _is_step_pending(db, task_id: int, agent_id: str) -> bool:
+    """检查某个步骤是否处于 pending 状态"""
+    import json
+    row = db.execute("SELECT steps FROM workflows WHERE task_id=?", (task_id,)).fetchone()
+    if not row:
+        return False
+    steps = json.loads(row[0])
+    step = next((s for s in steps if s["agent_id"] == agent_id), None)
+    return step is not None and step["status"] == "pending"
+
+
+def _fallback_patent_search(db, task_description: str, patent_keywords: list) -> list[dict]:
+    """LIKE 回退检索"""
+    keywords = patent_keywords[:3] if patent_keywords else [task_description[:50]]
+    or_conditions = []
+    params = []
+    for kw in keywords:
+        like = f"%{kw}%"
+        or_conditions.append("(title LIKE ? OR abstract LIKE ?)")
+        params.extend([like, like])
+    sql = f"SELECT * FROM patents WHERE {' OR '.join(or_conditions)} ORDER BY relevance_score DESC LIMIT 10"
+    rows = db.execute(sql, params).fetchall()
+    return [{"title": r["title"], "abstract": r["abstract"], "relevance": r["relevance_score"]} for r in rows]
+
+
+async def run_analysis_background(task_id: int, user_id: int, task_description: str, knowledge_base_ids: Optional[list[str]] = None, start_from: str = "agent1"):
+    """后台执行分析任务"""
+    print(f"[DEBUG] Background task started for task_id={task_id}, start_from={start_from}", flush=True)
+    db = get_db()
+    engine = ZRIPMEngine()
+
+    # 构建带知识库上下文的任务描述（仅首次运行需要）
+    enriched_description = task_description
+    if start_from == "agent1" and knowledge_base_ids:
+        print(f"[DEBUG] Searching knowledge bases: {knowledge_base_ids}", flush=True)
+        update_workflow_step(db, task_id, "agent1", "running",
+                           description="正在检索知识库...")
+        kb_context = await _search_knowledge_bases(user_id, knowledge_base_ids, task_description)
+        if kb_context:
+            enriched_description = f"{kb_context}\n\n【用户问题】\n{task_description}"
+
+    try:
+        # Step 1: 需求洞察（仅 first run，proceed 时跳过）
+        if start_from == "agent1":
+            print(f"[DEBUG] Setting agent1 to running for task_id={task_id}", flush=True)
+            update_workflow_step(db, task_id, "agent1", "running")
+            print(f"[DEBUG] Agent1 set to running successfully", flush=True)
+            
+            analysis_result = await engine.analyze(enriched_description)
+            
+            # 增量更新：问题要素
+            await _update_problem_modeling(db, task_id, task_description, analysis_result, "agent1")
+            
+            update_workflow_step(db, task_id, "agent1", "completed",
+                               description="理解用户需求，提取关键要素",
+                               output=json.dumps(analysis_result, ensure_ascii=False))
+        else:
+            # 从 proceed 恢复时，从 workflow 读取之前 agent1 的输出
+            row = db.execute("SELECT steps FROM workflows WHERE task_id=?", (task_id,)).fetchone()
+            steps = json.loads(row["steps"]) if row else []
+            agent1_step = next((s for s in steps if s["agent_id"] == "agent1"), None)
+            analysis_result = {}
+            if agent1_step and agent1_step.get("output"):
+                try:
+                    analysis_result = json.loads(agent1_step["output"])
+                except (json.JSONDecodeError, TypeError):
+                    analysis_result = {}
+
+        # Step 2: 问题建模（如果已完成则跳过）
+        if _is_step_pending(db, task_id, "agent2"):
+            update_workflow_step(db, task_id, "agent2", "running")
+            try:
+                from app.algorithm.base import AIBase
+                from app.algorithm.analyzers.problem_modeling import ProblemModelingAnalyzer
+                ai_base = _create_ai_base()
+                if ai_base:
+                    pm_analyzer = ProblemModelingAnalyzer(ai_base)
+                    pm_result = await pm_analyzer.analyze(enriched_description)
+                    innovations = pm_result.get("innovations", [])
+
+                    update_workflow_step(db, task_id, "agent2", "completed",
+                                       description=f"生成 {len(innovations)} 个创新方向",
+                                       output=json.dumps(pm_result, ensure_ascii=False))
+                else:
+                    raise RuntimeError("AI 模型未配置")
+            except Exception as e:
+                logger.error(f"问题建模分析失败: {e}")
+                update_workflow_step(db, task_id, "agent2", "failed",
+                                   description=f"执行失败: {str(e)}")
+                return
+
+            # 来自 proceed 流程，暂停等评分
+            if start_from != "agent1":
+                db.execute("UPDATE workflows SET status=? WHERE task_id=?", ("awaiting_rating", task_id))
+                db.commit()
+                return
+
+        # 构建冲突图谱（用于最终保存到 analyses 表）
+        conflict_graph = {"centerNode": {}, "satelliteNodes": [], "edges": [], "principles": []}
+        if isinstance(analysis_result, dict):
+            conflict_graph = engine._build_conflict_graph({
+                "centerConflict": analysis_result.get("centerNode", {}).get("description", ""),
+                "satellites": [
+                    {"label": s["label"], "sublabel": s.get("sublabel", ""), "description": s["description"]}
+                    for s in analysis_result.get("satelliteNodes", [])
+                ],
+                "principles": analysis_result.get("principles", []),
             })
 
-        # 增量更新：推荐原理
-        await _update_problem_modeling(db, task_id, task_description, analysis_result, "agent5",
-                                       extra_data={"patents": patent_info})
-        
-        update_workflow_step(db, task_id, "agent5", "completed",
-                           description=f"检索到 {len(patent_info)} 条相关专利",
-                           output=json.dumps(patent_info, ensure_ascii=False))
+        # Step 3: 专利检索 - 语义搜索（如果已完成则跳过）
+        if _is_step_pending(db, task_id, "agent5"):
+            update_workflow_step(db, task_id, "agent5", "running",
+                               description="正在语义检索专利...")
+            
+            # 用问题描述作为搜索关键词（结合分析结果中的专利关键词）
+            patent_keywords = analysis_result.get("patentKeywords", [])
+            search_query = task_description
+            if patent_keywords:
+                search_query = " ".join(patent_keywords[:5]) + " " + task_description
+            
+            try:
+                from app.algorithm.patent_search import PatentSearchEngine
+                patent_searcher = PatentSearchEngine()
+                patent_info = await patent_searcher.search(search_query, top_k=10)
+            except Exception as e:
+                logger.warning(f"语义检索失败，回退 LIKE: {e}")
+                patent_info = _fallback_patent_search(db, task_description, patent_keywords)
+
+            await _update_problem_modeling(db, task_id, task_description, analysis_result, "agent5",
+                                           extra_data={"patents": patent_info})
+            
+            update_workflow_step(db, task_id, "agent5", "completed",
+                               description=f"检索到 {len(patent_info)} 条相关专利",
+                               output=json.dumps(patent_info, ensure_ascii=False))
+
+            if start_from != "agent1":
+                db.execute("UPDATE workflows SET status=? WHERE task_id=?", ("awaiting_rating", task_id))
+                db.commit()
+                return
 
         # Step 4: 方案生成 - AI生成解决方案
         update_workflow_step(db, task_id, "agent3", "running")
@@ -595,10 +723,9 @@ async def trigger_analysis(task_id: int, body: Optional[TriggerAnalysisInput] = 
 
     db.close()
 
-    # 后台启动分析任务
-    # 使用 BackgroundTasks 确保任务在响应发送后继续执行
+    # 后台启动需求洞察步骤（仅第一步）
     kb_ids = body.knowledgeBaseIds if body else None
-    task = asyncio.create_task(run_analysis_background(task_id, user["id"], task["description"], kb_ids))
+    task = asyncio.create_task(run_demand_portrait(task_id, user["id"], task["description"], kb_ids))
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
 
@@ -609,5 +736,79 @@ async def trigger_analysis(task_id: int, body: Optional[TriggerAnalysisInput] = 
             "status": "analyzing",
         },
         "message": "分析已启动",
+        "code": 200,
+    }
+
+
+class ProceedInput(BaseModel):
+    ratings: Optional[list[dict]] = None
+
+
+@router.post("/{task_id}/proceed")
+async def proceed_workflow(task_id: int, body: Optional[ProceedInput] = None, user: dict = Depends(get_current_user)):
+    """用户评分后，继续执行后续工作流步骤"""
+    db = get_db()
+
+    task = db.execute("SELECT * FROM tasks WHERE id=? AND user_id=?", (task_id, user["id"])).fetchone()
+    if not task:
+        db.close()
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    wf = db.execute("SELECT * FROM workflows WHERE task_id=?", (task_id,)).fetchone()
+    if not wf:
+        db.close()
+        raise HTTPException(status_code=400, detail="工作流未启动")
+
+    if wf["status"] != "awaiting_rating":
+        db.close()
+        raise HTTPException(status_code=400, detail="工作流当前不需要评分")
+
+    # 保存评分到刚完成的步骤 output 中
+    if body and body.ratings:
+        steps = json.loads(wf["steps"])
+        # 找到最后一个 completed 的步骤，把评分存进去
+        completed_step = None
+        for step in reversed(steps):
+            if step["status"] == "completed" and step.get("output"):
+                completed_step = step
+                break
+        if completed_step:
+            try:
+                output = json.loads(completed_step["output"])
+                output["ratings"] = body.ratings
+                completed_step["output"] = json.dumps(output, ensure_ascii=False)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        db.execute(
+            "UPDATE workflows SET steps=? WHERE task_id=?",
+            (json.dumps(steps), task_id),
+        )
+        db.commit()
+
+    db.close()
+
+    # 找下一个待执行的步骤
+    next_agent = None
+    agent_phases = ["agent2", "agent5", "agent3", "agent4", "agent6"]
+    steps = json.loads(wf["steps"]) if isinstance(wf["steps"], str) else wf["steps"]
+    for agent_id in agent_phases:
+        step = next((s for s in steps if s["agent_id"] == agent_id), None)
+        if step and step["status"] == "pending":
+            next_agent = agent_id
+            break
+
+    if not next_agent:
+        return {"data": {"status": "done"}, "message": "所有步骤已完成", "code": 200}
+
+    # 启动后台任务执行下一步
+    remaining = asyncio.create_task(
+        run_analysis_background(task_id, user["id"], task["description"], None, start_from=next_agent)
+    )
+    _background_tasks.add(remaining)
+    remaining.add_done_callback(_background_tasks.discard)
+
+    return {
+        "data": {"status": "proceeding"},
+        "message": "继续执行后续步骤",
         "code": 200,
     }

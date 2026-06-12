@@ -15,13 +15,14 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/settings", tags=["admin-settings"])
 
-MODEL_KEYS = ["chat_model", "embedding_model", "rerank_model"]
+MODEL_KEYS = ["chat_model", "embedding_model", "rerank_model", "ocr_model"]
 
 
 class AssignedModelsInput(BaseModel):
     chat_model: Optional[str] = None
     embedding_model: Optional[str] = None
     rerank_model: Optional[str] = None
+    ocr_model: Optional[str] = None
 
 
 class RagConfigInput(BaseModel):
@@ -43,8 +44,8 @@ def get_assigned_models(user: dict = Depends(require_admin)) -> dict:
     """获取全局模型分配配置"""
     db = get_db()
     rows = db.execute(
-        "SELECT key, value FROM system_settings WHERE key IN (?, ?, ?)",
-        ("chat_model", "embedding_model", "rerank_model"),
+        "SELECT key, value FROM system_settings WHERE key IN (?, ?, ?, ?)",
+        ("chat_model", "embedding_model", "rerank_model", "ocr_model"),
     ).fetchall()
     db.close()
     result = {k: None for k in MODEL_KEYS}
@@ -133,12 +134,13 @@ def get_available_models(user: dict = Depends(require_admin)) -> dict:
     }
     """
     from app.algorithm.model_service import model_service
-    from app.algorithm.providers_registry import get_model_id, get_model_capabilities, CAPABILITY_EMBEDDING, CAPABILITY_RERANK
+    from app.algorithm.providers_registry import get_model_id, get_model_capabilities, CAPABILITY_EMBEDDING, CAPABILITY_RERANK, CAPABILITY_VISION
 
     providers = model_service.list_all()
     chat_models = []
     embedding_models = []
     rerank_models = []
+    vision_models = []
 
     for p in providers:
         if not p["isEnabled"]:
@@ -155,11 +157,14 @@ def get_available_models(user: dict = Depends(require_admin)) -> dict:
                 embedding_models.append(entry)
             if CAPABILITY_RERANK in caps:
                 rerank_models.append(entry)
+            if CAPABILITY_VISION in caps:
+                vision_models.append(entry)
 
     return {
         "data": {
             "chat": sorted(chat_models, key=lambda x: x["modelId"]),
             "embedding": sorted(embedding_models, key=lambda x: x["modelId"]),
             "rerank": sorted(rerank_models, key=lambda x: x["modelId"]),
+            "vision": sorted(vision_models, key=lambda x: x["modelId"]),
         }
     }

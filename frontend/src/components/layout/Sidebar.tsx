@@ -50,6 +50,7 @@ export function Sidebar() {
               { label: '模型服务', path: '/admin/keys', icon: 'fa-server' },
               { label: '用户管理', path: '/admin/users', icon: 'fa-users' },
               { label: '数据监控', path: '/monitor', icon: 'fa-chart-line' },
+              { label: '专利数据库', path: '/admin/patents', icon: 'fa-database' },
             ].map((item) => {
               const active = location.pathname === item.path;
               return (

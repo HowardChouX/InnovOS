@@ -40,7 +40,7 @@ export function KeyManagementPage() {
 
   // ─── 全局模型分配 ───
   const [availableModels, setAvailableModels] = useState<AvailableModelsByCapability | null>(null);
-  const [assignedModels, setAssignedModels] = useState<{ chat: string; embedding: string; rerank: string }>({ chat: '', embedding: '', rerank: '' });
+  const [assignedModels, setAssignedModels] = useState<{ chat: string; embedding: string; rerank: string; vision: string }>({ chat: '', embedding: '', rerank: '', vision: '' });
   const [savingAssignment, setSavingAssignment] = useState(false);
 
   /** 从 provider.models 中查找对应 model ID 的完整条目 */
@@ -76,6 +76,7 @@ export function KeyManagementPage() {
         chat: a.chat_model || '',
         embedding: a.embedding_model || '',
         rerank: a.rerank_model || '',
+        vision: a.ocr_model || '',
       });
     }).catch(() => {});
   }, []);
@@ -184,6 +185,7 @@ export function KeyManagementPage() {
         chat_model: assignedModels.chat || null,
         embedding_model: assignedModels.embedding || null,
         rerank_model: assignedModels.rerank || null,
+        ocr_model: assignedModels.vision || null,
       });
       setToast({ msg: '模型分配已保存', type: 'success' });
     } catch { setToast({ msg: '保存模型分配失败', type: 'error' }); }
@@ -309,8 +311,8 @@ export function KeyManagementPage() {
             <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border-light)' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12 }}>全局模型分配</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {(['chat', 'embedding', 'rerank'] as const).map(cap => {
-                  const label = { chat: '对话模型（首页分析）', embedding: '嵌入模型（知识库）', rerank: '重排模型（知识库）' }[cap];
+                {(['chat', 'embedding', 'rerank', 'vision'] as const).map(cap => {
+                  const label = { chat: '对话模型（首页分析）', embedding: '嵌入模型（知识库）', rerank: '重排模型（知识库）', vision: 'OCR 模型（专利处理）' }[cap];
                   const list = availableModels?.[cap] || [];
                   return (
                     <div key={cap}>
@@ -465,7 +467,7 @@ function RagGlobalConfig() {
         const v: Record<string, string> = {};
         const raw = res.data || {};
         for (const key of ['chunk_size', 'chunk_overlap', 'search_mode', 'hybrid_alpha',
-                           'threshold', 'document_count', 'file_processor', 'rag_rerank_model']) {
+                           'threshold', 'document_count', 'file_processor']) {
           v[key] = (raw as any)[key] ?? '';
         }
         setValues(v);
@@ -535,11 +537,6 @@ function RagGlobalConfig() {
             <option value="">默认</option>
             <option value="default">DefaultFileProcessor</option>
           </select>
-        </div>
-        <div style={ragFieldStyle}>
-          <span style={ragLabelStyle}>重排序模型</span>
-          <input style={{ ...ragInputStyle, width: 250 }} value={values.rag_rerank_model ?? ''} onChange={e => set('rag_rerank_model', e.target.value)} placeholder="留空禁用" />
-          <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>如 silicon:BAAI/bge-reranker-v2-m3</span>
         </div>
       </div>
       <button onClick={handleSave} disabled={saving} style={{ marginTop: 8, padding: '6px 20px', borderRadius: 6, fontSize: 12, fontWeight: 500, background: 'var(--accent)', border: 'none', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', opacity: saving ? 0.5 : 1 }}>

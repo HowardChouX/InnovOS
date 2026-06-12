@@ -62,4 +62,10 @@ export const workflowApi = {
 
   getModelingResults: (taskId: string) =>
     apiRequest<{ data: any }>(`/api/workflow-steps/modeling/${taskId}/results`).then(r => r.data),
+
+  proceed: (taskId: string, ratings?: { demandId: string; score: number }[]) =>
+    apiRequest<{ data: any }>(`/api/analysis/${taskId}/proceed`, {
+      method: 'POST',
+      body: ratings ? JSON.stringify({ ratings }) : undefined,
+    }).then(r => r.data),
 };

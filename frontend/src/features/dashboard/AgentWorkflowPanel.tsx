@@ -15,6 +15,7 @@ const workflowStatusConfig: Record<string, { color: string; bg: string; label: s
   running: { color: 'var(--accent-blue)', bg: 'rgba(96,165,250,0.15)', label: '运行中' },
   failed: { color: 'var(--accent-red)', bg: 'rgba(248,113,113,0.15)', label: '失败' },
   idle: { color: 'var(--text-tertiary)', bg: 'rgba(100,116,139,0.1)', label: '空闲' },
+  awaiting_rating: { color: 'var(--accent-yellow)', bg: 'rgba(251,191,36,0.15)', label: '等待评分' },
 };
 
 function TimelineStep({
@@ -123,29 +124,44 @@ function DefaultStateView() {
   );
 }
 
-function WorkflowProgressView({ workflow }: { workflow: NonNullable<ReturnType<typeof useWorkflowStore.getState>['workflow']> }) {
+function WorkflowProgressView() {
+  const { phaseStatus, workflow } = useWorkflowStore();
+
+  if (!workflow) return null;
   const steps = workflow.steps || [];
 
-  const getStepForAgent = (phaseId: string) => {
-    return steps.find(s => s.agentId === phaseId) || {
-      status: 'pending' as AgentStatus,
-      description: undefined,
-      duration: undefined,
-    };
+  // Map agentId -> step data for duration/description
+  const agentMap = new Map(steps.map(s => [s.agentId, s]));
+
+  // phaseId -> agentId mapping
+  const PHASE_TO_AGENT: Record<string, string> = {
+    demand_portrait: 'agent1',
+    problem_modeling: 'agent2',
+    patent_search: 'agent5',
+    solution_gen: 'agent3',
+    evaluation: 'agent4',
   };
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-        {WORKFLOW_STEPS.map((agent, i) => (
-          <TimelineStep
-            key={agent.phaseId}
-            agent={agent}
-            step={getStepForAgent(agent.phaseId)}
-            index={i}
-            isLast={i === WORKFLOW_STEPS.length - 1}
-          />
-        ))}
+        {WORKFLOW_STEPS.map((agent, i) => {
+          const stepAgentId = PHASE_TO_AGENT[agent.phaseId];
+          const stepData = stepAgentId ? agentMap.get(stepAgentId) : undefined;
+          return (
+            <TimelineStep
+              key={agent.phaseId}
+              agent={agent}
+              step={{
+                status: (phaseStatus[agent.phaseId] || 'pending') as AgentStatus,
+                description: stepData?.description,
+                duration: stepData?.duration,
+              }}
+              index={i}
+              isLast={i === WORKFLOW_STEPS.length - 1}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -179,5 +195,5 @@ export function AgentWorkflowPanel() {
     return wrap(<DefaultStateView />);
   }
 
-  return wrap(<WorkflowProgressView workflow={workflow} />);
+  return wrap(<WorkflowProgressView />);
 }

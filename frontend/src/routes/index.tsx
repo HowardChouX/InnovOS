@@ -9,7 +9,9 @@ import { PatentSearchPage } from '../features/patents/PatentSearchPage';
 import { KnowledgeBasePage } from '../features/knowledge/KnowledgeBasePage';
 import { KeyManagementPage } from '../features/admin/KeyManagementPage';
 import { UserManagementPage } from '../features/admin/UserManagementPage';
+import { PatentDbPage } from '../features/admin/PatentDbPage';
 import { MonitorPage } from '../features/monitor/MonitorPage';
+
 
 export const routes = [
   { path: '/login', element: <LoginPage /> },
@@ -32,6 +34,7 @@ export const routes = [
       { path: 'workflow/modeling', element: <PlaceholderPage title="问题建模" /> },
       { path: 'admin/keys', element: <KeyManagementPage /> },
       { path: 'admin/users', element: <UserManagementPage /> },
+      { path: 'admin/patents', element: <PatentDbPage /> },
     ],
   },
 ];

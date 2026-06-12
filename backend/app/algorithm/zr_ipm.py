@@ -8,6 +8,7 @@ ZR-IPM (智融创新问题映射) 算法引擎
   4. 结构化建模 → 输出冲突图谱 + 创新原理
 """
 
+import json
 from .ai_client import chat_completion
 from .model_resolver import model_resolver
 
@@ -46,6 +47,13 @@ class ZRIPMEngine:
             response_format=dict,
             model_id=self._get_model_id(),
         )
+        # 防御：AI 可能返回字符串而非 dict（JSON 解析异常等）
+        if isinstance(result, str):
+            try:
+                result = json.loads(result)
+            except (json.JSONDecodeError, TypeError):
+                print(f"[WARN] AI returned string, not dict: {result[:200]}", flush=True)
+                result = {}
         return self._build_conflict_graph(result)
 
     async def generate_solutions(self, task_description: str) -> list[dict]:
@@ -73,6 +81,9 @@ class ZRIPMEngine:
 
     @staticmethod
     def _build_conflict_graph(ai_result: dict) -> dict:
+        if not isinstance(ai_result, dict):
+            print(f"[WARN] _build_conflict_graph received non-dict: {type(ai_result).__name__}", flush=True)
+            ai_result = {}
         satellites = []
         colors = ["#60a5fa", "#4ade80", "#a78bfa", "#fbbf24"]
         positions = ["top", "right", "bottom", "left"]

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { patentsApi } from '../../api/patents';
 import type { Patent } from '../../types/patent';
+import type { SemanticResult } from '../../api/patents';
 
 function PatentDetailModal({ patent, onClose }: { patent: Patent; onClose: () => void }) {
   if (!patent) return null;
@@ -106,6 +107,8 @@ export function PatentSearchPage() {
   const [pageSize] = useState(20);
   const [selectedPatent, setSelectedPatent] = useState<Patent | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [semanticMode, setSemanticMode] = useState(false);
+  const [semanticResults, setSemanticResults] = useState<SemanticResult[]>([]);
   const initialized = useRef(false);
 
   const totalPages = Math.ceil(total / pageSize);
@@ -139,7 +142,16 @@ export function PatentSearchPage() {
   }, []);
 
   const handleSearch = () => {
-    fetchPatents(1);
+    if (semanticMode) {
+      setLoading(true);
+      patentsApi.semanticSearch(query, 20).then(res => {
+        setSemanticResults(res.data);
+        setTotal(res.total);
+        setLoading(false);
+      }).catch(() => setLoading(false));
+    } else {
+      fetchPatents(1);
+    }
   };
 
   const handlePageChange = (newPage: number) => {
@@ -207,8 +219,21 @@ export function PatentSearchPage() {
               color: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
             }}
           >
-            搜索
-          </button>
+          搜索
+            </button>
+            <button
+              onClick={() => setSemanticMode(!semanticMode)}
+              style={{
+                padding: '8px 14px', borderRadius: 6,
+                background: semanticMode ? 'rgba(139,92,246,0.15)' : 'rgba(0,0,0,0.2)',
+                border: '1px solid var(--border-light)',
+                color: semanticMode ? 'var(--accent-purple)' : 'var(--text-tertiary)',
+                cursor: 'pointer', fontSize: 12, fontFamily: 'inherit',
+              }}
+              title="语义搜索基于AI理解含义查找相似专利，关键词搜索基于文字匹配">
+              <i className="fa-solid fa-wand-magic-sparkles" style={{ marginRight: 4 }} />
+              语义
+            </button>
         </div>
 
         {/* 高级筛选 */}
@@ -271,7 +296,52 @@ export function PatentSearchPage() {
             <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 24, color: 'var(--accent-blue)' }} />
             <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>加载中...</div>
           </div>
-        ) : patents.length === 0 ? (
+        ) : semanticMode && semanticResults.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {semanticResults.map((r, i) => (
+              <div key={r.itemId} style={{
+                display: 'flex', alignItems: 'flex-start', gap: 12,
+                padding: '12px 14px', borderRadius: 8,
+                background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)',
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+                onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(139,92,246,0.15)'; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; }}
+                onClick={() => setSelectedPatent({
+                  id: r.patentId, title: r.title || '', abstract: r.text,
+                  patentNumber: r.patentNumber || '', filingDate: '', publicationDate: '',
+                  applicants: [], inventors: [], ipcCodes: [], relevanceScore: Math.round(r.score * 100),
+                  publicationNumber: '', priorityNumber: '', claims: '', description: '', pdfPath: '', created_at: '',
+                } as Patent)}>
+                <span style={{
+                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                  background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 600, color: 'var(--accent-purple)',
+                }}>{i + 1}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+                    {r.title || `专利 #${r.patentId}`}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 4 }}>
+                    {r.text.slice(0, 200)}{r.text.length > 200 ? '...' : ''}
+                  </div>
+                  {r.patentNumber && (
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                      专利号: {r.patentNumber}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-purple)' }}>
+                    {Math.round(r.score * 100)}%
+                  </span>
+                  <span style={{ fontSize: 9, color: 'var(--text-tertiary)' }}>相似度</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : patents.length === 0 && !semanticMode ? (
           <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
             <i className="fa-solid fa-inbox" style={{ fontSize: 32, marginBottom: 12, display: 'block', opacity: 0.3 }} />
             暂无专利数据
