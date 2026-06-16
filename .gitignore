@@ -12,3 +12,4 @@ venv
 .zshenv
 *.zshenv
 backend/data/uploads/
+backend/storage/patents/

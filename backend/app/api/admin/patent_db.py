@@ -284,6 +284,13 @@ async def upload_patent_pdf(
     db.commit()
     patent = db.execute("SELECT * FROM patents WHERE id = ?", [row_id]).fetchone()
 
+    # 原始 PDF 已提取完毕，删除临时文件
+    try:
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+    except Exception:
+        pass
+
     import asyncio
     # 向量化：优先用 abstract+claims，没有则用 pdfminer 全文
     raw_text = fields.get("abstract", "") or ""
