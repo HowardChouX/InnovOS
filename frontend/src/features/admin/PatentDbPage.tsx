@@ -10,7 +10,6 @@ interface Patent {
   publicationDate: string;
   patentNumber: string;
   publicationNumber: string;
-  priorityNumber: string;
   ipcCodes: string[];
   claims: string;
   description: string;
@@ -20,7 +19,7 @@ interface Patent {
 const EMPTY_PATENT: Patent = {
   id: '', title: '', abstract: '', applicants: [], inventors: [],
   filingDate: '', publicationDate: '', patentNumber: '',
-  publicationNumber: '', priorityNumber: '', ipcCodes: [],
+  publicationNumber: '', ipcCodes: [],
   claims: '', description: '', created_at: '',
 };
 
@@ -124,7 +123,7 @@ export function PatentDbPage() {
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  const modeLabel = { pdfminer: '快速提取', paddleocr: 'PaddleOCR', deepseek: 'DeepSeek-OCR' } as const;
+  const modeLabel = { pdfminer: 'PDFMINER', paddleocr: 'PaddleOCR', deepseek: 'DeepSeek-OCR' } as const;
 
   const pageTotal = Math.ceil(total / 20);
 
@@ -338,10 +337,6 @@ export function PatentDbPage() {
                     style={{ ...inputStyle, resize: 'vertical' }} placeholder="每行一个" />
                 </FormField>
               </div>
-
-              <FormField label="优先权号">
-                <input value={form.priorityNumber} onChange={(e) => setForm((f) => ({ ...f, priorityNumber: e.target.value }))} style={inputStyle} placeholder="优先权号" />
-              </FormField>
 
               <FormField label="摘要">
                 <textarea rows={3} value={form.abstract} onChange={(e) => setForm((f) => ({ ...f, abstract: e.target.value }))}

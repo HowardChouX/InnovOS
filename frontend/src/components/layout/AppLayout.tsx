@@ -172,18 +172,9 @@ export function AppLayout() {
         height: 48, background: 'var(--bg-panel)', borderBottom: '1px solid var(--border-light)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: 6,
-            background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <i className="fa-solid fa-cube" style={{ color: '#fff', fontSize: 13 }} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>InnovOS</span>
-            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>创新智能操作系统</span>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>InnovOS</span>
+          <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>创新智能操作系统</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>

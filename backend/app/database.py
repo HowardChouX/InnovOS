@@ -137,7 +137,7 @@ def _get_pg_db():
                 "Example: postgresql://user:password@host:5432/innovos"
             )
         logger.info(f"Connecting to PostgreSQL: {DATABASE_URL[:30]}...")
-        _pg_pool = _pool.ThreadedConnectionPool(1, 20, DATABASE_URL)
+        _pg_pool = _pool.ThreadedConnectionPool(1, 50, DATABASE_URL)
     raw_conn = _pg_pool.getconn()
     return _PostgresDatabase(raw_conn)
 

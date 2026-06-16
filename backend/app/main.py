@@ -21,7 +21,7 @@ import time
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db, get_db
-from app.api import auth, tasks, analysis, patents, solutions, workflow, evaluation, feedback, notifications, knowledge as knowledge_api, knowledge_bases as knowledge_bases_api, modeling, models as models_api, kb_tools as kb_tools_api
+from app.api import auth, tasks, analysis, patents, solutions, workflow, evaluation, feedback, notifications, knowledge as knowledge_api, knowledge_bases as knowledge_bases_api, modeling, models as models_api, kb_tools as kb_tools_api, conversion as conversion_api
 from app.api.sidebar import router as sidebar_router
 from app.api.admin import router as admin_router
 from app.api.workflow_steps import router as workflow_steps_router
@@ -38,11 +38,38 @@ app = FastAPI(title="InnovOS API", description="创新智能平台后端 API")
 
 @app.on_event("startup")
 async def startup():
-    """启动时初始化知识库作业系统（崩溃恢复）"""
+    """启动时初始化知识库作业系统 + 专利向量表"""
     from app.services.knowledge_orchestration_service import knowledge_orchestration_service
     await knowledge_orchestration_service.start()
     logger = logging.getLogger(__name__)
     logger.info("Knowledge job system started — recovered stalled jobs")
+
+    # 建专利向量表并重建所有向量（用 title + abstract）
+    try:
+        from app.algorithm.patent_search_engine import init_patent_vectors_table, PatentSearchEngine
+        init_patent_vectors_table()
+        engine = PatentSearchEngine()
+        if engine.embedder:
+            # 清除旧向量并重建
+            from app.database import get_db, is_postgres
+            db = get_db()
+            db.execute("DELETE FROM patent_vectors")
+            db.commit()
+            count = await engine.backfill()
+            logger.info(f"Patent vectors rebuilt: {count}")
+            # 创建 HNSW 索引（仅 PostgreSQL，halfvec 支持 4096 维）
+            if is_postgres():
+                db.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_patent_embedding_hnsw 
+                    ON patent_vectors USING hnsw (embedding halfvec_cosine_ops) 
+                    WITH (m = 16, ef_construction = 200)
+                """)
+                db.commit()
+                logger.info("HNSW index created")
+            db.close()
+            logger.info(f"Patent vectors rebuilt: {count}")
+    except Exception as e:
+        logger.warning(f"Patent vector init failed (non-fatal): {e}")
 
 # 开发环境 CORS（生产环境通过 nginx 同源代理，无需 CORS）
 dev_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175").split(",")
@@ -70,6 +97,7 @@ app.include_router(knowledge_bases_api.router)
 app.include_router(kb_tools_api.router)
 app.include_router(models_api.router)
 app.include_router(modeling.router)
+app.include_router(conversion_api.router)
 app.include_router(workflow_steps_router)
 
 

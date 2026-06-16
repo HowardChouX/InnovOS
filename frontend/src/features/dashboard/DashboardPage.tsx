@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import { TaskInputPanel } from './TaskInputPanel';
-import { TaskList } from './TaskList';
 import { AgentWorkflowPanel } from './AgentWorkflowPanel';
 import { WorkflowStepResults } from '../workflow/WorkflowStepResults';
 import { useTaskStore } from '../../store/useTaskStore';
@@ -57,8 +56,7 @@ export function DashboardPage() {
       {/* Left main area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
         <div className="card-enter"><TaskInputPanel /></div>
-        <div className="card-enter"><TaskList /></div>
-        <div className="card-enter" style={{ flex: 1, minHeight: 0 }}>
+        <div className="card-enter" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <WorkflowStepResults />
         </div>
       </div>

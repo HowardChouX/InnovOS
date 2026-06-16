@@ -58,7 +58,7 @@ export default function NoteEditorDialog({ open, onClose }: Props) {
           <button onClick={onClose} style={{
             background: 'none', border: 'none',
             color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 16, padding: 4,
-          }}>✕</button>
+          }}><i className="fa-solid fa-xmark" /></button>
         </div>
 
         {/* Title */}

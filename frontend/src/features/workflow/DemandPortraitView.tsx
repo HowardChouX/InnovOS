@@ -24,7 +24,7 @@ function StarInput({ value, onChange }: { value: number; onChange: (v: number) =
             transition: 'color 0.1s',
           }}
         >
-          ★
+          <i className="fa-solid fa-star" />
         </span>
       ))}
     </div>
@@ -38,6 +38,12 @@ export function DemandPortraitView({ output }: { output: any }) {
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
+  const [manualDemands, setManualDemands] = useState<Demand[]>([]);
+  const [newDesc, setNewDesc] = useState('');
+  const [newCategory, setNewCategory] = useState('功能需求');
+
+  const CATEGORY_OPTIONS = ['功能需求', '性能需求', '安全需求', '体验需求', '合规需求', '其他'];
 
   useEffect(() => {
     if (output?.ratings) {
@@ -51,8 +57,33 @@ export function DemandPortraitView({ output }: { output: any }) {
   }, [output]);
 
   const demands: Demand[] = output?.demands || [];
+  const allDemands = [...demands, ...manualDemands];
 
-  if (!workflow || demands.length === 0) {
+  const addManualDemand = () => {
+    const desc = newDesc.trim();
+    if (!desc) return;
+    const newDemand: Demand = {
+      id: `manual_${Date.now()}`,
+      source: '手动补充',
+      category: newCategory,
+      description: desc,
+      priority: 0.5,
+      user_rating: null,
+    };
+    setManualDemands((prev) => [...prev, newDemand]);
+    setNewDesc('');
+  };
+
+  const removeManualDemand = (id: string) => {
+    setManualDemands((prev) => prev.filter((d) => d.id !== id));
+    setRatings((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  if (!workflow || allDemands.length === 0) {
     return (
       <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
         <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>暂无需求数据</span>
@@ -60,13 +91,14 @@ export function DemandPortraitView({ output }: { output: any }) {
     );
   }
 
-  const allRated = demands.every((d) => (ratings[d.id] ?? 0) > 0);
+  const allRated = allDemands.every((d) => (ratings[d.id] ?? 0) > 0);
 
   const handleSubmit = async () => {
     if (!selectedTaskId || !allRated || submitting) return;
     setSubmitting(true);
+    setError('');
     try {
-      const ratingsPayload = demands.map((d) => ({
+      const ratingsPayload = allDemands.map((d) => ({
         demandId: d.id,
         score: ratings[d.id] || 0,
       }));
@@ -74,8 +106,10 @@ export function DemandPortraitView({ output }: { output: any }) {
       setSubmitted(true);
       // 立即刷新工作流状态，状态机同步更新
       fetchWorkflow(selectedTaskId);
-    } catch (err) {
+    } catch (err: any) {
       console.error('提交评分失败:', err);
+      const msg = err?.message || '提交失败，请重试';
+      setError(msg.includes('不需要评分') ? '工作流状态异常，请刷新页面后重试' : msg);
     } finally {
       setSubmitting(false);
     }
@@ -123,7 +157,113 @@ export function DemandPortraitView({ output }: { output: any }) {
         ))}
       </div>
 
+      {/* 手动补充需求 */}
+      {!submitted && (
+        <div style={{
+          borderTop: '1px solid var(--border)', paddingTop: 16,
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+            <i className="fa-solid fa-pen" style={{ marginRight: 6, color: 'var(--accent-purple)' }} />
+            补充需求
+          </div>
+
+          {manualDemands.map((d) => (
+            <div key={d.id} style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '10px 14px', borderRadius: 8,
+              background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)',
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
+                  {d.description}
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{
+                    fontSize: 10, padding: '1px 6px', borderRadius: 3,
+                    background: 'rgba(139,92,246,0.1)', color: 'var(--accent-purple)',
+                  }}>
+                    {d.category}
+                  </span>
+                  <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                    {d.source}
+                  </span>
+                </div>
+              </div>
+              <StarInput
+                value={ratings[d.id] || 0}
+                onChange={(v) => setRatings((prev) => ({ ...prev, [d.id]: v }))}
+              />
+              <button
+                onClick={() => removeManualDemand(d.id)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-tertiary)', fontSize: 14, padding: '2px 4px',
+                }}
+                title="删除"
+              >
+                <i className="fa-solid fa-xmark" />
+              </button>
+            </div>
+          ))}
+
+          {/* 新增需求输入 */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '8px 12px', borderRadius: 8,
+            background: 'rgba(0,0,0,0.15)', border: '1px dashed var(--border-light)',
+          }}>
+            <input
+              type="text"
+              placeholder="输入补充需求描述..."
+              value={newDesc}
+              onChange={(e) => setNewDesc(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') addManualDemand(); }}
+              style={{
+                flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                fontSize: 13, color: 'var(--text-primary)', fontFamily: 'inherit',
+              }}
+            />
+            <select
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+              style={{
+                padding: '4px 8px', borderRadius: 4, fontSize: 12,
+                background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)',
+                color: 'var(--text-primary)', fontFamily: 'inherit', cursor: 'pointer',
+              }}
+            >
+              {CATEGORY_OPTIONS.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <button
+              onClick={addManualDemand}
+              disabled={!newDesc.trim()}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '4px 10px', borderRadius: 4, fontSize: 12,
+                background: newDesc.trim() ? 'var(--accent-purple)' : 'var(--text-tertiary)',
+                border: 'none', color: '#fff', cursor: newDesc.trim() ? 'pointer' : 'not-allowed',
+                fontFamily: 'inherit', whiteSpace: 'nowrap',
+              }}
+            >
+              <i className="fa-solid fa-plus" /> 添加
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+        {error && (
+          <div style={{
+            flex: 1, fontSize: 12, color: 'var(--accent-red)',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <i className="fa-solid fa-circle-exclamation" />
+            {error}
+          </div>
+        )}
         <button
           onClick={handleSubmit}
           disabled={!allRated || submitting || submitted}

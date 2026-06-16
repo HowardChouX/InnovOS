@@ -53,13 +53,13 @@ function TimelineStep({
           animation: isRunning ? 'pulse-ring 1.5s ease-in-out infinite' : 'none',
           transition: 'all 0.3s ease',
         }}>
-          {isCompleted ? '✓' : isRunning ? (
+          {isCompleted ? <i className="fa-solid fa-check" /> : isRunning ? (
             <div style={{
               width: 8, height: 8, border: `2px solid ${cfg.color}`,
               borderTopColor: 'transparent', borderRadius: '50%',
               animation: 'spin 1s linear infinite',
             }} />
-          ) : isFailed ? '✕' : (index + 1)}
+          ) : isFailed ? <i className="fa-solid fa-xmark" /> : (index + 1)}
         </div>
         {/* Line */}
         {!isLast && (
@@ -131,7 +131,7 @@ function WorkflowProgressView() {
   const steps = workflow.steps || [];
 
   // Map agentId -> step data for duration/description
-  const agentMap = new Map(steps.map(s => [s.agentId, s]));
+    const agentMap = new Map(steps.map(s => [s.agentId || s.agent_id, s]));
 
   // phaseId -> agentId mapping
   const PHASE_TO_AGENT: Record<string, string> = {

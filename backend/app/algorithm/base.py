@@ -298,6 +298,19 @@ class AIBase:
                     return content
 
                 parsed = parse_ai_json(content)
+
+                # json_mode=True 但解析结果不是 dict → 重试
+                if json_mode and not isinstance(parsed, dict):
+                    logger.warning(f"[{logger_prefix}] 返回非 JSON 格式（{type(parsed).__name__}），重试 {attempt + 1}/{max_attempts}")
+                    # 重试时移除 response_format（部分模型不支持 json_object）
+                    kwargs.pop("response_format", None)
+                    json_mode = False
+                    # 在用户提示词末尾追加 JSON 格式要求
+                    for i, msg in enumerate(kwargs.get("messages", [])):
+                        if msg["role"] == "user":
+                            kwargs["messages"][i]["content"] = str(msg["content"]) + "\n\n【重要】请只输出合法的JSON对象，不要包含其他文字。"
+                    continue
+
                 return parsed
 
             except APIError as e:

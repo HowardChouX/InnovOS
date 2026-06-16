@@ -106,7 +106,7 @@ export function ModelSelector({
         <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--border-light)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>{title}</span>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 16 }}><i className="fa-solid fa-xmark" /></button>
           </div>
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="搜索模型 ID 或名称"
@@ -133,7 +133,7 @@ export function ModelSelector({
                   background: 'rgba(0,0,0,0.1)', cursor: 'pointer',
                 }} onClick={() => allSelected ? removeAllFromGroup(group.models) : addAllFromGroup(group.models)}>
                   <span style={{ fontSize: 10, marginRight: 6, color: 'var(--text-tertiary)' }}>
-                    {allSelected ? '▼' : '▶'}
+                    {allSelected ? <i className="fa-solid fa-chevron-down" /> : <i className="fa-solid fa-chevron-right" />}
                   </span>
                   <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{group.name}</span>
                   <span style={{
@@ -162,7 +162,7 @@ export function ModelSelector({
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 11, color: '#fff',
                       }}>
-                        {isActive ? '✓' : id[0].toUpperCase()}
+                        {isActive ? <i className="fa-solid fa-check" /> : id[0].toUpperCase()}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <span style={{

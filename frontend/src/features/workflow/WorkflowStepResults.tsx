@@ -16,6 +16,7 @@ const PHASE_TO_AGENT: Record<string, string> = {
   patent_search: 'agent5',
   solution_gen: 'agent3',
   evaluation: 'agent4',
+  completed: 'agent6',
 };
 
 function getStepOutput(workflow: WorkflowState, phaseId: string): any {
@@ -30,7 +31,7 @@ function EmptyState({ msg, icon }: { msg: string; icon: string }) {
   return (
     <div className="card" style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      minHeight: 260, padding: 40,
+      minHeight: 260, padding: 40, height: '100%',
     }}>
       <i className={icon} style={{
         fontSize: 48, color: 'var(--text-tertiary)', opacity: 0.3,
@@ -53,9 +54,8 @@ const PHASE_VIEWS: Record<string, React.ComponentType<{ output: any }>> = {
 export function WorkflowStepResults() {
   const { workflow, currentPhase, phaseStatus } = useWorkflowStore();
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
-  const stepInfo = WORKFLOW_STEPS.find(s => s.phaseId === currentPhase);
 
-  // 等待评分时，找到最后一个 completed 的阶段作为显示
+  // 等待评分时，显示最后一个已完成的阶段（让用户看到结果并确认）
   const displayPhase = useMemo(() => {
     if (!workflow) return currentPhase;
     if (workflow.status === 'awaiting_rating') {
@@ -71,17 +71,27 @@ export function WorkflowStepResults() {
     return currentPhase;
   }, [workflow, currentPhase, phaseStatus]);
 
+  const stepInfo = WORKFLOW_STEPS.find(s => s.phaseId === displayPhase);
+
   const currentOutput = useMemo(() => {
     if (!workflow) return null;
     return getStepOutput(workflow, displayPhase);
   }, [workflow, displayPhase]);
 
   if (!selectedTaskId) {
-    return <EmptyState msg="选择任务查看分析结果" icon="fa-solid fa-hand-pointer" />;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <EmptyState msg="输入文字，点击开始进行分析" icon="fa-solid fa-hand-pointer" />
+      </div>
+    );
   }
 
   if (!workflow) {
-    return <EmptyState msg="暂无运行中的工作流" icon="fa-solid fa-diagram-project" />;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <EmptyState msg="暂无运行中的工作流" icon="fa-solid fa-diagram-project" />
+      </div>
+    );
   }
 
   const isRunning = phaseStatus[displayPhase] === 'running' && workflow.status !== 'awaiting_rating';
@@ -91,7 +101,7 @@ export function WorkflowStepResults() {
     return (
       <div className="card" style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        minHeight: 260, padding: 40,
+        minHeight: 260, padding: 40, height: '100%',
       }}>
         <i className={stepInfo?.icon || 'fa-solid fa-circle-notch fa-spin'} style={{
           fontSize: 36, color: stepInfo?.color || 'var(--accent-blue)', opacity: 0.6,

@@ -64,7 +64,7 @@ export function OverviewCards() {
       />
       <StatCard
         label="平均评分"
-        value={overview.avgRating > 0 ? `${overview.avgRating}★` : '-'}
+        value={overview.avgRating > 0 ? `${overview.avgRating}` : '-'}
         color="var(--accent-yellow)"
         icon="fa-star"
       />

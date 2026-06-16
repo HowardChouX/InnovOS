@@ -10,7 +10,7 @@ function StarRating({ rating, max = 5 }: { rating: number; max?: number }) {
         <span key={i} style={{
           fontSize: 14, color: i < rating ? '#fbbf24' : 'rgba(255,255,255,0.15)',
         }}>
-          {i < rating ? '★' : '☆'}
+          {i < rating ? <i className="fa-solid fa-star" /> : <i className="fa-regular fa-star" />}
         </span>
       ))}
     </div>
@@ -74,7 +74,7 @@ function EvaluationDetailModal({ evaluation, onClose }: { evaluation: Evaluation
           }}>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>整体裁决</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: verdictColor }}>
-              {evaluation.overallVerdict === 'passed' ? '✓ 通过' : '✗ 未通过'}
+              {evaluation.overallVerdict === 'passed' ? <><i className="fa-solid fa-check" /> 通过</> : <><i className="fa-solid fa-xmark" /> 未通过</>}
             </div>
           </div>
           <div style={{
@@ -140,7 +140,7 @@ function EvaluationDetailModal({ evaluation, onClose }: { evaluation: Evaluation
                 <div style={{ marginTop: 4 }}>
                   <div style={{ color: 'var(--accent-red)', marginBottom: 2 }}>新引入矛盾：</div>
                   {evaluation.newContradictions.map((c, i) => (
-                    <div key={i} style={{ paddingLeft: 16 }}>• {c}</div>
+                    <div key={i} style={{ paddingLeft: 16 }}>- {c}</div>
                   ))}
                 </div>
               )}
@@ -161,7 +161,7 @@ function EvaluationDetailModal({ evaluation, onClose }: { evaluation: Evaluation
                 <div style={{ marginBottom: 4 }}>
                   <div style={{ color: 'var(--accent-green)', marginBottom: 2 }}>补足功能缺失：</div>
                   {evaluation.functionDeficitsFilled.map((f, i) => (
-                    <div key={i} style={{ paddingLeft: 16 }}>• {f}</div>
+                    <div key={i} style={{ paddingLeft: 16 }}>- {f}</div>
                   ))}
                 </div>
               ) : (
@@ -171,7 +171,7 @@ function EvaluationDetailModal({ evaluation, onClose }: { evaluation: Evaluation
                 <div style={{ marginTop: 4 }}>
                   <div style={{ color: 'var(--accent-red)', marginBottom: 2 }}>新有害作用：</div>
                   {evaluation.newHarmfulInteractions.map((h, i) => (
-                    <div key={i} style={{ paddingLeft: 16 }}>• {h}</div>
+                    <div key={i} style={{ paddingLeft: 16 }}>- {h}</div>
                   ))}
                 </div>
               )}
@@ -204,7 +204,7 @@ function EvaluationDetailModal({ evaluation, onClose }: { evaluation: Evaluation
                 <div style={{ marginTop: 4 }}>
                   <div style={{ color: 'var(--text-tertiary)', marginBottom: 2 }}>关键参数达成：</div>
                   {evaluation.ifrParametersAchieved.map((p, i) => (
-                    <div key={i} style={{ paddingLeft: 16 }}>• {p}</div>
+                    <div key={i} style={{ paddingLeft: 16 }}>- {p}</div>
                   ))}
                 </div>
               )}
@@ -244,7 +244,7 @@ function EvaluationDetailModal({ evaluation, onClose }: { evaluation: Evaluation
                 <div style={{ marginTop: 4 }}>
                   <div style={{ color: 'var(--accent-green)', marginBottom: 2 }}>已对齐法则：</div>
                   {evaluation.alignedLaws.map((l, i) => (
-                    <div key={i} style={{ paddingLeft: 16 }}>• {l}</div>
+                    <div key={i} style={{ paddingLeft: 16 }}>- {l}</div>
                   ))}
                 </div>
               )}
@@ -252,7 +252,7 @@ function EvaluationDetailModal({ evaluation, onClose }: { evaluation: Evaluation
                 <div style={{ marginTop: 4 }}>
                   <div style={{ color: 'var(--accent-red)', marginBottom: 2 }}>未对齐法则：</div>
                   {evaluation.misalignedLaws.map((l, i) => (
-                    <div key={i} style={{ paddingLeft: 16 }}>• {l}</div>
+                    <div key={i} style={{ paddingLeft: 16 }}>- {l}</div>
                   ))}
                 </div>
               )}
@@ -283,7 +283,7 @@ function EvaluationCard({ evaluation }: { evaluation: Evaluation }) {
               fontSize: 14, fontWeight: 600,
               color: verdictColor,
             }}>
-              {evaluation.overallVerdict === 'passed' ? '✓ 通过' : '✗ 未通过'}
+              {evaluation.overallVerdict === 'passed' ? <><i className="fa-solid fa-check" /> 通过</> : <><i className="fa-solid fa-xmark" /> 未通过</>}
             </span>
             <span style={{
               fontSize: 10, padding: '2px 8px', borderRadius: 4,

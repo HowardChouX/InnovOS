@@ -11,6 +11,7 @@ import { KeyManagementPage } from '../features/admin/KeyManagementPage';
 import { UserManagementPage } from '../features/admin/UserManagementPage';
 import { PatentDbPage } from '../features/admin/PatentDbPage';
 import { MonitorPage } from '../features/monitor/MonitorPage';
+import { PatentConversionPage } from '../features/patent_conversion/PatentConversionPage';
 
 
 export const routes = [
@@ -29,7 +30,7 @@ export const routes = [
       { path: 'knowledge', element: <KnowledgeBasePage /> },
       { path: 'monitor', element: <MonitorPage /> },
       { path: 'history', element: <PlaceholderPage title="历史方案" /> },
-      { path: 'patent-conversion', element: <PlaceholderPage title="专利转化" /> },
+      { path: 'patent-conversion', element: <PatentConversionPage /> },
       { path: 'workflow/demand', element: <PlaceholderPage title="需求画像" /> },
       { path: 'workflow/modeling', element: <PlaceholderPage title="问题建模" /> },
       { path: 'admin/keys', element: <KeyManagementPage /> },

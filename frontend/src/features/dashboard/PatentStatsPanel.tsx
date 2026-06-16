@@ -24,9 +24,9 @@ export function PatentStatsPanel() {
         <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
             {[
-              { label: '检索到相关专利', value: stats.relatedCount.toLocaleString(), unit: '篇', color: 'var(--accent-blue)', change: '↑ 86%', sub: '较通用检索' },
-              { label: '高相关专利', value: stats.coreCount.toLocaleString(), unit: '篇', color: 'var(--accent-cyan)', change: '↑ 72%', sub: '较通用检索' },
-              { label: '核心专利分析完成', value: stats.analyzedCount.toLocaleString(), unit: '篇', color: 'var(--accent-purple)', change: '↑ 65%', sub: '较通用分析' },
+              { label: '检索到相关专利', value: stats.relatedCount.toLocaleString(), unit: '篇', color: 'var(--accent-blue)', change: '+86%', sub: '较通用检索' },
+              { label: '高相关专利', value: stats.coreCount.toLocaleString(), unit: '篇', color: 'var(--accent-cyan)', change: '+72%', sub: '较通用检索' },
+              { label: '核心专利分析完成', value: stats.analyzedCount.toLocaleString(), unit: '篇', color: 'var(--accent-purple)', change: '+65%', sub: '较通用分析' },
             ].map((item) => (
               <div key={item.label} style={{
                 background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: '10px 12px',
@@ -65,7 +65,7 @@ export function PatentStatsPanel() {
                       {p.title}
                     </div>
                     <div style={{ color: 'var(--text-tertiary)', fontSize: 10 }}>
-                      申请号：{p.patentNumber} · 申请日：{p.filingDate?.slice(0, 10)}
+                      申请号：{p.patentNumber} | 申请日：{p.filingDate?.slice(0, 10)}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>

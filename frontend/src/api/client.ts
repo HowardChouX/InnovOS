@@ -15,6 +15,12 @@ export async function apiRequest<T>(path: string, options?: RequestInit): Promis
     },
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || '请求失败');
+  if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    throw new Error(data.detail || '请求失败');
+  }
   return data;
 }

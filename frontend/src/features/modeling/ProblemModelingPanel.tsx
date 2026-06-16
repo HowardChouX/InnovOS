@@ -58,7 +58,7 @@ export function ProblemModelingPanel({ modeling, loading, workflow }: ProblemMod
           问题建模
         </div>
         <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-          {modeling.modelStructure?.problemType || '未知'} · {modeling.modelStructure?.complexity || '未知'}
+          {modeling.modelStructure?.problemType || '未知'} | {modeling.modelStructure?.complexity || '未知'}
         </span>
       </div>
 

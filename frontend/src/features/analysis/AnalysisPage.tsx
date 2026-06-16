@@ -176,7 +176,7 @@ export function AnalysisPage() {
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
                       {analysis.satelliteNodes.map((node) => (
-                        <div key={node.id}>• {node.label} {node.sublabel || ''}</div>
+                        <div key={node.id}>- {node.label} {node.sublabel || ''}</div>
                       ))}
                     </div>
                   </div>

@@ -120,11 +120,11 @@ function ProblemModelingView({ modeling }: { modeling: ProblemModeling | null })
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
             {modeling?.problemElements?.potentialConflicts && modeling?.problemElements?.potentialConflicts.length > 0 ? (
               modeling.problemElements.potentialConflicts.map((c: any) => (
-                <div key={c.id}>• {c.label}</div>
+                <div key={c.id}>- {c.label}</div>
               ))
             ) : analysis?.satelliteNodes && analysis?.satelliteNodes.length > 0 ? (
               analysis.satelliteNodes.map((node: any) => (
-                <div key={node.id}>• {node.label} {node.sublabel || ''}</div>
+                <div key={node.id}>- {node.label} {node.sublabel || ''}</div>
               ))
             ) : (
               <div style={{ color: 'var(--text-tertiary)' }}>暂无数据</div>
@@ -138,11 +138,11 @@ function ProblemModelingView({ modeling }: { modeling: ProblemModeling | null })
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
             {modeling?.recommendedPrinciples && modeling?.recommendedPrinciples.length > 0 ? (
               modeling.recommendedPrinciples.map((p: string, i: number) => (
-                <div key={i}>• {p}</div>
+                <div key={i}>- {p}</div>
               ))
             ) : analysis?.principles && analysis?.principles.length > 0 ? (
               analysis.principles.map((p: string, i: number) => (
-                <div key={i}>• {p}</div>
+                <div key={i}>- {p}</div>
               ))
             ) : (
               <div style={{ color: 'var(--text-tertiary)' }}>暂无推荐原理</div>
@@ -288,7 +288,7 @@ export function AnalysisResult({ modeling }: AnalysisResultProps) {
       <div style={{ flex: 1, overflow: 'auto' }}>
         {!selectedTaskId ? (
           <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>
-            选择任务查看分析结果
+            输入文字，点击开始进行分析
           </div>
         ) : loading ? (
           <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>

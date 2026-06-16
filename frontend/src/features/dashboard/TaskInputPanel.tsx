@@ -106,7 +106,7 @@ export function TaskInputPanel() {
     <div className="card">
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div className="card-title">创新任务输入</div>
+        <div className="card-title">创新分析</div>
 
         <div style={{ position: 'relative' }} ref={selectorRef}>
           <button
@@ -160,7 +160,7 @@ export function TaskInputPanel() {
                     {loadError || '暂无知识库'}
                   </div>
                   <a href="/knowledge" style={{ fontSize: 11, color: 'var(--accent)' }}>
-                    前往创建 →
+                    前往创建 <i className="fa-solid fa-arrow-right" style={{ fontSize: 9 }} />
                   </a>
                 </div>
               ) : (
@@ -232,7 +232,7 @@ export function TaskInputPanel() {
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder="输入您的创新问题..."
+        placeholder="输入文字，点击开始进行分析"
         disabled={isAnalyzing}
         style={{
           width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)',

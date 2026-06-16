@@ -40,7 +40,7 @@ export function KeyManagementPage() {
 
   // ─── 全局模型分配 ───
   const [availableModels, setAvailableModels] = useState<AvailableModelsByCapability | null>(null);
-  const [assignedModels, setAssignedModels] = useState<{ chat: string; embedding: string; rerank: string; vision: string }>({ chat: '', embedding: '', rerank: '', vision: '' });
+  const [assignedModels, setAssignedModels] = useState<{ chat: string; embedding: string; rerank: string; vision: string; extract: string }>({ chat: '', embedding: '', rerank: '', vision: '', extract: '' });
   const [savingAssignment, setSavingAssignment] = useState(false);
 
   /** 从 provider.models 中查找对应 model ID 的完整条目 */
@@ -77,6 +77,7 @@ export function KeyManagementPage() {
         embedding: a.embedding_model || '',
         rerank: a.rerank_model || '',
         vision: a.ocr_model || '',
+        extract: a.extract_model || '',
       });
     }).catch(() => {});
   }, []);
@@ -119,9 +120,9 @@ export function KeyManagementPage() {
     if (!testModel) { setShowCheckModelPicker(true); setChecking(false); return; }
     providersApi.check(selected.providerId, testModel).then(r => {
       setToast(r.data.status === 'ok'
-        ? { msg: `${testModel} ✅ ${r.data.latency_ms}ms`, type: 'success' }
-        : { msg: r.data.message || `${testModel} ❌ 连接失败`, type: 'error' });
-    }).catch(() => setToast({ msg: `${testModel} ❌ 连接失败`, type: 'error' }))
+        ? { msg: `${testModel} ${r.data.latency_ms}ms`, type: 'success' }
+        : { msg: r.data.message || `${testModel} 连接失败`, type: 'error' });
+    }).catch(() => setToast({ msg: `${testModel} 连接失败`, type: 'error' }))
     .finally(() => setChecking(false));
   };
 
@@ -166,7 +167,7 @@ export function KeyManagementPage() {
       const res = await providersApi.batchCheckModels(selected.providerId, editModels);
       setBatchResults(res.data.models);
       const failed = res.data.models.filter(m => m.status !== 'ok');
-      if (failed.length === 0) setToast({ msg: `全部 ${res.data.models.length} 个模型检查通过 ✅`, type: 'success' });
+      if (failed.length === 0) setToast({ msg: `全部 ${res.data.models.length} 个模型检查通过`, type: 'success' });
       else setToast({ msg: `${failed.length}/${res.data.models.length} 个模型连接失败`, type: 'error' });
     } catch { setToast({ msg: '批量检查失败', type: 'error' }); }
     finally { setBatchChecking(false); }
@@ -186,6 +187,7 @@ export function KeyManagementPage() {
         embedding_model: assignedModels.embedding || null,
         rerank_model: assignedModels.rerank || null,
         ocr_model: assignedModels.vision || null,
+        extract_model: assignedModels.extract || null,
       });
       setToast({ msg: '模型分配已保存', type: 'success' });
     } catch { setToast({ msg: '保存模型分配失败', type: 'error' }); }
@@ -224,7 +226,7 @@ export function KeyManagementPage() {
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: p.isConfigured ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: p.isConfigured ? 'var(--accent-green)' : 'var(--text-tertiary)' }}>{p.name[0]}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? 'var(--text-primary)' : 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 1 }}>{p.isConfigured ? (p.apiKeyMasked || '已配置') : '未配置'}{p.models?.length > 0 ? ` · ${p.models.length}个模型` : ''}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 1 }}>{p.isConfigured ? (p.apiKeyMasked || '已配置') : '未配置'}{p.models?.length > 0 ? ` | ${p.models.length}个模型` : ''}</div>
                 </div>
                 {p.isConfigured && !p.isEnabled && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(248,113,113,0.15)', color: 'var(--accent-red)' }}>禁用</span>}
               </div>
@@ -311,8 +313,8 @@ export function KeyManagementPage() {
             <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border-light)' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12 }}>全局模型分配</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {(['chat', 'embedding', 'rerank', 'vision'] as const).map(cap => {
-                  const label = { chat: '对话模型（首页分析）', embedding: '嵌入模型（知识库）', rerank: '重排模型（知识库）', vision: 'OCR 模型（专利处理）' }[cap];
+                {(['chat', 'embedding', 'rerank', 'vision', 'extract'] as const).map(cap => {
+                  const label = { chat: '对话模型（首页分析）', embedding: '嵌入模型（知识库/专利）', rerank: '重排模型（知识库）', vision: 'OCR 模型（专利处理）', extract: '提取模型（专利字段提取）' }[cap];
                   const list = availableModels?.[cap] || [];
                   return (
                     <div key={cap}>

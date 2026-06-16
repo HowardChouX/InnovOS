@@ -97,7 +97,7 @@ export function KnowledgeDetail() {
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-foreground-muted leading-4">
-                <span>{base.itemCount} 个数据源</span><span aria-hidden="true">·</span><span>更新于 {new Date(base.updatedAt).toLocaleDateString()}</span>
+                <span>{base.itemCount} 个数据源</span><span aria-hidden="true">|</span><span>更新于 {new Date(base.updatedAt).toLocaleDateString()}</span>
               </div>
             </div>
           </div>

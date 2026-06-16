@@ -33,6 +33,7 @@ const AGENT_TO_PHASE: Record<string, string> = {
   agent5: 'patent_search',
   agent3: 'solution_gen',
   agent4: 'evaluation',
+  agent6: 'completed',
 };
 
 // 默认 phaseStatus
@@ -45,10 +46,11 @@ const DEFAULT_PHASE_STATUS: Record<string, 'pending' | 'running' | 'completed' |
 };
 
 /** 从 workflow.steps 同步 phaseStatus */
-function syncPhaseStatus(steps: { agentId: string; status: string }[]): Record<string, 'pending' | 'running' | 'completed' | 'failed'> {
+function syncPhaseStatus(steps: { agentId?: string; agent_id?: string; status: string }[]): Record<string, 'pending' | 'running' | 'completed' | 'failed'> {
   const status = { ...DEFAULT_PHASE_STATUS };
   for (const step of steps) {
-    const phase = AGENT_TO_PHASE[step.agentId];
+    const agentId = step.agentId || step.agent_id;
+    const phase = AGENT_TO_PHASE[agentId || ''];
     if (phase) {
       (status as any)[phase] = step.status;
     }

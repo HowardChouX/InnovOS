@@ -15,7 +15,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/settings", tags=["admin-settings"])
 
-MODEL_KEYS = ["chat_model", "embedding_model", "rerank_model", "ocr_model"]
+MODEL_KEYS = ["chat_model", "embedding_model", "rerank_model", "ocr_model", "extract_model"]
 
 
 class AssignedModelsInput(BaseModel):
@@ -23,6 +23,7 @@ class AssignedModelsInput(BaseModel):
     embedding_model: Optional[str] = None
     rerank_model: Optional[str] = None
     ocr_model: Optional[str] = None
+    extract_model: Optional[str] = None
 
 
 class RagConfigInput(BaseModel):
@@ -43,9 +44,10 @@ RAG_KEYS = ["chunk_size", "chunk_overlap", "search_mode", "hybrid_alpha", "thres
 def get_assigned_models(user: dict = Depends(require_admin)) -> dict:
     """获取全局模型分配配置"""
     db = get_db()
+    placeholders = ",".join("?" * len(MODEL_KEYS))
     rows = db.execute(
-        "SELECT key, value FROM system_settings WHERE key IN (?, ?, ?, ?)",
-        ("chat_model", "embedding_model", "rerank_model", "ocr_model"),
+        f"SELECT key, value FROM system_settings WHERE key IN ({placeholders})",
+        MODEL_KEYS,
     ).fetchall()
     db.close()
     result = {k: None for k in MODEL_KEYS}
@@ -166,5 +168,6 @@ def get_available_models(user: dict = Depends(require_admin)) -> dict:
             "embedding": sorted(embedding_models, key=lambda x: x["modelId"]),
             "rerank": sorted(rerank_models, key=lambda x: x["modelId"]),
             "vision": sorted(vision_models, key=lambda x: x["modelId"]),
+            "extract": sorted(chat_models, key=lambda x: x["modelId"]),
         }
     }

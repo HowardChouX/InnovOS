@@ -2,21 +2,73 @@
 专利结构化提取器 — 从 PDF 文本中提取专利元数据字段
 
 策略：
-  1. 正则提取结构化字段（免费，覆盖 90% 中国专利格式）
-  2. AI 兜底：仅当关键字段缺失时调用 LLM 补充
-
-支持两种输入格式：
-  - pdfminer: 半角括号，顺序从左到右 (19)(12)(10)...
-  - PaddleOCR: 全角/半角括号混合，版面排序（(54)(57)可能在IPC后面）
-
-中国发明专利/实用新型标准格式：
-  (10)申请公布号  (21)申请号  (22)申请日  (71)申请人
-  (72)发明人  (74)专利代理  (51)Int.Cl.  (54)发明名称  (57)摘要
+  1. AI 模型提取结构化字段（使用已配置的对话模型）
+  2. 正则兜底（AI 不可用时）
 """
 import json
 import logging
 import re
 from typing import Optional
+
+
+EXTRACT_SYSTEM_PROMPT = """你是一个专利文档结构化提取器。从专利文本中提取以下字段，只输出JSON：
+
+{{
+  "title": "发明名称",
+  "patent_number": "申请号",
+  "filing_date": "申请日",
+  "publication_number": "公开号",
+  "publication_date": "公开日",
+  "ipc_codes": ["IPC分类号"],
+  "applicants": ["申请人"],
+  "inventors": ["发明人"],
+  "abstract": "摘要内容",
+  "claims": "权利要求书内容",
+  "description": "说明书内容",
+  "patent_agency": "专利代理机构",
+  "patent_agent": "专利代理人"
+}}
+
+如果某个字段在文本中不存在，用空字符串或空数组代替。
+不要输出任何其他文字。"""
+
+
+async def extract_patent_fields_ai(text: str) -> dict | None:
+    """使用 extract_model 提取专利结构化字段"""
+    try:
+        from app.algorithm.model_resolver import model_resolver
+        s = model_resolver.get_assigned_settings()
+        extract_model_id = s.get("extract_model") or ""
+
+        if not extract_model_id:
+            logger.info("extract_model 未配置，跳过 AI 提取")
+            return None
+        if ":" not in extract_model_id:
+            logger.warning(f"extract_model 格式无效: {extract_model_id}")
+            return None
+
+        from app.algorithm.ai_client import chat_completion
+
+        result = await chat_completion(
+            system_prompt=EXTRACT_SYSTEM_PROMPT,
+            user_prompt=f"请从以下专利文本中提取结构化字段：\n\n{text[:8000]}",
+            response_format=dict,
+            temperature=0.05,
+            max_retries=2,
+            model_id=extract_model_id,
+        )
+
+        if isinstance(result, dict):
+            for arr_field in ["ipc_codes", "applicants", "inventors"]:
+                if not isinstance(result.get(arr_field), list):
+                    result[arr_field] = [result[arr_field]] if result.get(arr_field) else []
+            for str_field in ["title", "patent_number", "abstract", "claims"]:
+                if not isinstance(result.get(str_field), str):
+                    result[str_field] = str(result.get(str_field, ""))
+            return result
+    except Exception as e:
+        logger.warning(f"AI 提取失败: {e}")
+    return None
 
 logger = logging.getLogger(__name__)
 
@@ -37,17 +89,17 @@ RE_FILING_DATE = re.compile(rf"{_RE_BRACKET}22[）)][^0-9]*?(\d{{4}}\.\d{{2}}\.\
 # 公开日
 RE_PUB_DATE = re.compile(rf"{_RE_BRACKET}43[）)][^0-9]*?(\d{{4}}\.\d{{2}}\.\d{{2}})")
 
-# IPC 分类号: G16H 40/20
-RE_IPC = re.compile(r"([A-Z]\d+\w*\s+\d+/\d+)")
+# IPC 分类号: G16H 40/20 或 LOC(15)Cl.23-04
+RE_IPC = re.compile(r"(?:[A-Z]\d+\w*\s+\d+/\d+|\d+-\d+)")
 
-# 发明名称 — 从 (54) 到 (57)摘要 或末尾
-RE_TITLE = re.compile(rf"{_RE_BRACKET}54[）)]发明名称\s*(.+?)(?={_RE_BRACKET}57[）)]摘要|\Z)", re.DOTALL)
+# 发明名称 — 从 (54) 到 (57)摘要 或下一个括号标记，匹配完整内容
+RE_TITLE = re.compile(rf"{_RE_BRACKET}54[）)](?:发明名称|实用新型名称|专利名称|使用外观设计的产品名称)?\s*([\s\S]+?)(?={_RE_BRACKET}5[78][）)]|\Z)", re.DOTALL)
 
-# 摘要 — 从 (57)摘要 到 "CN" 页码标记或 "1." 权利要求开头
-RE_ABSTRACT = re.compile(rf"{_RE_BRACKET}57[）)]摘要\s*(.+?)(?=\n\s*CN[^书]|\n\s*[1．\.]\s|权利要求书|\Z)", re.DOTALL)
+# 摘要 — 从 (57)摘要 或 (57)外观设计简要说明
+RE_ABSTRACT = re.compile(rf"{_RE_BRACKET}57[）)](?:摘要|外观设计简要说明)\s*(.+?)(?=\n\s*CN[^书]|\n\s*[1．\.]\s|权利要求书|\Z)", re.DOTALL)
 
 # 权利要求书 — 从 "1." 到 "技术领域" 或 "发明内容"
-RE_CLAIMS = re.compile(r"1[．\.]\s*(.+?)(?=技术领域|发明内容|附图说明|\Z)", re.DOTALL)
+RE_CLAIMS = re.compile(r"(?:^|\n)([1．\.]\s*.+?)(?=技术领域|发明内容|附图说明|\Z)", re.DOTALL)
 
 # 说明书 — 从 "技术领域" 或 "发明内容" 到 "附图说明"
 RE_DESC = re.compile(r"(?:技术领域|发明内容)\s*(.+?)(?=附图说明|\Z)", re.DOTALL)
@@ -81,6 +133,9 @@ def _clean_pdfminer_noise(text: str) -> str:
 def extract_patent_fields(text: str) -> dict:
     """从专利文本中提取结构化字段。
 
+    优先使用 AI 提取（调用已配置的 chat_model），
+    AI 不可用时回退到正则提取。
+
     Args:
         text: pdfminer/PyPDF2 提取的纯文本。
 
@@ -94,13 +149,12 @@ def extract_patent_fields(text: str) -> dict:
             "ipc_codes": list[str],
             "applicants": list[str],
             "inventors": list[str],
-            "priority_number": str,
             "abstract": str,
             "claims": str,
             "description": str,
             "patent_agency": str,
             "patent_agent": str,
-            "_missing": list[str],      # 正则未能提取的字段名
+            "_missing": list[str],
         }
     """
     text = _clean_pdfminer_noise(text)
@@ -114,7 +168,6 @@ def extract_patent_fields(text: str) -> dict:
         "ipc_codes": [],
         "applicants": [],
         "inventors": [],
-        "priority_number": "",
         "abstract": "",
         "claims": "",
         "description": "",
@@ -158,9 +211,14 @@ def extract_patent_fields(text: str) -> dict:
     # (54) 发明名称
     m = RE_TITLE.search(text)
     if m:
-        fields["title"] = _clean_text(m.group(1))
+        title = _clean_text(m.group(1))
+        # 外观设计专利：去掉 "立体图" 之后的格式描述
+        title = re.sub(r"(?:立体图|图片|照片)[\s\S]*", "", title, flags=re.DOTALL)
+        title = title.split("\n")[0].strip()
+        title = re.sub(r"^(?:发明名称|实用新型名称|使用外观设计的产品名称)\s*", "", title)  # 只取第一行
+        fields["title"] = title.strip().rstrip("（")
 
-    # (57) 摘要
+    # (57) 摘要（设计专利无此字段，可选）
     m = RE_ABSTRACT.search(text)
     if m:
         fields["abstract"] = _clean_text(m.group(1))
@@ -175,12 +233,14 @@ def extract_patent_fields(text: str) -> dict:
             seen.add(clean)
             fields["ipc_codes"].append(clean)
 
-    # (71) 申请人 — 到 (72) 之前
+    # (71) 申请人 — 到 (72) 之前，或 (73) 专利权人（实用新型/外观设计）
     m = re.search(r"[（(]71[）)]\s*(.*?)(?=[（(]72[）)])", text, re.DOTALL)
+    if not m:
+        m = re.search(r"[（(]73[）)]\s*(.*?)(?=[（(]72[）)])", text, re.DOTALL)
     if m:
         block = m.group(1)
         # 从块中提取所有 "申请人 XXX" 格式的名称
-        for name in re.findall(r"申请人\s*([^\d(]+?)(?:\s*(?=申请人|地址|\Z))", block):
+        for name in re.findall(r"(?:申请人|专利权人)\s*([^\d(]+?)(?:\s*(?=申请人|专利权人|地址|\Z))", block):
             name = name.strip().rstrip("\u3000")
             if name:
                 fields["applicants"].append(name)
@@ -189,16 +249,16 @@ def extract_patent_fields(text: str) -> dict:
             for line in block.split("\n"):
                 line = line.strip()
                 if "地址" not in line and line:
-                    fields["applicants"].append(line.lstrip("申请人").strip())
+                    fields["applicants"].append(re.sub(r"^(?:申请人|专利权人)\s*", "", line).strip())
 
-    # (72) 发明人 — 到 (74) 之前
+    # (72) 发明人/设计人 — 到 (74) 之前
     m = re.search(r"[（(]72[）)]\s*(.*?)(?=[（(]74[）)]|[（(]51[）)]|\Z)", text, re.DOTALL)
     if m:
         raw = m.group(1).strip()
-        raw = re.sub(r"^\s*发明人[\s\u3000:：]*", "", raw)  # 去掉前缀
+        raw = re.sub(r"^\s*(?:发明人|设计人)[\s\u3000:：]*", "", raw)  # 去掉前缀
         raw = re.sub(r"\d+$", "", raw).strip()
         inventors = _split_inventors(raw)
-        fields["inventors"] = [i for i in inventors if i and len(i) > 1 and "发明人" not in i]
+        fields["inventors"] = [i for i in inventors if i and len(i) > 1 and i not in ("发明人", "设计人")]
 
     # (74) 专利代理 — 兼容全角/半角括号
     m = re.search(r"[（(]74[）)]\s*(.*?)(?=[（(]51[）)]|\Z)", text, re.DOTALL)
@@ -233,89 +293,140 @@ def extract_patent_fields(text: str) -> dict:
     return fields
 
 
-# ── 百家姓（扩展版，覆盖98%中国人口）──
-_SURNAMES = (
-    "王李张刘陈杨赵黄周吴徐孙马胡朱郭何罗高林"
-    "梁宋郑谢韩唐冯于董萧程曹袁邓许傅沈曾彭吕"
-    "苏卢蒋蔡贾丁魏薛叶阎余潘杜戴夏钟汪田任"
-    "姜范方石姚谭廖邹熊金陆郝孔白崔康毛邱秦"
-    "江史顾侯邵孟龙万段漕钱汤尹黎易常武乔贺"
-    "赖龚文庞樊兰殷施陶洪翟安颜倪严牛温芦"
-    "季俞章鲁葛韦申尤毕聂丛焦向柳邢骆岳齐"
-    "宫卞栗"
-)
+def extract_deepseek_fields(text: str) -> dict:
+    """专用于 DeepSeek-OCR 输出的字段提取
+
+    DeepSeek-OCR 格式特点：
+      - (54)(57) 在 (51) 后面
+      - 可能缺少 "权利要求书" 章节标记
+      - (74) 代理编号被空行包裹
+    """
+    fields = {k: v for k, v in _empty_fields().items()}
+    text = _clean_deepseek_text(text)
+
+    # (10) 申请公布号
+    m = re.search(rf"[（(]10[）)]\s*申请公布号\s*(CN[\s\dA-Z]+)", text)
+    if m:
+        fields["publication_number"] = m.group(1).replace(" ", "")
+
+    # (21) 申请号
+    m = re.search(rf"[（(]21[）)][^0-9]*?(\d{{12}}\.?\d*)", text)
+    if m:
+        fields["patent_number"] = m.group(1).replace(" ", "")
+
+    # (22) 申请日
+    m = re.search(rf"[（(]22[）)][^0-9]*?(\d{{4}}\.\d{{2}}\.\d{{2}})", text)
+    if m:
+        fields["filing_date"] = m.group(1)
+
+    # (43) 公开日
+    m = re.search(rf"[（(]43[）)][^0-9]*?(\d{{4}}\.\d{{2}}\.\d{{2}})", text)
+    if m:
+        fields["publication_date"] = m.group(1)
+
+    # (54) 发明名称 — 到 (57)摘要
+    m = re.search(rf"[（(]54[）)]发明名称\s*(.+?)(?=[（(]57[）)]摘要|\Z)", text, re.DOTALL)
+    if m:
+        fields["title"] = _clean_text(m.group(1))
+
+    # (57) 摘要 — 到下一个章节
+    m = re.search(rf"[（(]57[）)]摘要\s*(.+?)(?=\n技术领域|\n背景技术|权利要求书|\n\s*1[．\.]\s|\Z)", text, re.DOTALL)
+    if m:
+        abstract = m.group(1)
+        if len(abstract) > 500:
+            abstract = abstract[:abstract.find('。')+1] if '。' in abstract[:500] else abstract[:300]
+        fields["abstract"] = _clean_text(abstract)
+
+    # (51) 全部 IPC
+    ipcs = re.findall(r"([A-Z]\d+\w*\s+\d+/\d+)", text)
+    seen = set()
+    for ipc in ipcs:
+        clean = ipc.strip()
+        if clean not in seen:
+            seen.add(clean)
+            fields["ipc_codes"].append(clean)
+
+    # (71) 申请人
+    m = re.search(rf"[（(]71[）)]\s*(.*?)(?=[（(]72[）)])", text, re.DOTALL)
+    if m:
+        block = m.group(1)
+        for name in re.findall(r"申请人\s*([^\d(]+?)(?:\s*(?=申请人|地址|\Z))", block):
+            name = name.strip().rstrip("\u3000")
+            if name:
+                fields["applicants"].append(name)
+        if not fields["applicants"]:
+            for line in block.split("\n"):
+                line = line.strip()
+                if "地址" not in line and line and "申请人" not in line:
+                    fields["applicants"].append(line)
+
+    # (72) 发明人
+    m = re.search(rf"[（(]72[）)]\s*(.*?)(?=[（(]74[）)]|[（(]51[）)]|\Z)", text, re.DOTALL)
+    if m:
+        raw = m.group(1).strip()
+        raw = re.sub(r"^\s*发明人[\s\u3000:：]*", "", raw)
+        inventors = _split_inventors(raw)
+        fields["inventors"] = [i for i in inventors if i and len(i) > 1]
+
+    # (74) 专利代理
+    m = re.search(rf"[（(]74[）)]\s*(.*?)(?=[（(]51[）)]|\Z)", text, re.DOTALL)
+    if m:
+        block = m.group(1)
+        m_a = re.search(r"专利代理机构\s+(.+?)(?=\n+专利代理师|\Z)", block, re.DOTALL)
+        if m_a:
+            agency = re.sub(r"\s+", " ", m_a.group(1)).strip()
+            # 去掉末尾的注册号（纯数字）
+            agency = re.sub(r"\s*\d+\s*$", "", agency).strip()
+            fields["patent_agency"] = agency
+        m_ag = re.search(r"专利代理师\s+(.+)", block)
+        if m_ag:
+            fields["patent_agent"] = m_ag.group(1).strip()
+
+    # 权利要求 — 从 "1." 到 "技术领域" 或 "[0001]"
+    m = re.search(r"(?:^|\n)\s*[1．\.]\s*(.+?)(?=技术领域|发明内容|\[0001\]|附图说明|\Z)", text, re.DOTALL)
+    if m:
+        fields["claims"] = _clean_text(m.group(1))
+
+    # 说明书 — 从 "技术领域" 或 "[0001]" 到 "附图说明"
+    m = re.search(r"(?:技术领域|\[0001\])\s*(.+?)(?=附图说明|\Z)", text, re.DOTALL)
+    if m:
+        desc = m.group(1)
+        desc = re.sub(r"^[，,、。\s]+", "", desc)
+        fields["description"] = _clean_text(desc)
+
+    return fields
+
+
+def _empty_fields() -> dict:
+    return {
+        "title": "", "patent_number": "", "filing_date": "",
+        "publication_date": "", "publication_number": "",
+        "ipc_codes": [], "applicants": [], "inventors": [],
+        "abstract": "", "claims": "",
+        "description": "", "patent_agency": "", "patent_agent": "",
+        "_missing": [],
+    }
+
+
+def _clean_deepseek_text(text: str) -> str:
+    """清理 DeepSeek-OCR 特有的格式"""
+    if not text:
+        return ""
+    text = re.sub(r"---\s*第\s*\d+\s*页\s*---", "", text)
+    text = re.sub(r"\f", "\n", text)
+    text = re.sub(r"[ \t]+", " ", text)
+    return text.strip()
 
 
 def _split_inventors(raw: str) -> list[str]:
-    """智能分割发明人列表，处理 PaddleOCR 无空格拼接的情况"""
+    """分割发明人列表（按空格/换行分割）"""
     if not raw:
         return []
-
-    # 1. 先按换行分割
-    parts = raw.replace("\r", "").split("\n")
-    result = []
-    for part in parts:
-        part = part.strip()
-        if not part:
-            continue
-        # 2. 有空格 → 按空格分割
-        if " " in part or "\u3000" in part:
-            for name in re.split(r"[\s\u3000]+", part):
-                name = name.strip().rstrip("\u3000")
-                if name and len(name) > 1:
-                    result.append(name)
-        else:
-            # 3. 无空格 → 用姓氏分割
-            names = _split_by_surname(part)
-            result.extend(n for n in names if n and len(n) > 1)
-    return result
-
-
-def _split_by_surname(text: str) -> list[str]:
-    """用百家姓分割连续人名。逐个字符扫描，发现姓氏即截取2-4字为一个人名。"""
-    names = []
-    i = 0
-    while i < len(text):
-        # 检查当前位置是否是姓氏（优先2字姓）
-        surname_len = 2 if i + 1 < len(text) and text[i:i+2] in _SURNAMES else (1 if text[i] in _SURNAMES else 0)
-        if surname_len > 0:
-            # 取 2-4 字（姓名长度通常范围）
-            for name_len in range(4, 1, -1):
-                end = i + name_len
-                if end > len(text):
-                    continue
-                # 仅当末尾是另一个姓氏或字符串结束时截断
-                if end >= len(text):
-                    names.append(text[i:end])
-                    i = end
-                    break
-                next_is_surname = (text[end] in _SURNAMES or (end+1 < len(text) and text[end:end+2] in _SURNAMES)
-                                   or text[end] in "、，,")
-                if next_is_surname:
-                    names.append(text[i:end])
-                    i = end
-                    break
-            else:
-                i += 1  # 无法确定长度，跳过
-        else:
-            i += 1  # 不是姓氏
-    return names
-
-
-def _find_name_end(text: str, start: int) -> int:
-    """找到中文姓名的结束位置，在下一个姓氏前停止"""
-    max_len = min(4, len(text) - start)
-    for l in range(max_len, 1, -1):
-        end = start + l
-        if end >= len(text):
-            return end
-        # 检查下个位置是否为新姓氏
-        if text[end] in _SURNAMES or (end + 1 < len(text) and text[end:end+2] in _SURNAMES):
-            return end
-        # 常见分隔符
-        if text[end] in "、，, \n\t\r":
-            return end
-    return start + 4
+    raw = re.sub(r"^\s*发明人[\s\u3000:：]*", "", raw)
+    raw = re.sub(r"\d+$", "", raw).strip()
+    # 按换行、空格、全角空格分割
+    names = re.split(r"[\s\u3000]+", raw)
+    return [n.strip().rstrip("\u3000") for n in names if n and len(n.strip()) > 1]
 
 
 def _clean_text(text: str) -> str:

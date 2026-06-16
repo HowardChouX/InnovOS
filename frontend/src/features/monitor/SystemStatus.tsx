@@ -112,10 +112,10 @@ export function SystemStatus() {
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
             <div style={{ fontSize: 10 }}>
-              <span style={{ color: 'var(--accent-green)' }}>✓ {aiStats.successCalls}</span>
+              <span style={{ color: 'var(--accent-green)' }}><i className="fa-solid fa-check" /> {aiStats.successCalls}</span>
             </div>
             <div style={{ fontSize: 10 }}>
-              <span style={{ color: 'var(--accent-red)' }}>✗ {aiStats.failedCalls}</span>
+              <span style={{ color: 'var(--accent-red)' }}><i className="fa-solid fa-xmark" /> {aiStats.failedCalls}</span>
             </div>
           </div>
         </div>

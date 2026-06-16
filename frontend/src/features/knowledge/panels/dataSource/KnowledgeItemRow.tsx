@@ -187,7 +187,7 @@ export default function KnowledgeItemRow({
               <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-4 text-foreground-muted">
                 {metaParts.map((part, index) => (
                   <span key={`${part}-${index}`} className="inline-flex min-w-0 items-center gap-1.5">
-                    {index > 0 ? <span aria-hidden="true">·</span> : null}
+                    {index > 0 ? <span aria-hidden="true">|</span> : null}
                     <span className="truncate">{part}</span>
                   </span>
                 ))}

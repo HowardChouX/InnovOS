@@ -62,7 +62,7 @@ const DetailHeader = ({
               </div>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-foreground-muted leading-4">
                 <span>{itemCount} 个数据源</span>
-                <span aria-hidden="true">·</span>
+                <span aria-hidden="true">|</span>
                 <span>更新于 {formattedDate}</span>
               </div>
             </div>

@@ -1,35 +1,45 @@
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import { useWorkflowStore } from '../../store/useWorkflowStore';
+import { useTaskStore } from '../../store/useTaskStore';
+import { workflowApi } from '../../api/workflow';
 
 interface SolutionItem {
   title: string;
   description: string;
   principles?: string[];
-  confidenceScore?: number;
-  patentReferences?: string[];
-}
-
-function ConfidenceBar({ score }: { score: number }) {
-  const color = useMemo(() => {
-    if (score >= 70) return 'var(--accent-green)';
-    if (score >= 40) return 'var(--accent-yellow)';
-    return 'var(--accent-red)';
-  }, [score]);
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <div style={{ width: 60, height: 6, borderRadius: 3, background: 'rgba(0,0,0,0.3)', overflow: 'hidden' }}>
-        <div style={{
-          width: `${score}%`, height: '100%',
-          background: color, borderRadius: 3,
-          transition: 'width 0.4s ease',
-        }} />
-      </div>
-      <span style={{ fontSize: 10, color, fontWeight: 600 }}>{score}%</span>
-    </div>
-  );
+  referencedPatents?: string[];
 }
 
 export function SolutionGenView({ output }: { output: SolutionItem[] | null }) {
+  const workflow = useWorkflowStore((s) => s.workflow);
+  const fetchWorkflow = useWorkflowStore((s) => s.fetchWorkflow);
+  const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
+  const [ratings, setRatings] = useState<Record<string, number>>({})
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const solutions = Array.isArray(output) ? output : [];
+
+  const allRated = solutions.length > 0 && solutions.every((_, i) => (ratings[String(i)] ?? 0) > 0);
+
+  const handleSubmit = async () => {
+    if (!selectedTaskId || !allRated || submitting) return;
+    setSubmitting(true);
+    try {
+      const ratingsPayload = solutions.map((s, i) => ({
+        demandId: String(i),
+        score: ratings[String(i)] || 0,
+      }));
+      await workflowApi.proceed(selectedTaskId, ratingsPayload);
+      setSubmitted(true);
+      fetchWorkflow(selectedTaskId);
+    } catch (err) {
+      console.error('确认方案失败:', err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (!output || !Array.isArray(output) || output.length === 0) {
     return (
       <div className="card" style={{
@@ -42,12 +52,48 @@ export function SolutionGenView({ output }: { output: SolutionItem[] | null }) {
     );
   }
 
+  // 已确认且 workflow 正在运行下一步 → 显示加载状态
+  if (submitted && workflow?.status === 'running') {
+    return (
+      <div className="card" style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        minHeight: 200, gap: 16,
+      }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: '50%',
+          background: 'rgba(139,92,246,0.15)', border: '2px solid rgba(139,92,246,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 20, color: 'var(--accent-purple)' }} />
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+            正在评估方案...
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+            AI 正在对方案进行多维度评估，请稍候
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="card-title">
         <i className="fa-solid fa-wand-magic-sparkles" style={{ marginRight: 8, color: 'var(--accent-green)' }} />
         方案生成
+        <span style={{ marginLeft: 8, fontSize: 11, padding: '2px 8px', borderRadius: 10,
+          background: 'rgba(74,222,128,0.15)', color: 'var(--accent-green)' }}>
+          {solutions.length} 项
+        </span>
       </div>
+
+      {workflow?.status === 'awaiting_rating' && (
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
+          请对以下方案的可行性进行评分，评分后确认进入下一步
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {output.map((sol, i) => (
@@ -56,14 +102,22 @@ export function SolutionGenView({ output }: { output: SolutionItem[] | null }) {
             border: '1px solid var(--border-light)',
           }}>
             <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               marginBottom: 8, gap: 8,
             }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
                 方案 {i + 1}: {sol.title}
               </div>
-              {sol.confidenceScore !== undefined && (
-                <ConfidenceBar score={sol.confidenceScore} />
+              {workflow?.status === 'awaiting_rating' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer', flexShrink: 0 }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <span key={star}
+                      onClick={(e) => { e.stopPropagation(); setRatings(prev => ({ ...prev, [String(i)]: star })); }}
+                      style={{ fontSize: 18, color: star <= (ratings[String(i)] || 0) ? '#fbbf24' : 'rgba(255,255,255,0.15)' }}>
+                      <i className="fa-solid fa-star" />
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
 
@@ -89,15 +143,40 @@ export function SolutionGenView({ output }: { output: SolutionItem[] | null }) {
               </div>
             )}
 
-            {sol.patentReferences && sol.patentReferences.length > 0 && (
-              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <i className="fa-regular fa-copyright" style={{ fontSize: 9 }} />
-                参考专利: {sol.patentReferences.join('、')}
+            {sol.referencedPatents && sol.referencedPatents.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {sol.referencedPatents.map((patent, j) => (
+                  <span key={j} style={{
+                    padding: '2px 8px', borderRadius: 3, fontSize: 10,
+                    background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
+                    color: 'var(--accent-blue)',
+                  }}>
+                    <i className="fa-regular fa-copyright" style={{ marginRight: 4, fontSize: 9 }} />
+                    {patent}
+                  </span>
+                ))}
               </div>
             )}
           </div>
         ))}
       </div>
+
+      {workflow?.status === 'awaiting_rating' && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+          <button onClick={handleSubmit} disabled={!allRated || submitting || submitted}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 20px', borderRadius: 6, fontSize: 13,
+              background: !allRated || submitting ? 'var(--text-tertiary)' : submitted ? 'var(--accent-green)' : 'var(--accent)',
+              border: 'none', color: '#fff', cursor: !allRated || submitting ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+            }}>
+            {submitting ? <><i className="fa-solid fa-circle-notch fa-spin" /> 提交中...</>
+              : submitted ? <><i className="fa-solid fa-check" /> 已确认</>
+              : <><i className="fa-solid fa-check" /> 确认并进入下一步</>}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

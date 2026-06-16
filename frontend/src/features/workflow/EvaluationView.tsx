@@ -1,3 +1,6 @@
+import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '../../utils/constants';
+
 interface EvaluationScore {
   innovation: number;
   feasibility: number;
@@ -62,6 +65,12 @@ function OverallBadge({ overall }: { overall: number }) {
 }
 
 export function EvaluationView({ output }: { output: EvaluationItem[] | null }) {
+  const navigate = useNavigate();
+
+  const handleGoToConversion = () => {
+    navigate(ROUTES.PATENT_CONVERSION);
+  };
+
   if (!output || !Array.isArray(output) || output.length === 0) {
     return (
       <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
@@ -79,7 +88,12 @@ export function EvaluationView({ output }: { output: EvaluationItem[] | null }) 
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {output.map((item, i) => {
-          const { scores, overall, strengths, weaknesses, recommendations } = item.evaluation;
+          const evaluation = item.evaluation || {};
+          const scores = evaluation.scores || {};
+          const overall = evaluation.overall || 0;
+          const strengths = evaluation.strengths || [];
+          const weaknesses = evaluation.weaknesses || [];
+          const recommendations = evaluation.recommendations || [];
           const keys = Object.keys(scores) as (keyof EvaluationScore)[];
 
           return (
@@ -121,13 +135,26 @@ export function EvaluationView({ output }: { output: EvaluationItem[] | null }) 
                 <div style={{ marginTop: 8, padding: 8, borderRadius: 6, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)' }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-blue)', marginBottom: 4 }}>建议</div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                    {recommendations.map((r, j) => <div key={j}>• {r}</div>)}
+                    {recommendations.map((r, j) => <div key={j}>- {r}</div>)}
                   </div>
                 </div>
               )}
             </div>
           );
         })}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+        <button onClick={handleGoToConversion}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '8px 20px', borderRadius: 6, fontSize: 13,
+            background: 'var(--accent)',
+            border: 'none', color: '#fff', cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}>
+          <i className="fa-solid fa-file-contract" /> 进入专利转化
+        </button>
       </div>
     </div>
   );

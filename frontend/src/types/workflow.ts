@@ -2,7 +2,8 @@ export type AgentType = 'problem_analysis' | 'patent_search' | 'solution_gen' | 
 export type AgentStatus = 'pending' | 'running' | 'completed' | 'failed';
 
 export interface AgentStep {
-  agentId: string;
+  agentId?: string;
+  agent_id?: string;
   agentType: AgentType;
   agentLabel: string;
   status: AgentStatus;

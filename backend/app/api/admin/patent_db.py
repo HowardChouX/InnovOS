@@ -1,8 +1,9 @@
-import json, os, shutil
+import json, os, shutil, re
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from pydantic import BaseModel
 from app.database import get_db
 from app.auth import get_current_user, require_admin
+from app.algorithm.patent_search_engine import PatentSearchEngine
 
 router = APIRouter(prefix="/patents", tags=["admin-patent-db"])
 
@@ -20,7 +21,7 @@ class PatentCreate(BaseModel):
     publication_date: str = ""
     patent_number: str = ""
     publication_number: str = ""
-    priority_number: str = ""
+    
     ipc_codes: list[str] = []
     claims: str = ""
     description: str = ""
@@ -41,7 +42,7 @@ def row_to_patent(r):
         "publicationDate": r["publication_date"],
         "patentNumber": r["patent_number"],
         "publicationNumber": r["publication_number"],
-        "priorityNumber": r["priority_number"],
+
         "ipcCodes": json.loads(r["ipc_codes"]) if isinstance(r["ipc_codes"], str) else r["ipc_codes"],
         "claims": r["claims"],
         "description": r["description"],
@@ -96,16 +97,16 @@ def create_patent(body: PatentCreate, user: dict = Depends(require_admin)):
         raise HTTPException(503, "数据库未连接")
     cur = db.execute(
         """INSERT INTO patents (title, abstract, applicants, inventors, filing_date,
-           publication_date, patent_number, publication_number, priority_number,
+           publication_date, patent_number, publication_number,
            ipc_codes, claims, description)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            RETURNING id""",
         [
             body.title, body.abstract,
             json.dumps(body.applicants, ensure_ascii=False),
             json.dumps(body.inventors, ensure_ascii=False),
             body.filing_date, body.publication_date,
-            body.patent_number, body.publication_number, body.priority_number,
+            body.patent_number, body.publication_number,
             json.dumps(body.ipc_codes, ensure_ascii=False),
             body.claims, body.description,
         ],
@@ -116,6 +117,13 @@ def create_patent(body: PatentCreate, user: dict = Depends(require_admin)):
     row_id = row["id"]
     db.commit()
     patent = db.execute("SELECT * FROM patents WHERE id = ?", [row_id]).fetchone()
+    # 异步嵌入
+    import asyncio
+    try:
+        engine = PatentSearchEngine()
+        asyncio.create_task(engine.index_patent(row_id, body.title or "", body.abstract or "", body.claims or ""))
+    except Exception:
+        pass
     return row_to_patent(patent)
 
 
@@ -129,14 +137,14 @@ def update_patent(patent_id: int, body: PatentUpdate, user: dict = Depends(requi
     db.execute(
         """UPDATE patents SET title=?, abstract=?, applicants=?, inventors=?,
            filing_date=?, publication_date=?, patent_number=?, publication_number=?,
-           priority_number=?, ipc_codes=?, claims=?, description=?
+           ipc_codes=?, claims=?, description=?
            WHERE id=?""",
         [
             body.title, body.abstract,
             json.dumps(body.applicants, ensure_ascii=False),
             json.dumps(body.inventors, ensure_ascii=False),
             body.filing_date, body.publication_date,
-            body.patent_number, body.publication_number, body.priority_number,
+            body.patent_number, body.publication_number,
             json.dumps(body.ipc_codes, ensure_ascii=False),
             body.claims, body.description,
             patent_id,
@@ -144,6 +152,12 @@ def update_patent(patent_id: int, body: PatentUpdate, user: dict = Depends(requi
     )
     db.commit()
     patent = db.execute("SELECT * FROM patents WHERE id = ?", [patent_id]).fetchone()
+    import asyncio
+    try:
+        engine = PatentSearchEngine()
+        asyncio.create_task(engine.index_patent(patent_id, body.title or "", body.abstract or "", body.claims or ""))
+    except Exception:
+        pass
     return row_to_patent(patent)
 
 
@@ -166,21 +180,28 @@ def import_patents(patents: list[PatentCreate], user: dict = Depends(require_adm
     for p in patents:
         db.execute(
             """INSERT INTO patents (title, abstract, applicants, inventors, filing_date,
-               publication_date, patent_number, publication_number, priority_number,
+               publication_date, patent_number, publication_number,
                ipc_codes, claims, description)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 p.title, p.abstract,
                 json.dumps(p.applicants, ensure_ascii=False),
                 json.dumps(p.inventors, ensure_ascii=False),
                 p.filing_date, p.publication_date,
-                p.patent_number, p.publication_number, p.priority_number,
+                p.patent_number, p.publication_number,
                 json.dumps(p.ipc_codes, ensure_ascii=False),
                 p.claims, p.description,
             ],
         )
         imported += 1
     db.commit()
+    # 后台回填向量
+    import asyncio
+    try:
+        engine = PatentSearchEngine()
+        asyncio.create_task(engine.backfill())
+    except Exception:
+        pass
     return {"message": f"成功导入 {imported} 条专利", "count": imported}
 
 
@@ -190,48 +211,67 @@ async def upload_patent_pdf(
     mode: str = Form("pdfminer"),
     user: dict = Depends(require_admin),
 ):
-    """上传专利 PDF → 提取文字 → 结构化字段 → 存入数据库
+    """上传专利 PDF → pdfminer 提取 → 正则提取结构化字段
 
     mode: pdfminer | paddleocr | deepseek
     """
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "仅支持 PDF 文件")
 
-    # 保存 PDF
     safe_name = f"{user['id']}_{int(__import__('time').time())}_{file.filename}"
     pdf_path = os.path.join(PATENT_PDF_DIR, safe_name)
     with open(pdf_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    # 提取文字
     from app.algorithm.file_parser import parse_file
     parsed = parse_file(pdf_path, mode=mode)
+    full_text = parsed.get("content", "") or ""
 
-    # 提取结构化字段
     from app.algorithm.patent_extractor import extract_patent_fields
-    fields = extract_patent_fields(parsed["content"])
+    fields = extract_patent_fields(full_text)
     fields.pop("_missing", None)
 
-    # 写入数据库
+    # AI 增强：生成干净的标题+摘要用于展示（用 extract_model，单次）
+    ai_title = fields.get("title", "") or ""
+    ai_abstract = fields.get("abstract", "") or ""
+    if len(full_text) > 200:
+        try:
+            from app.algorithm.model_resolver import model_resolver
+            from app.algorithm.ai_client import chat_completion
+            s = model_resolver.get_assigned_settings()
+            extract_id = s.get("extract_model") or ""
+            if extract_id and ":" in extract_id:
+                result = await chat_completion(
+                    system_prompt="你是一个专利分析助手。分析以下专利文本，输出JSON：{\"title\": \"简洁的专利名称\", \"summary\": \"50字以内的专利摘要\"}",
+                    user_prompt=full_text[:3000],
+                    response_format=dict, temperature=0.1, max_retries=1,
+                    model_id=extract_id,
+                )
+                if isinstance(result, dict):
+                    if result.get("title") and len(result["title"]) > 5:
+                        ai_title = result["title"].strip()
+                    if result.get("summary"):
+                        ai_abstract = result["summary"].strip()
+        except Exception:
+            pass
+
     db = get_db()
     if not db:
         raise HTTPException(503, "数据库未连接")
     cur = db.execute(
         """INSERT INTO patents (title, abstract, applicants, inventors, filing_date,
-           publication_date, patent_number, publication_number, priority_number,
+           publication_date, patent_number, publication_number,
            ipc_codes, claims, description)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           RETURNING id""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""",
         [
-            fields.get("title", file.filename) or file.filename,
-            fields.get("abstract", "") or "",
+            ai_title,
+            ai_abstract,
             json.dumps(fields.get("applicants", []), ensure_ascii=False),
             json.dumps(fields.get("inventors", []), ensure_ascii=False),
             fields.get("filing_date", "") or "",
             fields.get("publication_date", "") or "",
             fields.get("patent_number", "") or "",
             fields.get("publication_number", "") or "",
-            fields.get("priority_number", "") or "",
             json.dumps(fields.get("ipc_codes", []), ensure_ascii=False),
             fields.get("claims", "") or "",
             fields.get("description", "") or "",
@@ -244,27 +284,25 @@ async def upload_patent_pdf(
     db.commit()
     patent = db.execute("SELECT * FROM patents WHERE id = ?", [row_id]).fetchone()
 
-    # 异步触发 RAG 索引
     import asyncio
-    content_for_index = f"{fields.get('title', '')}\n{fields.get('abstract', '')}\n{fields.get('claims', '')}\n{fields.get('description', '')}"
-    if len(content_for_index) > 100:
-        asyncio.create_task(_index_patent_vectors(row_id, content_for_index))
+    # 向量化：优先用 abstract+claims，没有则用 pdfminer 全文
+    raw_text = fields.get("abstract", "") or ""
+    claims_text = fields.get("claims", "") or ""
+    content = f"{raw_text}\n{claims_text}" if raw_text or claims_text else full_text
+    if len(content) > 100:
+        asyncio.create_task(_index_patent_vectors(row_id, content[:1500]))
 
-    return {
-        **row_to_patent(patent),
-        "mode": mode,
-        "extractSource": parsed["type"],
-    }
+    return {**row_to_patent(patent), "mode": mode, "extractSource": parsed["type"]}
 
 
 async def _index_patent_vectors(patent_id: int, content: str):
-    """后台异步索引专利向量"""
+    """后台异步索引专利向量（使用 PatentSearchEngine）"""
     try:
-        from app.services.patent_rag_service import PatentRagService
-        svc = PatentRagService()
-        chunks = await svc.index_patent(patent_id, content)
+        from app.algorithm.patent_search_engine import PatentSearchEngine
+        engine = PatentSearchEngine()
+        await engine.index_patent_with_content(patent_id, content)
         logger = __import__("logging").getLogger(__name__)
-        logger.info(f"专利 {patent_id} RAG 索引完成: {chunks} 分块")
+        logger.info(f"专利 {patent_id} 向量索引完成")
     except Exception as e:
         logger = __import__("logging").getLogger(__name__)
-        logger.warning(f"专利 {patent_id} RAG 索引失败: {e}")
+        logger.warning(f"专利 {patent_id} 向量索引失败: {e}")

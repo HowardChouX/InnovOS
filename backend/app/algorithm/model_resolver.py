@@ -39,10 +39,10 @@ class ModelResolver:
         from app.database import get_db
         db = get_db()
         rows = db.execute(
-            "SELECT key, value FROM system_settings WHERE key IN ('chat_model','embedding_model','rerank_model')"
+            "SELECT key, value FROM system_settings WHERE key IN ('chat_model','embedding_model','rerank_model','ocr_model','extract_model')"
         ).fetchall()
         db.close()
-        result = {"chat_model": None, "embedding_model": None, "rerank_model": None}
+        result = {"chat_model": None, "embedding_model": None, "rerank_model": None, "ocr_model": None, "extract_model": None}
         for r in rows:
             result[r["key"]] = r["value"]
         return result

@@ -59,7 +59,7 @@ export function ModelEditDrawer({ open, onClose, providerId, model, onSave }: Pr
       <div style={{ width: 420, maxWidth: '90vw', background: 'var(--bg-card)', height: '100%', overflowY: 'auto', borderLeft: '1px solid var(--border)', padding: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{model.label || model.id}</div>
-          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
+          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><i className="fa-solid fa-xmark" /></button>
         </div>
 
         {/* 能力标签 */}

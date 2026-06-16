@@ -34,7 +34,7 @@ export default function KnowledgeEntityNameDialog({ title, open, onClose, onSubm
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>{title}</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 16 }}><i className="fa-solid fa-xmark" /></button>
         </div>
         <div style={{ padding: 16 }}>
           <input

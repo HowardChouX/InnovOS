@@ -14,6 +14,7 @@ export interface AssignedModels {
   embedding_model: string | null;
   rerank_model: string | null;
   ocr_model: string | null;
+  extract_model: string | null;
 }
 
 /** 按能力分组的可用模型 */

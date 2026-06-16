@@ -176,6 +176,28 @@ def init_patents(db):
     """)
 
 
+def init_patent_vectors(db):
+    """专利向量表 — 存储语义搜索所需的嵌入向量"""
+    from app.database import is_postgres
+    if is_postgres():
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS patent_vectors (
+                patent_id INTEGER PRIMARY KEY REFERENCES patents(id) ON DELETE CASCADE,
+                embedding vector(4096),
+                updated_at TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))
+            )
+        """)
+    else:
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS patent_vectors (
+                patent_id INTEGER PRIMARY KEY,
+                embedding TEXT,
+                updated_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+    logger.info("表 patent_vectors 已初始化")
+
+
 def init_evaluations(db):
     is_sql = _is_sqlite(db)
     pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
@@ -630,6 +652,7 @@ def init_all_tables(db):
     init_solutions(db)
     init_workflows(db)
     init_patents(db)
+    init_patent_vectors(db)
     init_evaluations(db)
     init_feedbacks(db)
     init_audit_logs(db)
