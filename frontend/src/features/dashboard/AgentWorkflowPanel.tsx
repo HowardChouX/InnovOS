@@ -140,6 +140,7 @@ function WorkflowProgressView() {
     patent_search: 'agent5',
     solution_gen: 'agent3',
     evaluation: 'agent4',
+    conversion: 'agent6',
   };
 
   return (

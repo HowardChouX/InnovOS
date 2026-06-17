@@ -1,5 +1,7 @@
-import { useNavigate } from 'react-router-dom';
-import { ROUTES } from '../../utils/constants';
+import { useState } from 'react';
+import { useWorkflowStore } from '../../store/useWorkflowStore';
+import { useTaskStore } from '../../store/useTaskStore';
+import { workflowApi } from '../../api/workflow';
 
 interface EvaluationScore {
   innovation: number;
@@ -65,11 +67,11 @@ function OverallBadge({ overall }: { overall: number }) {
 }
 
 export function EvaluationView({ output }: { output: EvaluationItem[] | null }) {
-  const navigate = useNavigate();
-
-  const handleGoToConversion = () => {
-    navigate(ROUTES.PATENT_CONVERSION);
-  };
+  const workflow = useWorkflowStore((s) => s.workflow);
+  const fetchWorkflow = useWorkflowStore((s) => s.fetchWorkflow);
+  const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   if (!output || !Array.isArray(output) || output.length === 0) {
     return (
@@ -78,6 +80,20 @@ export function EvaluationView({ output }: { output: EvaluationItem[] | null }) 
       </div>
     );
   }
+
+  const handleSubmit = async () => {
+    if (!selectedTaskId || submitting) return;
+    setSubmitting(true);
+    try {
+      await workflowApi.proceed(selectedTaskId);
+      setSubmitted(true);
+      fetchWorkflow(selectedTaskId);
+    } catch (err) {
+      console.error('确认失败:', err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -144,18 +160,30 @@ export function EvaluationView({ output }: { output: EvaluationItem[] | null }) 
         })}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-        <button onClick={handleGoToConversion}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '8px 20px', borderRadius: 6, fontSize: 13,
-            background: 'var(--accent)',
-            border: 'none', color: '#fff', cursor: 'pointer',
-            fontFamily: 'inherit',
-          }}>
-          <i className="fa-solid fa-file-contract" /> 进入专利转化
-        </button>
-      </div>
+      {workflow?.status === 'awaiting_rating' && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting || submitted}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 20px', borderRadius: 6, fontSize: 13,
+              background: submitting ? 'var(--text-tertiary)' : submitted ? 'var(--accent-green)' : 'var(--accent)',
+              border: 'none', color: '#fff',
+              cursor: submitting ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit', transition: 'all 0.15s',
+            }}
+          >
+            {submitting ? (
+              <><i className="fa-solid fa-circle-notch fa-spin" /> 提交中...</>
+            ) : submitted ? (
+              <><i className="fa-solid fa-check" /> 已确认</>
+            ) : (
+              <><i className="fa-solid fa-arrow-right" /> 确认并进入成果转化</>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

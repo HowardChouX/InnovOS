@@ -7,6 +7,7 @@ import { PatentSearchView } from './PatentSearchView';
 import { SolutionGenView } from './SolutionGenView';
 import { EvaluationView } from './EvaluationView';
 import { CompletedView } from './CompletedView';
+import { ConversionView } from './ConversionView';
 import type { WorkflowState } from '../../types/workflow';
 import { WORKFLOW_STEPS } from '../../types/workflow';
 
@@ -16,7 +17,7 @@ const PHASE_TO_AGENT: Record<string, string> = {
   patent_search: 'agent5',
   solution_gen: 'agent3',
   evaluation: 'agent4',
-  completed: 'agent6',
+  conversion: 'agent6',
 };
 
 function getStepOutput(workflow: WorkflowState, phaseId: string): any {
@@ -48,6 +49,7 @@ const PHASE_VIEWS: Record<string, React.ComponentType<{ output: any }>> = {
   patent_search: PatentSearchView,
   solution_gen: SolutionGenView,
   evaluation: EvaluationView,
+  conversion: ConversionView,
   completed: CompletedView,
 };
 
@@ -55,18 +57,18 @@ export function WorkflowStepResults() {
   const { workflow, currentPhase, phaseStatus } = useWorkflowStore();
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
 
-  // 等待评分时，显示最后一个已完成的阶段（让用户看到结果并确认）
+  // 等待评分或已完成时，显示最后一个已完成的阶段
   const displayPhase = useMemo(() => {
     if (!workflow) return currentPhase;
-    if (workflow.status === 'awaiting_rating') {
-      const order = ['demand_portrait', 'problem_modeling', 'patent_search', 'solution_gen', 'evaluation'];
+    const order = ['demand_portrait', 'problem_modeling', 'patent_search', 'solution_gen', 'evaluation', 'conversion'];
+    if (workflow.status === 'awaiting_rating' || workflow.status === 'completed') {
       let lastComplete = '';
       for (const phase of order) {
         if (phaseStatus[phase] === 'completed') {
           lastComplete = phase;
         }
       }
-      return lastComplete || 'demand_portrait';
+      return lastComplete || currentPhase;
     }
     return currentPhase;
   }, [workflow, currentPhase, phaseStatus]);

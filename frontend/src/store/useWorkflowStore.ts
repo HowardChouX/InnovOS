@@ -33,7 +33,7 @@ const AGENT_TO_PHASE: Record<string, string> = {
   agent5: 'patent_search',
   agent3: 'solution_gen',
   agent4: 'evaluation',
-  agent6: 'completed',
+  agent6: 'conversion',
 };
 
 // 默认 phaseStatus
@@ -43,6 +43,7 @@ const DEFAULT_PHASE_STATUS: Record<string, 'pending' | 'running' | 'completed' |
   patent_search: 'pending',
   solution_gen: 'pending',
   evaluation: 'pending',
+  conversion: 'pending',
 };
 
 /** 从 workflow.steps 同步 phaseStatus */
@@ -60,7 +61,7 @@ function syncPhaseStatus(steps: { agentId?: string; agent_id?: string; status: s
 
 /** 确定当前阶段：找到第一个 running 或 pending 的阶段 */
 function determineCurrentPhase(phaseStatus: Record<string, string>): string {
-  const order = ['demand_portrait', 'problem_modeling', 'patent_search', 'solution_gen', 'evaluation'];
+  const order = ['demand_portrait', 'problem_modeling', 'patent_search', 'solution_gen', 'evaluation', 'conversion'];
   for (const phase of order) {
     if (phaseStatus[phase] === 'running' || phaseStatus[phase] === 'pending') {
       return phase;

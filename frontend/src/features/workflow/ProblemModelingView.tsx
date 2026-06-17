@@ -54,6 +54,17 @@ export function ProblemModelingView({ output }: { output: any }) {
   const conflictNodes = (() => {
     if (!output) return [];
     const funcAnalysis = output.function_analysis;
+    if (funcAnalysis?.key_interactions?.length > 0) {
+      const harmful = funcAnalysis.key_interactions
+        .filter((ix: any) => ix.type === '有害')
+        .slice(0, 4);
+      if (harmful.length > 0) {
+        return harmful.map((ix: any) => ({
+          label: `${ix.tool} → ${ix.receiver}`,
+          sublabel: ix.verb?.slice(0, 18) || '',
+        }));
+      }
+    }
     if (funcAnalysis?.system_components?.length > 0) {
       return funcAnalysis.system_components.slice(0, 4).map((c: any) => ({
         label: c.name,

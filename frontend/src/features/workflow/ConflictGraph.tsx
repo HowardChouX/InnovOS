@@ -7,9 +7,9 @@ interface ConflictGraphProps {
 
 const POSITIONS: Array<{ cx: number; cy: number }> = [
   { cx: 200, cy: 40 },   // top
-  { cx: 360, cy: 120 },  // right
+  { cx: 370, cy: 120 },  // right
   { cx: 200, cy: 200 },  // bottom
-  { cx: 40, cy: 120 },   // left
+  { cx: 30, cy: 120 },   // left
 ];
 
 const CENTER = { cx: 200, cy: 120 };
@@ -76,14 +76,14 @@ export function ConflictGraph({ centerConflict, nodes }: ConflictGraphProps) {
           return (
             <g key={i}>
               <rect
-                x={pos.cx - 56} y={pos.cy - 26}
-                width={112} height={52}
+                x={pos.cx - 62} y={pos.cy - 26}
+                width={124} height={52}
                 rx={8}
                 fill={`${color}15`}
                 stroke={`${color}40`}
                 strokeWidth={1}
               />
-              <foreignObject x={pos.cx - 50} y={pos.cy - 24} width={100} height={48}>
+              <foreignObject x={pos.cx - 58} y={pos.cy - 24} width={116} height={48}>
                 <div
                   xmlns="http://www.w3.org/1999/xhtml"
                   style={{
