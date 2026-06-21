@@ -37,6 +37,7 @@ export function ProblemModelingView({ output }: { output: any }) {
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (output?.ratings) {
@@ -93,17 +94,18 @@ export function ProblemModelingView({ output }: { output: any }) {
 
   if (!workflow || (innovations.length === 0 && conflictNodes.length === 0)) {
     return (
-      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 0 }}>
         <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>暂无问题建模数据</span>
       </div>
     );
   }
 
-  if (submitted && workflow?.status === 'running') {
+  // 已确认 → 显示加载状态，直到组件因 phase 切换而卸载
+  if (submitted) {
     return (
       <div className="card" style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        minHeight: 200, gap: 16,
+        flex: 1, minHeight: 0, gap: 16,
       }}>
         <div style={{
           width: 48, height: 48, borderRadius: '50%',
@@ -140,13 +142,14 @@ export function ProblemModelingView({ output }: { output: any }) {
       fetchWorkflow(selectedTaskId);
     } catch (err) {
       console.error('提交评分失败:', err);
+      setSubmitError(err instanceof Error ? err.message : '提交评分失败');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, height: '100%', overflowY: 'auto' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minHeight: 0, overflowY: 'auto' }}>
       <div className="card" style={{ flexShrink: 0 }}>
         <div className="card-title">
           <i className="fa-solid fa-diagram-project" style={{ marginRight: 8, color: 'var(--accent-purple)' }} />
@@ -219,6 +222,11 @@ export function ProblemModelingView({ output }: { output: any }) {
           </>
         )}
 
+        {submitError && (
+          <div style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--accent-red)', fontSize: 12, marginTop: 8 }}>
+            {submitError}
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
           <button
             onClick={handleSubmit}

@@ -35,8 +35,16 @@ test:
 #  代码检查
 # ──────────────────────────────────────────────
 lint:
+	@echo "=== Linting frontend ==="
 	cd frontend && npm run lint
-	cd backend && python -m py_app/app --check
+	@echo "=== Linting backend (ruff) ==="
+	cd backend && uv run ruff check app/
+	@echo "=== Formatting check (black) ==="
+	cd backend && uv run black --check app/
+	@echo "=== Import sort check (isort) ==="
+	cd backend && uv run isort --check-only app/
+	@echo "=== Type check (mypy) ==="
+	cd backend && uv run mypy app/
 
 # ──────────────────────────────────────────────
 #  清理
@@ -54,3 +62,32 @@ install:
 
 build:
 	cd frontend && npm run build
+
+# ──────────────────────────────────────────────
+#  格式化
+# ──────────────────────────────────────────────
+format:
+	@echo "=== Formatting frontend (prettier) ==="
+	cd frontend && npx prettier --write "src/**/*.{ts,tsx,json,css}"
+	@echo "=== Formatting backend (black + isort + ruff) ==="
+	cd backend && uv run ruff check --fix app/
+	cd backend && uv run isort app/
+	cd backend && uv run black app/
+
+# ──────────────────────────────────────────────
+#  安全扫描
+# ──────────────────────────────────────────────
+security:
+	@echo "=== Bandit security scan ==="
+	cd backend && uv run bandit -c pyproject.toml -r app/
+	@echo "=== Safety dependency scan ==="
+	cd backend && uv run safety check --full-report
+
+# ──────────────────────────────────────────────
+#  Pre-commit 安装
+# ──────────────────────────────────────────────
+setup-hooks:
+	@echo "=== Installing pre-commit hooks ==="
+	cd backend && uv run pre-commit install
+	@echo "=== Installing husky hooks ==="
+	cd frontend && npx husky init

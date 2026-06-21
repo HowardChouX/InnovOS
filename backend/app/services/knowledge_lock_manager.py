@@ -6,7 +6,7 @@ Knowledge Lock Manager — 完全复现 CherryStudio KnowledgeLockManager
 - 序列化同库变更
 """
 import asyncio
-from typing import Callable, TypeVar
+from typing import Awaitable, Callable, TypeVar
 
 T = TypeVar("T")
 
@@ -23,12 +23,15 @@ class KnowledgeLockManager:
             self._base_mutexes[base_id] = asyncio.Lock()
         return self._base_mutexes[base_id]
 
-    async def with_base_mutation_lock(self, base_id: str, task: Callable[[], T]) -> T:
+    async def with_base_mutation_lock(self, base_id: str, task: Callable[[], T] | Callable[[], Awaitable[T]]) -> T:
         """在基变更锁下执行任务"""
         mutex = self._get_mutex(base_id)
         async with mutex:
             try:
-                return await task()
+                result = task()
+                if isinstance(result, Awaitable):
+                    return await result
+                return result
             finally:
                 self._delete_idle_mutex(base_id, mutex)
 

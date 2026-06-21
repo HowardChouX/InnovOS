@@ -23,7 +23,7 @@ export interface SolutionWithEval {
   evaluation: Record<string, number>;
 }
 
-export interface ConversionData {
+export interface HistorySolutionsData {
   taskId: string;
   taskTitle: string;
   taskDescription: string;
@@ -44,9 +44,9 @@ export interface InfringementResult {
   keyRecommendations: string[];
 }
 
-export const conversionApi = {
-  async getData(taskId: string): Promise<ConversionData> {
-    const res = await apiRequest<{ data: ConversionData }>(`/api/conversion/${taskId}`);
+export const historySolutionsApi = {
+  async getData(taskId: string): Promise<HistorySolutionsData> {
+    const res = await apiRequest<{ data: HistorySolutionsData }>(`/api/conversion/${taskId}`);
     return res.data;
   },
 

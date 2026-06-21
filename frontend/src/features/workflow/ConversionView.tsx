@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTaskStore } from '../../store/useTaskStore';
-import { conversionApi } from '../../api/conversion';
-import type { ConversionData, SolutionWithEval, InfringementResult } from '../../api/conversion';
+import { historySolutionsApi } from '../../api/historySolutions';
+import type { HistorySolutionsData, SolutionWithEval, InfringementResult } from '../../api/historySolutions';
 
 const SCORE_LABELS: Record<string, string> = {
   innovation: '创新性',
@@ -260,13 +260,14 @@ function SolutionCard({
   );
 }
 
-export function ConversionView({ output }: { output: any }) {
+export function ConversionView({ output: _output }: { output: any }) {
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
-  const [data, setData] = useState<ConversionData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<HistorySolutionsData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [analyzingAll, setAnalyzingAll] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<Record<string, InfringementResult>>({});
+  const [analysisFailed, setAnalysisFailed] = useState<string[]>([]);
 
   useEffect(() => {
     if (!selectedTaskId) {
@@ -278,23 +279,30 @@ export function ConversionView({ output }: { output: any }) {
     setLoading(true);
     setError('');
     setAnalysisResults({});
-    conversionApi.getData(selectedTaskId)
+    setAnalysisFailed([]);
+    historySolutionsApi.getData(selectedTaskId)
       .then((d) => {
         setData(d);
-        if (d.solutions.length > 0) {
+        if (d.solutions.length > 0 && d.solutions.some(s => s.refPatents.length > 0)) {
           setAnalyzingAll(true);
           Promise.allSettled(
             d.solutions.map((sol) =>
-              conversionApi.checkInfringement(sol.id).then((result) => ({ id: sol.id, result }))
+              historySolutionsApi.checkInfringement(sol.id)
+                .then((result) => ({ id: sol.id, result }))
+                .catch(() => ({ id: sol.id, result: null }))
             )
           ).then((outcomes) => {
             const results: Record<string, InfringementResult> = {};
+            const failed: string[] = [];
             outcomes.forEach((o) => {
-              if (o.status === 'fulfilled') {
+              if (o.status === 'fulfilled' && o.value.result) {
                 results[o.value.id] = o.value.result;
+              } else {
+                failed.push(o.status === 'fulfilled' ? o.value.id : 'unknown');
               }
             });
             setAnalysisResults(results);
+            setAnalysisFailed(failed);
           }).finally(() => setAnalyzingAll(false));
         }
       })
@@ -304,7 +312,7 @@ export function ConversionView({ output }: { output: any }) {
 
   if (loading) {
     return (
-      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 0 }}>
         <div style={{ textAlign: 'center' }}>
           <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 24, color: 'var(--accent-blue)', marginBottom: 12, display: 'block' }} />
           <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>加载成果转化数据...</span>
@@ -315,7 +323,7 @@ export function ConversionView({ output }: { output: any }) {
 
   if (error) {
     return (
-      <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200, gap: 12 }}>
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 0, gap: 12 }}>
         <i className="fa-solid fa-circle-exclamation" style={{ fontSize: 24, color: 'var(--accent-red)' }} />
         <span style={{ fontSize: 13, color: 'var(--accent-red)' }}>{error}</span>
       </div>
@@ -324,7 +332,7 @@ export function ConversionView({ output }: { output: any }) {
 
   if (!data || data.solutions.length === 0) {
     return (
-      <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200, gap: 12 }}>
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 0, gap: 12 }}>
         <i className="fa-solid fa-folder-open" style={{ fontSize: 32, color: 'var(--text-tertiary)', opacity: 0.3 }} />
         <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>该任务暂无成果转化数据</span>
       </div>
@@ -346,6 +354,28 @@ export function ConversionView({ output }: { output: any }) {
         <i className="fa-solid fa-circle-info" style={{ marginRight: 4 }} />
         对每个方案进行「侵权分析」，检查方案是否与参考专利存在技术重叠，并获取规避设计建议，避免专利侵权风险。
       </div>
+
+      {analysisFailed.length > 0 && (
+        <div style={{
+          padding: '8px 12px', borderRadius: 6, fontSize: 12,
+          background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.15)',
+          color: 'var(--accent-red)', lineHeight: 1.5,
+        }}>
+          <i className="fa-solid fa-circle-exclamation" style={{ marginRight: 4 }} />
+          {analysisFailed.length} 个方案的侵权分析暂时不可用，请确认已配置可用的对话模型后刷新重试
+        </div>
+      )}
+
+      {!analyzingAll && data.solutions.every(s => s.refPatents.length === 0) && (
+        <div style={{
+          padding: '8px 12px', borderRadius: 6, fontSize: 12,
+          background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.15)',
+          color: 'var(--accent-yellow)', lineHeight: 1.5,
+        }}>
+          <i className="fa-solid fa-circle-info" style={{ marginRight: 4 }} />
+          当前方案暂无关联的参考专利数据（分析流程中专利搜索未匹配到相关专利），侵权分析无法进行
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {data.solutions.map((sol) => (

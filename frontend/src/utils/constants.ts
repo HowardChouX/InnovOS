@@ -4,7 +4,7 @@ export const ROUTES = {
   KNOWLEDGE: '/knowledge',
   MONITOR: '/monitor',
   HISTORY: '/history',
-  PATENT_CONVERSION: '/patent-conversion',
+  HISTORY_SOLUTIONS: '/history-solutions',
   WORKFLOW_DEMAND: '/workflow/demand',
   WORKFLOW_MODELING: '/workflow/modeling',
   ADMIN_KEYS: '/admin/keys',
@@ -14,9 +14,9 @@ export const ROUTES = {
 
 export const NAV_ITEMS = [
   { label: '首页', path: ROUTES.HOME, icon: 'fa-house' },
+  { label: '历史方案库', path: ROUTES.HISTORY_SOLUTIONS, icon: 'fa-clock-rotate-left' },
   { label: '知识库', path: ROUTES.KNOWLEDGE, icon: 'fa-book' },
   { label: '专利检索', path: ROUTES.PATENTS, icon: 'fa-file-alt' },
-  { label: '成果转化', path: ROUTES.PATENT_CONVERSION, icon: 'fa-file-contract' },
 ] as const;
 
 export const TASK_STATUS_MAP: Record<string, { label: string; color: string }> = {

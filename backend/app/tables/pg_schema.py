@@ -1,52 +1,37 @@
 """
-Database schema — dual-mode: PostgreSQL / SQLite.
-
-Auto-detects backend from the connection object.
-PostgreSQL:
-  - SERIAL PRIMARY KEY, to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')
-  - information_schema.columns for migration
-SQLite:
-  - INTEGER PRIMARY KEY AUTOINCREMENT, datetime('now')
-  - PRAGMA table_info for migration
+Database schema — PostgreSQL only.
+Uses SERIAL PRIMARY KEY, to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
+and information_schema.columns for migration.
 """
 import json
 import logging
-import sqlite3
 
 logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════
-#  Backend detection helpers
+#  DDL helpers
 # ═══════════════════════════════════════════════════════════════
 
-def _is_sqlite(db) -> bool:
-    return isinstance(db._conn, sqlite3.Connection)
+def _ddl_int_pk() -> str:
+    """Primary key type: SERIAL PRIMARY KEY for PG."""
+    return "SERIAL PRIMARY KEY"
 
 
-def _serial(prefix: str = "") -> str:
-    return f"{prefix}INTEGER PRIMARY KEY AUTOINCREMENT"  # fallback for non-PG
-
-
-def _now() -> str:
-    return "datetime('now')"
+def _ddl_now() -> str:
+    """Default timestamp expression for PG."""
+    return "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
 
 
 def _ensure_columns(db, table: str, columns: list[tuple[str, str]]):
-    """确保表中存在指定列，缺失则添加（兼容 SQLite + PostgreSQL）。"""
-    if _is_sqlite(db):
-        existing = {
-            r["name"]
-            for r in db.execute(f"PRAGMA table_info({table})").fetchall()
-        }
-    else:
-        existing = {
-            r["column_name"]
-            for r in db.execute(
-                "SELECT column_name FROM information_schema.columns WHERE table_name=%s",
-                (table,),
-            ).fetchall()
-        }
+    """确保表中存在指定列，缺失则添加（PostgreSQL）。"""
+    existing = {
+        r["column_name"]
+        for r in db.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name=%s",
+            (table,),
+        ).fetchall()
+    }
     for col_name, col_def in columns:
         if col_name not in existing:
             try:
@@ -56,24 +41,13 @@ def _ensure_columns(db, table: str, columns: list[tuple[str, str]]):
                 logger.warning(f"  无法添加列 {table}.{col_name}: {e}")
 
 
-def _ddl_int_pk() -> str:
-    """Primary key type: SERIAL for PG, INTEGER for SQLite."""
-    return "SERIAL PRIMARY KEY"
-
-
-def _ddl_now() -> str:
-    """Default timestamp expression."""
-    return "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
-
-
 # ═══════════════════════════════════════════════════════════════
 #  Per-table DDL
 # ═══════════════════════════════════════════════════════════════
 
 def init_users(db):
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
-    now = "datetime('now')" if is_sql else "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
+    pk = _ddl_int_pk()
+    now = _ddl_now()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS users (
             id {pk},
@@ -93,9 +67,8 @@ def init_users(db):
 
 
 def init_tasks(db):
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
-    now = "datetime('now')" if is_sql else "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
+    pk = _ddl_int_pk()
+    now = _ddl_now()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS tasks (
             id {pk},
@@ -111,8 +84,7 @@ def init_tasks(db):
 
 
 def init_analyses(db):
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
+    pk = _ddl_int_pk()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS analyses (
             id {pk},
@@ -126,8 +98,7 @@ def init_analyses(db):
 
 
 def init_solutions(db):
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
+    pk = _ddl_int_pk()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS solutions (
             id {pk},
@@ -143,9 +114,8 @@ def init_solutions(db):
 
 
 def init_workflows(db):
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
-    now = "datetime('now')" if is_sql else "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
+    pk = _ddl_int_pk()
+    now = _ddl_now()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS workflows (
             id {pk},
@@ -158,8 +128,7 @@ def init_workflows(db):
 
 
 def init_patents(db):
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
+    pk = _ddl_int_pk()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS patents (
             id {pk},
@@ -178,30 +147,19 @@ def init_patents(db):
 
 def init_patent_vectors(db):
     """专利向量表 — 存储语义搜索所需的嵌入向量"""
-    from app.database import is_postgres
-    if is_postgres():
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS patent_vectors (
-                patent_id INTEGER PRIMARY KEY REFERENCES patents(id) ON DELETE CASCADE,
-                embedding vector(4096),
-                updated_at TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))
-            )
-        """)
-    else:
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS patent_vectors (
-                patent_id INTEGER PRIMARY KEY,
-                embedding TEXT,
-                updated_at TEXT DEFAULT (datetime('now'))
-            )
-        """)
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS patent_vectors (
+            patent_id INTEGER PRIMARY KEY REFERENCES patents(id) ON DELETE CASCADE,
+            embedding vector(4096),
+            updated_at TEXT DEFAULT ({_ddl_now()})
+        )
+    """)
     logger.info("表 patent_vectors 已初始化")
 
 
 def init_evaluations(db):
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
-    now = "datetime('now')" if is_sql else "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
+    pk = _ddl_int_pk()
+    now = _ddl_now()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS evaluations (
             id {pk},
@@ -231,9 +189,8 @@ def init_evaluations(db):
 
 
 def init_feedbacks(db):
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
-    now = "datetime('now')" if is_sql else "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
+    pk = _ddl_int_pk()
+    now = _ddl_now()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS feedbacks (
             id {pk},
@@ -249,9 +206,8 @@ def init_feedbacks(db):
 
 
 def init_audit_logs(db):
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
-    now = "datetime('now')" if is_sql else "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
+    pk = _ddl_int_pk()
+    now = _ddl_now()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS audit_logs (
             id {pk},
@@ -268,9 +224,8 @@ def init_audit_logs(db):
 
 
 def init_api_keys(db):
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
-    now = "datetime('now')" if is_sql else "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
+    pk = _ddl_int_pk()
+    now = _ddl_now()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS api_keys (
             id {pk},
@@ -295,9 +250,8 @@ def init_api_keys(db):
 
 
 def init_notifications(db):
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
-    now = "datetime('now')" if is_sql else "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
+    pk = _ddl_int_pk()
+    now = _ddl_now()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS notifications (
             id {pk},
@@ -316,8 +270,7 @@ def init_notifications(db):
 
 
 def init_knowledge_bases(db):
-    is_sql = _is_sqlite(db)
-    now = "datetime('now')" if is_sql else "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
+    now = _ddl_now()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS knowledge_bases (
             id TEXT PRIMARY KEY,
@@ -343,8 +296,7 @@ def init_knowledge_bases(db):
 
 
 def init_knowledge_items(db):
-    is_sql = _is_sqlite(db)
-    now = "datetime('now')" if is_sql else "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
+    now = _ddl_now()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS knowledge_items (
             id TEXT PRIMARY KEY,
@@ -369,60 +321,34 @@ def init_knowledge_items(db):
 
 
 def init_knowledge_items_pgvector(db):
-    """向量存储 — Cherry Studio 模式：base_id + item_id 关联 knowledge_items。"""
-    is_sql = _is_sqlite(db)
-    if is_sql:
-        logger.info("SQLite vector store — base_id + item_id schema")
-        now = "datetime('now')"
-        db.execute(f"""
-            CREATE TABLE IF NOT EXISTS knowledge_vectors (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                base_id TEXT NOT NULL,
-                item_id TEXT NOT NULL,
-                chunk_index INTEGER NOT NULL DEFAULT 0,
-                text TEXT NOT NULL,
-                embedding BLOB,
-                created_at TEXT DEFAULT ({now})
-            );
-        """)
-        db.execute("""
-            CREATE INDEX IF NOT EXISTS idx_knowledge_vectors_base_item
-            ON knowledge_vectors(base_id, item_id);
-        """)
-        db.execute("""
-            CREATE INDEX IF NOT EXISTS idx_knowledge_vectors_user_base
-            ON knowledge_vectors(user_id, base_id);
-        """)
-    else:
-        db.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-        now = "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
-        db.execute(f"""
-            CREATE TABLE IF NOT EXISTS knowledge_vectors (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                base_id TEXT NOT NULL,
-                item_id TEXT NOT NULL,
-                chunk_index INTEGER NOT NULL DEFAULT 0,
-                text TEXT NOT NULL,
-                embedding vector(4096),
-                created_at TEXT DEFAULT ({now})
-            );
-        """)
-        db.execute("""
-            CREATE INDEX IF NOT EXISTS idx_knowledge_vectors_base_item
-            ON knowledge_vectors(base_id, item_id);
-        """)
-        db.execute("""
-            CREATE INDEX IF NOT EXISTS idx_knowledge_vectors_user_base
-            ON knowledge_vectors(user_id, base_id);
-        """)
+    """向量存储 — pgvector 模式：base_id + item_id 关联 knowledge_items。"""
+    db.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+    now = _ddl_now()
+    db.execute(f"""
+        CREATE TABLE IF NOT EXISTS knowledge_vectors (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            base_id TEXT NOT NULL,
+            item_id TEXT NOT NULL,
+            chunk_index INTEGER NOT NULL DEFAULT 0,
+            text TEXT NOT NULL,
+            embedding vector(4096),
+            created_at TEXT DEFAULT ({now})
+        );
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_knowledge_vectors_base_item
+        ON knowledge_vectors(base_id, item_id);
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_knowledge_vectors_user_base
+        ON knowledge_vectors(user_id, base_id);
+    """)
 
 
 def init_knowledge_jobs(db):
     """知识库作业表 — 用于作业系统的持久化和崩溃恢复"""
-    is_sql = _is_sqlite(db)
-    now = "datetime('now')" if is_sql else "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
+    now = _ddl_now()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS knowledge_jobs (
             id TEXT PRIMARY KEY,
@@ -452,8 +378,7 @@ def init_knowledge_jobs(db):
 
 
 def init_knowledge_groups(db):
-    is_sql = _is_sqlite(db)
-    now = "datetime('now')" if is_sql else "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
+    now = _ddl_now()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS knowledge_groups (
             id TEXT PRIMARY KEY,
@@ -466,9 +391,8 @@ def init_knowledge_groups(db):
 
 
 def init_knowledge_docs(db):
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
-    now = "datetime('now')" if is_sql else "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
+    pk = _ddl_int_pk()
+    now = _ddl_now()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS knowledge_docs (
             id {pk},
@@ -488,8 +412,7 @@ def init_knowledge_docs(db):
 
 
 def init_problem_modelings(db):
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
+    pk = _ddl_int_pk()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS problem_modelings (
             id {pk},
@@ -505,9 +428,8 @@ def init_problem_modelings(db):
 
 def init_system_settings(db):
     """system_settings 表 — 全局键值配置（如默认模型分配）。"""
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
-    now = "datetime('now')" if is_sql else "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
+    pk = _ddl_int_pk()
+    now = _ddl_now()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS system_settings (
             id {pk},
@@ -520,8 +442,7 @@ def init_system_settings(db):
 
 def init_models(db):
     """models 表 — 独立模型配置（替代 model_providers.models JSON 列）。"""
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
+    pk = _ddl_int_pk()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS models (
             id {pk},
@@ -538,7 +459,6 @@ def init_models(db):
             metadata TEXT DEFAULT '{{}}'
         );
     """)
-    # Add unique constraint separately for SQLite compatibility
     try:
         db.execute("""
             CREATE UNIQUE INDEX IF NOT EXISTS idx_models_provider_model
@@ -551,15 +471,9 @@ def init_models(db):
 
 def _migrate_models_from_json_column(db):
     """从 model_providers.models JSON 列迁移数据到 models 表（幂等）。"""
-    is_sql = _is_sqlite(db)
-    if is_sql:
-        rows = db.execute(
-            "SELECT provider_id, models FROM model_providers WHERE models IS NOT NULL AND models != '[]'"
-        ).fetchall()
-    else:
-        rows = db.execute(
-            "SELECT provider_id, models FROM model_providers WHERE models IS NOT NULL AND models::text != '[]'"
-        ).fetchall()
+    rows = db.execute(
+        "SELECT provider_id, models FROM model_providers WHERE models IS NOT NULL AND models::text != '[]'"
+    ).fetchall()
     migrated = 0
     for row in rows:
         pid = row["provider_id"]
@@ -570,19 +484,12 @@ def _migrate_models_from_json_column(db):
                 continue
             caps = json.dumps(entry.get("capabilities", [])) if isinstance(entry, dict) else "[]"
             try:
-                if is_sql:
-                    db.execute(
-                        """INSERT OR IGNORE INTO models (provider_id, model_id, capabilities)
-                           VALUES (?, ?, ?)""",
-                        (pid, mid, caps),
-                    )
-                else:
-                    db.execute(
-                        """INSERT INTO models (provider_id, model_id, capabilities)
-                           VALUES (?, ?, ?)
-                           ON CONFLICT (provider_id, model_id) DO NOTHING""",
-                        (pid, mid, caps),
-                    )
+                db.execute(
+                    """INSERT INTO models (provider_id, model_id, capabilities)
+                       VALUES (%s, %s, %s)
+                       ON CONFLICT (provider_id, model_id) DO NOTHING""",
+                    (pid, mid, caps),
+                )
                 migrated += 1
             except Exception as e:
                 logger.warning(f"迁移 models 数据失败: {pid}/{mid}: {e}")
@@ -591,9 +498,8 @@ def _migrate_models_from_json_column(db):
 
 
 def init_model_providers(db):
-    is_sql = _is_sqlite(db)
-    pk = "INTEGER PRIMARY KEY AUTOINCREMENT" if is_sql else "SERIAL PRIMARY KEY"
-    now = "datetime('now')" if is_sql else "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"
+    pk = _ddl_int_pk()
+    now = _ddl_now()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS model_providers (
             id {pk},
@@ -623,16 +529,8 @@ def init_model_providers(db):
     ])
     # 迁移：删除废弃的 priority 列
     try:
-        is_sql = _is_sqlite(db)
-        if is_sql:
-            # Check if column exists before dropping
-            cols = {r["name"] for r in db.execute("PRAGMA table_info(model_providers)").fetchall()}
-            if "priority" in cols:
-                db.execute("ALTER TABLE model_providers DROP COLUMN priority")
-                logger.info("  - 移除 model_providers.priority 列")
-        else:
-            db.execute("ALTER TABLE model_providers DROP COLUMN IF EXISTS priority")
-            logger.info("  - 移除 model_providers.priority 列")
+        db.execute("ALTER TABLE model_providers DROP COLUMN IF EXISTS priority")
+        logger.info("  - 移除 model_providers.priority 列")
     except Exception as e:
         logger.warning(f"  无法移除 priority 列: {e}")
 
@@ -643,9 +541,7 @@ def init_model_providers(db):
 
 def init_all_tables(db):
     """按依赖顺序初始化所有表。"""
-    is_sql = _is_sqlite(db)
-    backend = "SQLite" if is_sql else "PostgreSQL"
-    logger.info(f"Initializing {backend} schema...")
+    logger.info("Initializing PostgreSQL schema...")
     init_users(db)
     init_tasks(db)
     init_analyses(db)
@@ -668,4 +564,4 @@ def init_all_tables(db):
     init_system_settings(db)
     init_model_providers(db)
     init_models(db)
-    logger.info(f"{backend} schema initialization complete")
+    logger.info("PostgreSQL schema initialization complete")

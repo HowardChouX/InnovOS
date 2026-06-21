@@ -72,10 +72,38 @@ export function EvaluationView({ output }: { output: EvaluationItem[] | null }) 
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // 已确认 → 显示加载状态（无论 workflow.status 是否已更新）
+  // 只要 submit 完成就立刻显示，直到组件因 phase 切换而卸载
+  if (submitted) {
+    return (
+      <div className="card" style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        flex: 1, minHeight: 0, gap: 16,
+      }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: '50%',
+          background: 'rgba(251,191,36,0.15)', border: '2px solid rgba(251,191,36,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 20, color: 'var(--accent-yellow)' }} />
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+            正在执行成果转化...
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+            AI 正在进行侵权风险分析与报告生成，请稍候
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!output || !Array.isArray(output) || output.length === 0) {
     return (
-      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 0 }}>
         <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>暂无评估数据</span>
       </div>
     );
@@ -90,6 +118,7 @@ export function EvaluationView({ output }: { output: EvaluationItem[] | null }) 
       fetchWorkflow(selectedTaskId);
     } catch (err) {
       console.error('确认失败:', err);
+      setSubmitError(err instanceof Error ? err.message : '确认失败');
     } finally {
       setSubmitting(false);
     }
@@ -160,6 +189,11 @@ export function EvaluationView({ output }: { output: EvaluationItem[] | null }) 
         })}
       </div>
 
+      {submitError && (
+        <div style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--accent-red)', fontSize: 12, marginTop: 8 }}>
+          {submitError}
+        </div>
+      )}
       {workflow?.status === 'awaiting_rating' && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
           <button

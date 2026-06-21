@@ -17,7 +17,7 @@ from app.services.knowledge_job_manager import (
     knowledge_idempotency_key,
 )
 from app.services.knowledge_orchestration_service import knowledge_orchestration_service
-from app.services.knowledge_service_v2 import KnowledgeBaseService
+from app.services.knowledge_base_service import KnowledgeBaseService
 from app.services.knowledge_item_service import KnowledgeItemService
 
 logger = logging.getLogger(__name__)
@@ -79,14 +79,14 @@ class UpdateBaseInput(BaseModel):
 
 @router.get("")
 def list_bases(page: int = 1, limit: int = 20, user: dict = Depends(get_current_user)):
-    result = KnowledgeBaseService.list_bases(user["id"], page=page, limit=limit)
+    result = KnowledgeBaseService.list(user["id"], page=page, limit=limit)
     return {"data": result, "message": "success", "code": 200}
 
 
 @router.post("")
 def create_base(body: CreateBaseInput, user: dict = Depends(get_current_user)):
     data = body.model_dump(exclude_unset=True)
-    result = KnowledgeBaseService.create_base(user["id"], data)
+    result = KnowledgeBaseService.create(user["id"], data)
     return {"data": result, "message": "created", "code": 200}
 
 
@@ -101,7 +101,7 @@ def get_base(base_id: str, user: dict = Depends(get_current_user)):
 @router.patch("/{base_id}")
 def update_base(base_id: str, body: UpdateBaseInput, user: dict = Depends(get_current_user)):
     data = {k: v for k, v in body.model_dump().items() if v is not None}
-    result = KnowledgeBaseService.update_base(user["id"], base_id, data)
+    result = KnowledgeBaseService.update(user["id"], base_id, data)
     if not result:
         raise HTTPException(status_code=404, detail="知识库不存在")
     return {"data": result, "message": "updated", "code": 200}
@@ -109,7 +109,7 @@ def update_base(base_id: str, body: UpdateBaseInput, user: dict = Depends(get_cu
 
 @router.delete("/{base_id}")
 def delete_base(base_id: str, user: dict = Depends(get_current_user)):
-    ok = KnowledgeBaseService.delete_base(user["id"], base_id)
+    ok = KnowledgeBaseService.delete(user["id"], base_id)
     if not ok:
         raise HTTPException(status_code=404, detail="知识库不存在")
     return {"message": "deleted", "code": 200}

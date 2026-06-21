@@ -10,30 +10,32 @@ export function PatentSearchView({ output }: { output: any }) {
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const patents = Array.isArray(output) ? output : (output?.patents || []);
 
   // 监听 workflow 状态变化，确认后进入 running 时重置 submitted 以显示加载状态
   useEffect(() => {
-    if (submitted && workflow?.status === 'running') {
+  // 已确认 → 显示加载状态，直到组件因 phase 切换而卸载
+  if (submitted) {
       // workflow 已经在运行下一步了，保持 submitted 状态让父组件切换视图
     }
   }, [submitted, workflow?.status]);
 
   if (!workflow || patents.length === 0) {
     return (
-      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 0 }}>
         <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>暂无专利数据</span>
       </div>
     );
   }
 
-  // 已确认且 workflow 正在运行下一步 → 显示加载状态
-  if (submitted && workflow?.status === 'running') {
+  // 已确认 → 显示加载状态，直到组件因 phase 切换而卸载
+  if (submitted) {
     return (
       <div className="card" style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        minHeight: 200, gap: 16,
+        flex: 1, minHeight: 0, gap: 16,
       }}>
         <div style={{
           width: 48, height: 48, borderRadius: '50%',
@@ -69,6 +71,7 @@ export function PatentSearchView({ output }: { output: any }) {
       fetchWorkflow(selectedTaskId);
     } catch (err) {
       console.error('提交评分失败:', err);
+      setSubmitError(err instanceof Error ? err.message : '提交评分失败');
     } finally {
       setSubmitting(false);
     }
@@ -121,6 +124,11 @@ export function PatentSearchView({ output }: { output: any }) {
         ))}
       </div>
 
+      {submitError && (
+        <div style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--accent-red)', fontSize: 12 }}>
+          {submitError}
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
         <button onClick={handleSubmit} disabled={!allRated || submitting || submitted}
           style={{

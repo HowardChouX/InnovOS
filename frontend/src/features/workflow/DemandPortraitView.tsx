@@ -83,9 +83,35 @@ export function DemandPortraitView({ output }: { output: any }) {
     });
   };
 
+  // 已确认 → 显示加载状态，直到组件因 phase 切换而卸载
+  if (submitted) {
+    return (
+      <div className="card" style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        flex: 1, minHeight: 0, gap: 16,
+      }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: '50%',
+          background: 'rgba(96,165,250,0.15)', border: '2px solid rgba(96,165,250,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 20, color: 'var(--accent-blue)' }} />
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+            正在进行问题建模...
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+            AI 正在根据需求进行问题建模，请稍候
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!workflow || allDemands.length === 0) {
     return (
-      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 0 }}>
         <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>暂无需求数据</span>
       </div>
     );

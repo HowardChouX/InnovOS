@@ -61,4 +61,39 @@ dev = [
     "PyPDF2>=3.0.0",
     "pdfminer.six>=20221105",
     "python-docx>=1.1.0",
+    "ruff>=0.11.0",
+    "mypy>=1.15.0",
+    "black>=25.0.0",
+    "isort>=6.0.0",
+    "pre-commit>=4.0.0",
+    "bandit>=1.8.0",
+    "safety>=3.0.0",
 ]
+
+# ── Ruff ──────────────────────────────────────────────
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM", "ARG", "C4", "PT"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# ── Mypy ──────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.10"
+strict = true
+ignore_missing_imports = true
+exclude = ["tests/", "migrations/"]
+
+# ── Black ─────────────────────────────────────────────
+[tool.black]
+line-length = 120
+target-version = ["py310"]
+
+# ── isort ─────────────────────────────────────────────
+[tool.isort]
+profile = "black"
+line_length = 120

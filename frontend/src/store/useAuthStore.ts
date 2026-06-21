@@ -34,7 +34,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
     try {
       const user = await authApi.me(token);
       set({ user, token, isAdmin: user.role === 'admin', loading: false });
-    } catch {
+    } catch (e) {
+      console.error('[useAuthStore] init failed:', e);
       localStorage.removeItem('token');
       set({ user: null, token: null, isAdmin: false, loading: false });
     }

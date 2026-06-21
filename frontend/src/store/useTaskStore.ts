@@ -10,6 +10,7 @@ interface TaskStore {
   totalPages: number;
   selectedTaskId: string | null;
   loading: boolean;
+  error: string | null;
   fetchTasks: (params?: { page?: number; search?: string; status?: string }) => Promise<void>;
   createTask: (input: CreateTaskInput) => Promise<Task | undefined>;
   updateTask: (id: string, input: UpdateTaskInput) => Promise<void>;
@@ -24,13 +25,15 @@ export const useTaskStore = create<TaskStore>((set) => ({
   totalPages: 1,
   selectedTaskId: null,
   loading: false,
+  error: null,
   fetchTasks: async (params) => {
     set({ loading: true });
     try {
       const res = await tasksApi.list({ pageSize: 50, ...params });
       set({ tasks: res.data, total: res.total, page: res.page, totalPages: res.totalPages, loading: false });
-    } catch {
-      set({ loading: false });
+    } catch (e) {
+      console.error('[useTaskStore] fetchTasks failed:', e);
+      set({ loading: false, error: e instanceof Error ? e.message : '获取任务列表失败' });
     }
   },
   createTask: async (input) => {
@@ -38,16 +41,16 @@ export const useTaskStore = create<TaskStore>((set) => ({
       const task = await tasksApi.create(input);
       set((s) => ({ tasks: [task, ...s.tasks], selectedTaskId: task.id }));
       return task;
-    } catch {
-      // silently fail
+    } catch (e) {
+      console.error('[useTaskStore] createTask failed:', e);
     }
   },
   updateTask: async (id, input) => {
     try {
       const task = await tasksApi.update(id, input);
       set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? task : t)) }));
-    } catch {
-      // silently fail
+    } catch (e) {
+      console.error('[useTaskStore] updateTask failed:', e);
     }
   },
   deleteTask: async (id) => {
@@ -64,8 +67,8 @@ export const useTaskStore = create<TaskStore>((set) => ({
           selectedTaskId: s.selectedTaskId === id ? (tasks[0]?.id ?? null) : s.selectedTaskId,
         };
       });
-    } catch {
-      // silently fail
+    } catch (e) {
+      console.error('[useTaskStore] deleteTask failed:', e);
     }
   },
   selectTask: (id: string) => set({ selectedTaskId: id }),

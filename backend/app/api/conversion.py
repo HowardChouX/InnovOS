@@ -1,10 +1,13 @@
 """成果转化 API — 专利侵权风险分析 + 规避设计建议"""
 
 import json
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from app.auth import get_current_user
 from app.database import get_db
 from app.algorithm.ai_client import chat_completion
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/conversion", tags=["conversion"])
 
@@ -222,4 +225,16 @@ async def check_infringement(solution_id: int, user: dict = Depends(get_current_
                 result = {"riskLevel": "分析失败", "riskScore": 0, "analysisSummary": result}
         return {"data": result, "message": "success", "code": 200}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"侵权分析失败: {str(e)}")
+        logger.warning(f"AI 侵权分析失败（返回友好提示）: {e}")
+        return {
+            "data": {
+                "riskLevel": "无法分析",
+                "riskScore": 0,
+                "analysisSummary": f"AI 分析服务暂不可用（{str(e)[:80]}），请确认已配置可用的对话模型",
+                "claimOverlaps": [],
+                "designArounds": [],
+                "keyRecommendations": ["配置 AI 模型服务后重新分析"],
+            },
+            "message": "success",
+            "code": 200,
+        }

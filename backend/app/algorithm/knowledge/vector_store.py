@@ -1,13 +1,12 @@
 """
 向量存储 — Cherry Studio 模式：base_id + item_id 关联 knowledge_items
 
-使用 pgvector（PostgreSQL）或 BLOB（SQLite）持久化向量。
+使用 pgvector（PostgreSQL）持久化向量。
 兼容原有 VectorStore 接口，新增 replaceByExternalId 语义。
 """
 from __future__ import annotations
 import json
 import logging
-import re
 from typing import Optional
 
 from app.database import get_db
@@ -47,7 +46,7 @@ class VectorStore:
         try:
             # 1. 删除该 item 的所有旧向量
             db.execute(
-                "DELETE FROM knowledge_vectors WHERE item_id = ?",
+                "DELETE FROM knowledge_vectors WHERE item_id = %s",
                 (item_id,),
             )
 
@@ -57,7 +56,7 @@ class VectorStore:
                 db.execute(
                     """INSERT INTO knowledge_vectors
                        (user_id, base_id, item_id, chunk_index, text, embedding)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
+                       VALUES (%s, %s, %s, %s, %s, %s)""",
                     (
                         self.user_id,
                         base_id,
@@ -85,7 +84,7 @@ class VectorStore:
         mode: str = "vector",
         alpha: float = 0.0,
     ) -> list[dict]:
-        """按 base_id 过滤的 Top-K 检索。
+        """按 base_id 过滤的 Top-K 检索（PostgreSQL + pgvector）。
 
         Args:
             base_id: 知识库 ID
@@ -97,90 +96,12 @@ class VectorStore:
         """
         db = get_db()
         try:
-            if self._is_sqlite():
-                return self._search_sqlite(base_id, query_vector, top_k, query_text, mode, alpha)
-            else:
-                return self._search_pg(base_id, query_vector, top_k, query_text, mode, alpha)
+            return self._search_pg(base_id, query_vector, top_k, query_text, mode, alpha)
         except Exception:
             logger.exception("向量检索失败")
             return []
         finally:
             db.close()
-
-    def _is_sqlite(self) -> bool:
-        from app.database import is_postgres
-        return not is_postgres()
-
-    def _search_sqlite(
-        self,
-        base_id: str,
-        query_vector: list[float],
-        top_k: int,
-        query_text: Optional[str] = None,
-        mode: str = "vector",
-        alpha: float = 0.0,
-    ) -> list[dict]:
-        """SQLite 环境下用 Python 计算余弦相似度，可选混合检索（余弦 + 关键词 BM25）。"""
-        import numpy as np
-
-        db = get_db()
-        rows = db.execute(
-            "SELECT id, item_id, chunk_index, text, embedding FROM knowledge_vectors WHERE base_id = ?",
-            (base_id,),
-        ).fetchall()
-        db.close()
-
-        if not rows:
-            return []
-
-        q = np.array(query_vector, dtype=np.float32)
-        q_norm = np.linalg.norm(q)
-        if q_norm == 0:
-            return []
-
-        # 预处理：查询关键词（混合模式用）
-        query_keywords: set[str] = set()
-        if mode == "hybrid" and alpha > 0 and query_text:
-            query_keywords = set(
-                w.lower()
-                for w in re.split(r"[^\w]+", query_text)
-                if w.strip() and len(w.strip()) > 1
-            )
-
-        results = []
-        for r in rows:
-            try:
-                vec = np.array(json.loads(r["embedding"]), dtype=np.float32)
-                v_norm = np.linalg.norm(vec)
-                if v_norm == 0:
-                    continue
-                cosine_score = float(np.dot(q, vec) / (q_norm * v_norm))
-
-                entry: dict = {
-                    "id": r["id"],
-                    "item_id": r["item_id"],
-                    "chunk_index": r["chunk_index"],
-                    "text": r["text"],
-                    "score": cosine_score,
-                }
-
-                if query_keywords and r["text"]:
-                    # TF-like BM25 分数：关键词在文本中的匹配比例
-                    chunk_words = set(
-                        w.lower()
-                        for w in re.split(r"[^\w]+", r["text"])
-                        if w.strip()
-                    )
-                    matches = len(query_keywords & chunk_words)
-                    bm25_score = matches / len(query_keywords) if query_keywords else 0.0
-                    entry["score"] = (1 - alpha) * cosine_score + alpha * bm25_score
-
-                results.append(entry)
-            except Exception:
-                continue
-
-        results.sort(key=lambda x: x["score"], reverse=True)
-        return results[:top_k]
 
     def _search_pg(
         self,
@@ -199,13 +120,13 @@ class VectorStore:
             # 混合检索：余弦相似度 + PostgreSQL 全文检索 ts_rank
             rows = db.execute(
                 """SELECT id, item_id, chunk_index, text,
-                          1 - (embedding <=> ?::vector) AS cosine_score,
-                          ts_rank(to_tsvector('simple', COALESCE(text, '')), plainto_tsquery('simple', ?)) AS text_score
+                          1 - (embedding <=> %s::vector) AS cosine_score,
+                          ts_rank(to_tsvector('simple', COALESCE(text, '')), plainto_tsquery('simple', %s)) AS text_score
                     FROM knowledge_vectors
-                    WHERE base_id = ?
+                    WHERE base_id = %s
                       AND embedding IS NOT NULL
-                    ORDER BY embedding <=> ?::vector
-                    LIMIT ?""",
+                    ORDER BY embedding <=> %s::vector
+                    LIMIT %s""",
                 (vec_json, query_text, base_id, vec_json, top_k * 2),
             ).fetchall()
             db.close()
@@ -236,12 +157,12 @@ class VectorStore:
             # 纯向量检索
             rows = db.execute(
                 """SELECT id, item_id, chunk_index, text,
-                          1 - (embedding <=> ?::vector) AS score
+                          1 - (embedding <=> %s::vector) AS score
                     FROM knowledge_vectors
-                    WHERE base_id = ?
+                    WHERE base_id = %s
                       AND embedding IS NOT NULL
-                    ORDER BY embedding <=> ?::vector
-                    LIMIT ?""",
+                    ORDER BY embedding <=> %s::vector
+                    LIMIT %s""",
                 (vec_json, base_id, vec_json, top_k),
             ).fetchall()
             db.close()
@@ -252,12 +173,12 @@ class VectorStore:
         try:
             if base_id:
                 row = db.execute(
-                    "SELECT COUNT(*) AS cnt FROM knowledge_vectors WHERE base_id = ?",
+                    "SELECT COUNT(*) AS cnt FROM knowledge_vectors WHERE base_id = %s",
                     (base_id,),
                 ).fetchone()
             else:
                 row = db.execute(
-                    "SELECT COUNT(*) AS cnt FROM knowledge_vectors WHERE user_id = ?",
+                    "SELECT COUNT(*) AS cnt FROM knowledge_vectors WHERE user_id = %s",
                     (self.user_id,),
                 ).fetchone()
             return row["cnt"] if row else 0
@@ -270,12 +191,12 @@ class VectorStore:
         try:
             if base_id:
                 db.execute(
-                    "DELETE FROM knowledge_vectors WHERE base_id = ?",
+                    "DELETE FROM knowledge_vectors WHERE base_id = %s",
                     (base_id,),
                 )
             else:
                 db.execute(
-                    "DELETE FROM knowledge_vectors WHERE user_id = ?",
+                    "DELETE FROM knowledge_vectors WHERE user_id = %s",
                     (self.user_id,),
                 )
             db.commit()
@@ -290,7 +211,7 @@ class VectorStore:
         db = get_db()
         try:
             db.execute(
-                "DELETE FROM knowledge_vectors WHERE item_id = ?",
+                "DELETE FROM knowledge_vectors WHERE item_id = %s",
                 (item_id,),
             )
             db.commit()
@@ -307,7 +228,7 @@ class VectorStore:
             return
         db = get_db()
         try:
-            placeholders = ",".join("?" for _ in item_ids)
+            placeholders = ",".join("%s" for _ in item_ids)
             db.execute(
                 f"DELETE FROM knowledge_vectors WHERE item_id IN ({placeholders})",
                 tuple(item_ids),

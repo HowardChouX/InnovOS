@@ -25,12 +25,11 @@ from app.api import auth, tasks, analysis, patents, solutions, workflow, evaluat
 from app.api.sidebar import router as sidebar_router
 from app.api.admin import router as admin_router
 from app.api.workflow_steps import router as workflow_steps_router
-from app.seed import seed_admin_user, seed_patents
+from app.seed import seed_admin_user
 from app.algorithm.model_registry import model_registry
 
 init_db()
 seed_admin_user()
-seed_patents()
 model_registry.load()  # 加载全量模型注册表
 
 app = FastAPI(title="InnovOS API", description="创新智能平台后端 API")

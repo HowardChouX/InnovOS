@@ -45,14 +45,27 @@ def _patch_get_db(monkeypatch, mock_db):
 
 
 def _make_row(id_: int, item_id: str, chunk_idx: int, text: str,
-              embedding: list[float]) -> dict:
-    """Build a dict shaped like a sqlite3.Row row for ``_search_sqlite``."""
+              score_or_embedding: list[float] = None) -> dict:
+    """Build a dict shaped like a PG row for ``_search_pg`` (vector mode)."""
     return {
         "id": id_,
         "item_id": item_id,
         "chunk_index": chunk_idx,
         "text": text,
-        "embedding": json.dumps(embedding),
+        "score": 0.0,  # placeholder; tests override via _fetchall_result directly
+    }
+
+
+def _make_hybrid_row(id_: int, item_id: str, chunk_idx: int, text: str,
+                     cosine_score: float = 0.0, text_score: float = 0.0) -> dict:
+    """Build a dict shaped like a PG row for ``_search_pg`` (hybrid mode)."""
+    return {
+        "id": id_,
+        "item_id": item_id,
+        "chunk_index": chunk_idx,
+        "text": text,
+        "cosine_score": cosine_score,
+        "text_score": text_score,
     }
 
 
@@ -83,7 +96,7 @@ def test_replace_by_external_id_inserts_vectors(monkeypatch, mock_db):
 
     # First statement is DELETE
     assert "DELETE FROM knowledge_vectors" in mock_db.all_sql[0]
-    assert "item_id = ?" in mock_db.all_sql[0]
+    assert "item_id = %s" in mock_db.all_sql[0]
 
     # Remaining statements are INSERTs
     for sql in mock_db.all_sql[1:]:
@@ -106,7 +119,7 @@ def test_replace_by_external_id_empty_clears_vectors(monkeypatch, mock_db):
     # Only DELETE should be recorded (no INSERT)
     assert len(mock_db.all_sql) == 1
     assert "DELETE FROM knowledge_vectors" in mock_db.all_sql[0]
-    assert "item_id = ?" in mock_db.all_sql[0]
+    assert "item_id = %s" in mock_db.all_sql[0]
 
 
 def test_delete_by_external_id_removes_vectors(monkeypatch, mock_db):
@@ -120,7 +133,7 @@ def test_delete_by_external_id_removes_vectors(monkeypatch, mock_db):
 
     assert len(mock_db.all_sql) == 1
     assert "DELETE FROM knowledge_vectors" in mock_db.all_sql[0]
-    assert "item_id = ?" in mock_db.all_sql[0]
+    assert "item_id = %s" in mock_db.all_sql[0]
 
     delete_entry = mock_db.cursor.history[0]
     assert delete_entry[1] == ("item_42",)
@@ -131,7 +144,7 @@ def test_delete_by_external_id_removes_vectors(monkeypatch, mock_db):
 # ════════════════════════════════════════════════════════════════
 
 
-def test_search_vector_mode_cosine_only(monkeypatch, mock_db, mock_numpy):
+def test_search_vector_mode_cosine_only(monkeypatch, mock_db):
     """Mock fetchall returns vectors; verify sorted by cosine score."""
     _patch_get_db(monkeypatch, mock_db)
 
@@ -139,9 +152,9 @@ def test_search_vector_mode_cosine_only(monkeypatch, mock_db, mock_numpy):
 
     # query = [1, 0, 0]; rows have decreasing dot-product similarity
     mock_db.cursor._fetchall_result = [
-        _make_row(1, "a", 0, "text a", [0.95, 0.05, 0.0]),
-        _make_row(2, "b", 0, "text b", [0.5, 0.5, 0.0]),
-        _make_row(3, "c", 0, "text c", [-0.8, 0.6, 0.0]),
+        {"id": 1, "item_id": "a", "chunk_index": 0, "text": "text a", "score": 0.95},
+        {"id": 2, "item_id": "b", "chunk_index": 0, "text": "text b", "score": 0.5},
+        {"id": 3, "item_id": "c", "chunk_index": 0, "text": "text c", "score": -0.8},
     ]
 
     vs = VectorStore(user_id=1, dimensions=3)
@@ -161,7 +174,7 @@ def test_search_vector_mode_cosine_only(monkeypatch, mock_db, mock_numpy):
     assert results[0]["item_id"] == "a"
 
 
-def test_search_hybrid_mode_blends_scores(monkeypatch, mock_db, mock_numpy):
+def test_search_hybrid_mode_blends_scores(monkeypatch, mock_db):
     """Hybrid mode with alpha=0.5 blends dot-product + keyword scores."""
     _patch_get_db(monkeypatch, mock_db)
 
@@ -170,8 +183,8 @@ def test_search_hybrid_mode_blends_scores(monkeypatch, mock_db, mock_numpy):
     # row_a: high cosine, but no keyword match
     # row_b: lower cosine, but strong keyword match → wins with hybrid
     mock_db.cursor._fetchall_result = [
-        _make_row(1, "a", 0, "unrelated content here", [0.95, 0.05, 0.0]),
-        _make_row(2, "b", 0, "hello world greetings", [0.5, 0.5, 0.0]),
+        _make_hybrid_row(1, "a", 0, "unrelated content here", cosine_score=0.95, text_score=0.0),
+        _make_hybrid_row(2, "b", 0, "hello world greetings", cosine_score=0.5, text_score=1.0),
     ]
 
     vs = VectorStore(user_id=1, dimensions=3)
@@ -190,14 +203,19 @@ def test_search_hybrid_mode_blends_scores(monkeypatch, mock_db, mock_numpy):
     scores = [r["score"] for r in hybrid_results]
     assert scores == sorted(scores, reverse=True)
 
-    # query_keywords = {"hello", "world"}
-    # row_a text → matches {}         → bm25=0   → score = 0.5*0.95 + 0.5*0   = 0.475
-    # row_b text → matches 2/2=1      → bm25=1   → score = 0.5*0.5  + 0.5*1   = 0.75
+    # text_scores: [0.0, 1.0] → max=1.0 → normalized: [0.0, 1.0]
+    # blended = (1-0.5)*cosine + 0.5*text_norm
+    # row_a: 0.5*0.95 + 0.5*0.0 = 0.475
+    # row_b: 0.5*0.5  + 0.5*1.0 = 0.75
     # So row_b (item_id="b") should be first
     assert hybrid_results[0]["item_id"] == "b", \
         "Hybrid mode should rank keyword-matched result higher"
 
     # --- pure vector mode for comparison ---
+    mock_db.cursor._fetchall_result = [
+        {"id": 1, "item_id": "a", "chunk_index": 0, "text": "unrelated content here", "score": 0.95},
+        {"id": 2, "item_id": "b", "chunk_index": 0, "text": "hello world greetings", "score": 0.5},
+    ]
     vector_results = vs.search(
         base_id="base_1",
         query_vector=[1.0, 0.0, 0.0],
@@ -231,18 +249,17 @@ def test_search_empty_base_returns_empty(monkeypatch, mock_db, mock_numpy):
 # ════════════════════════════════════════════════════════════════
 
 
-def test_hybrid_keyword_matching(monkeypatch, mock_db, mock_numpy):
+def test_hybrid_keyword_matching(monkeypatch, mock_db):
     """Directly verify keyword match computation with pure-keyword (alpha=1)."""
     _patch_get_db(monkeypatch, mock_db)
 
     from app.algorithm.knowledge.vector_store import VectorStore
 
     # All rows have identical vector → same dot product, keyword match is the differentiator
-    vec = [0.5, 0.5, 0.0]
     mock_db.cursor._fetchall_result = [
-        _make_row(1, "a", 0, "hello there world", vec),
-        _make_row(2, "b", 0, "hello only here", vec),
-        _make_row(3, "c", 0, "no match at all", vec),
+        _make_hybrid_row(1, "a", 0, "hello there world", cosine_score=0.5, text_score=1.0),
+        _make_hybrid_row(2, "b", 0, "hello only here", cosine_score=0.5, text_score=0.5),
+        _make_hybrid_row(3, "c", 0, "no match at all", cosine_score=0.5, text_score=0.0),
     ]
 
     vs = VectorStore(user_id=1, dimensions=3)
@@ -257,10 +274,11 @@ def test_hybrid_keyword_matching(monkeypatch, mock_db, mock_numpy):
 
     assert len(results) == 3
 
-    # query_keywords = {"hello", "world"}
-    # row_a text "hello there world" → matches {"hello","world"} → bm25 = 2/2 = 1.0
-    # row_b text "hello only here"   → matches {"hello"}        → bm25 = 1/2 = 0.5
-    # row_c text "no match at all"   → matches {}               → bm25 = 0/2 = 0.0
+    # text_scores: [1.0, 0.5, 0.0] → max=1.0 → normalized: [1.0, 0.5, 0.0]
+    # blended with alpha=1.0 → score = text_norm
+    # row_a should be first (1.0)
+    # row_b second (0.5)
+    # row_c third (0.0)
     assert results[0]["item_id"] == "a"
     assert abs(results[0]["score"] - 1.0) < 1e-6
     assert results[1]["item_id"] == "b"
@@ -269,23 +287,25 @@ def test_hybrid_keyword_matching(monkeypatch, mock_db, mock_numpy):
     assert abs(results[2]["score"] - 0.0) < 1e-6
 
 
-def test_hybrid_alpha_zero_equals_vector(monkeypatch, mock_db, mock_numpy):
+def test_hybrid_alpha_zero_equals_vector(monkeypatch, mock_db):
     """With alpha=0.0, hybrid results are identical to vector-only results."""
     _patch_get_db(monkeypatch, mock_db)
 
     from app.algorithm.knowledge.vector_store import VectorStore
 
+    # Vector mode results need "score" key
     mock_db.cursor._fetchall_result = [
-        _make_row(1, "a", 0, "some text", [0.9, 0.1]),
-        _make_row(2, "b", 0, "hello world", [0.5, 0.5]),
+        {"id": 1, "item_id": "a", "chunk_index": 0, "text": "some text", "score": 0.9},
+        {"id": 2, "item_id": "b", "chunk_index": 0, "text": "hello world", "score": 0.5},
     ]
-
     vs = VectorStore(user_id=1, dimensions=2)
 
     vector_results = vs.search(
         base_id="base_1", query_vector=[1.0, 0.0], top_k=5, mode="vector",
     )
 
+    # Hybrid mode with alpha=0.0 internally uses _search_pg with non-hybrid branch
+    # so it also expects "score" key
     hybrid_results = vs.search(
         base_id="base_1", query_vector=[1.0, 0.0], top_k=5,
         query_text="hello world", mode="hybrid", alpha=0.0,
@@ -312,7 +332,7 @@ def test_search_count_queries(monkeypatch, mock_db):
     count = vs.count(base_id="base_1")
     assert count == 7
     assert "SELECT COUNT(*)" in mock_db.all_sql[0]
-    assert "WHERE base_id = ?" in mock_db.all_sql[0]
+    assert "WHERE base_id = %s" in mock_db.all_sql[0]
 
     # — count all (no base_id) —
     mock_db.all_sql.clear()
@@ -322,7 +342,7 @@ def test_search_count_queries(monkeypatch, mock_db):
     count_all = vs.count()
     assert count_all == 42
     assert "SELECT COUNT(*)" in mock_db.all_sql[0]
-    assert "WHERE user_id = ?" in mock_db.all_sql[0]
+    assert "WHERE user_id = %s" in mock_db.all_sql[0]
 
 
 # ════════════════════════════════════════════════════════════════
@@ -342,8 +362,8 @@ def test_delete_by_external_ids_uses_IN_clause(monkeypatch, mock_db):
     assert len(mock_db.all_sql) == 1
     sql = mock_db.all_sql[0]
     assert "DELETE FROM knowledge_vectors" in sql
-    # The IN clause should have three placeholders (no spaces: ",".join("?"...))
-    assert "IN (?,?,?)" in sql, \
+    # The IN clause should have three %s placeholders
+    assert "IN (%s,%s,%s)" in sql, \
         "Expected IN clause with 3 comma-separated placeholders"
 
     delete_entry = mock_db.cursor.history[0]

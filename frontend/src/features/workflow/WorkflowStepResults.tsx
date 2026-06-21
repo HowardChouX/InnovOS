@@ -32,7 +32,7 @@ function EmptyState({ msg, icon }: { msg: string; icon: string }) {
   return (
     <div className="card" style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      minHeight: 260, padding: 40, height: '100%',
+      minHeight: 260, padding: 40, flex: 1,
     }}>
       <i className={icon} style={{
         fontSize: 48, color: 'var(--text-tertiary)', opacity: 0.3,
@@ -82,7 +82,7 @@ export function WorkflowStepResults() {
 
   if (!selectedTaskId) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <EmptyState msg="输入文字，点击开始进行分析" icon="fa-solid fa-hand-pointer" />
       </div>
     );
@@ -90,34 +90,49 @@ export function WorkflowStepResults() {
 
   if (!workflow) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <EmptyState msg="暂无运行中的工作流" icon="fa-solid fa-diagram-project" />
       </div>
     );
   }
 
-  const isRunning = phaseStatus[displayPhase] === 'running' && workflow.status !== 'awaiting_rating';
+  const isRunning = (phaseStatus[displayPhase] === 'running' || phaseStatus[displayPhase] === 'pending') && (workflow.status === 'running' || workflow.status === 'idle');
 
   // 运行中且无输出时，显示当前步骤名称和等待提示
   if (isRunning && !currentOutput) {
+    const accentColor = stepInfo?.color || 'var(--accent-blue)';
     return (
       <div className="card" style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        minHeight: 260, padding: 40, height: '100%',
+        padding: 60, flex: 1,
       }}>
-        <i className={stepInfo?.icon || 'fa-solid fa-circle-notch fa-spin'} style={{
-          fontSize: 36, color: stepInfo?.color || 'var(--accent-blue)', opacity: 0.6,
-          marginBottom: 16,
-        }} />
-        <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
+        {/* Icon ring */}
+        <div style={{
+          width: 72, height: 72, borderRadius: '50%',
+          background: `${accentColor}12`, border: `2px solid ${accentColor}28`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginBottom: 24,
+        }}>
+          <i className={stepInfo?.icon || 'fa-solid fa-circle-notch fa-spin'} style={{
+            fontSize: 30, color: accentColor, opacity: 0.7,
+          }} />
+        </div>
+        {/* Step label */}
+        <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 10px' }}>
           {stepInfo?.label || '分析中'}
         </p>
-        <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: 0 }}>
+        {/* Description */}
+        <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: '0 0 28px', textAlign: 'center', lineHeight: 1.5, maxWidth: 400 }}>
           {stepInfo?.description || '正在执行分析...'}
         </p>
-        <div style={{ marginTop: 16 }}>
-          <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 20, color: 'var(--accent-blue)' }} />
-        </div>
+        {/* Spinner */}
+        <div style={{
+          width: 40, height: 40, borderRadius: '50%',
+          border: '3px solid transparent',
+          borderTopColor: accentColor,
+          borderRightColor: accentColor,
+          animation: 'spin 0.8s linear infinite',
+        }} />
       </div>
     );
   }
@@ -125,7 +140,7 @@ export function WorkflowStepResults() {
   const PhaseComponent = PHASE_VIEWS[displayPhase];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, flex: 1, minHeight: 0 }}>
       {PhaseComponent ? (
         <PhaseComponent output={currentOutput} />
       ) : (

@@ -62,6 +62,7 @@ export function UserManagementPage() {
       setUsers(data);
     } catch (err) {
       console.error('Failed to fetch users', err);
+      setToast({ msg: '获取用户列表失败', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -90,6 +91,7 @@ export function UserManagementPage() {
       fetchUsers();
     } catch (err) {
       console.error('Failed to update user', err);
+      setToast({ msg: '更新用户状态失败', type: 'error' });
     }
   };
 

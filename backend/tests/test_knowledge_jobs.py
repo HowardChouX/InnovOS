@@ -23,7 +23,12 @@ JOB_PATH = "app.services.knowledge_jobs.index_documents"
 def _patch_get_db(monkeypatch):
     """Mock DB so job handler doesn't need real database."""
     mock_db = MagicMock()
-    mock_db.execute.return_value.fetchone.return_value = {"user_id": 1}
+    # Row-like dict that supports all key lookups the handler may need
+    mock_db.execute.return_value.fetchone.return_value = {
+        "user_id": 1,
+        "file_processor_id": None,
+        "value": None,
+    }
     monkeypatch.setattr("app.database.get_db", lambda: mock_db)
     return mock_db
 
@@ -125,19 +130,22 @@ async def test_url_processing_fetches_and_indexes(handler):
                 pipeline_instance.index_item = AsyncMock(return_value=2)
                 MockPipeline.return_value = pipeline_instance
 
-                # Mock httpx response
+                # Mock httpx response (must be >= 50 bytes for `fetch_url` validation)
                 mock_resp = AsyncMock()
                 mock_resp.status_code = 200
-                mock_resp.text = "<html>手机散热方案</html>"
+                mock_resp.text = "<html><body><p>手机散热方案是一种创新的散热技术，能够有效降低设备温度。</p></body></html>"
+                mock_resp.url = "https://example.com/doc"
+                mock_resp.headers = {"Content-Type": "text/html"}
                 mock_resp.raise_for_status = AsyncMock()
 
                 async def mock_get(*args, **kwargs):
                     return mock_resp
 
                 with patch("httpx.AsyncClient") as MockClient:
-                    client_instance = AsyncMock()
-                    client_instance.__aenter__.return_value.get = mock_get
-                    MockClient.return_value.__aenter__.return_value = client_instance
+                    # Set up the mock client so 'async with AsyncClient() as client: r = await client.get(url)' works
+                    mock_client = AsyncMock()
+                    mock_client.get = mock_get
+                    MockClient.return_value.__aenter__.return_value = mock_client
 
                     await handler.execute("job-3", {"baseId": "base-1", "itemId": "url-1"}, FakeSignal())
 
@@ -168,11 +176,11 @@ async def test_url_fetch_failure_marks_failed(handler):
     with patch(f"{JOB_PATH}.KnowledgeItemService.get_by_id", return_value=item):
         with patch(f"{JOB_PATH}.KnowledgeItemService.update_status") as mock_update:
             with patch("httpx.AsyncClient") as MockClient:
-                client_instance = AsyncMock()
                 async def mock_get(*args, **kwargs):
                     raise Exception("Connection refused")
-                client_instance.__aenter__.return_value.get = mock_get
-                MockClient.return_value.__aenter__.return_value = client_instance
+                mock_client = AsyncMock()
+                mock_client.get = mock_get
+                MockClient.return_value.__aenter__.return_value = mock_client
 
                 await handler.execute("job-5", {"baseId": "base-1", "itemId": "url-3"}, FakeSignal())
 

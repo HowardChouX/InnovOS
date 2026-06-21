@@ -81,15 +81,17 @@ export const useMonitorStore = create<MonitorStore>((set) => ({
   fetchAll: async () => {
     set({ loading: true, error: null });
     try {
-      const [overview, taskStats] = await Promise.all([
+      const [overview, taskStats, keyStats, systemStatus, health] = await Promise.all([
         monitorApi.getOverview(),
         monitorApi.getTaskStats(),
+        monitorApi.getKeyStats(),
+        monitorApi.getSystemStatus(),
+        monitorApi.getHealth(),
       ]);
-      set({ overview, taskStats });
+      set({ overview, taskStats, keyStats, systemStatus, health, loading: false });
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : '加载监控数据失败' });
-    } finally {
-      set({ loading: false });
+      console.error('[useMonitorStore] fetchAll failed:', e);
+      set({ loading: false, error: '获取监控数据失败' });
     }
   },
 }));

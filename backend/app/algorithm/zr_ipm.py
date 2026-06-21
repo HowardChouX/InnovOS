@@ -9,8 +9,11 @@ ZR-IPM (智融创新问题映射) 算法引擎
 """
 
 import json
+import logging
 from .ai_client import chat_completion
 from .model_resolver import model_resolver
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """你是一个创新问题分析专家。分析用户的技术问题，输出JSON：
 {
@@ -81,7 +84,7 @@ class ZRIPMEngine:
             try:
                 result = json.loads(result)
             except (json.JSONDecodeError, TypeError):
-                print(f"[WARN] AI returned string, not dict: {result[:200]}", flush=True)
+                logger.warning(f"AI returned string, not dict: {result[:200]}")
                 result = {}
         return self._build_conflict_graph(result)
 
@@ -208,7 +211,7 @@ class ZRIPMEngine:
         if isinstance(result, str):
             try:
                 result = json.loads(result)
-            except:
+            except (json.JSONDecodeError, TypeError):
                 result = {"title": "创新分析报告", "summary": result, "sections": [], "recommendations": [], "topSolutions": []}
         return result if isinstance(result, dict) else {
             "title": "创新分析报告", "summary": "", "sections": [], "recommendations": [], "topSolutions": []
@@ -217,7 +220,7 @@ class ZRIPMEngine:
     @staticmethod
     def _build_conflict_graph(ai_result: dict) -> dict:
         if not isinstance(ai_result, dict):
-            print(f"[WARN] _build_conflict_graph received non-dict: {type(ai_result).__name__}", flush=True)
+            logger.warning(f"_build_conflict_graph received non-dict: {type(ai_result).__name__}")
             ai_result = {}
         satellites = []
         colors = ["#60a5fa", "#4ade80", "#a78bfa", "#fbbf24"]

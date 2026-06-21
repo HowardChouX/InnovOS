@@ -26,8 +26,8 @@ export function AppLayout() {
       try {
         const count = await notificationsApi.getUnreadCount();
         setUnreadCount(count);
-      } catch {
-        // silent fail
+      } catch (e) {
+        console.error('[AppLayout] fetchUnreadCount failed:', e);
       }
     };
     fetchUnread();
@@ -43,7 +43,8 @@ export function AppLayout() {
       try {
         const res = await notificationsApi.list({ page: 1, pageSize: 20 });
         setNotifications(res.data);
-      } catch {
+      } catch (e) {
+        console.error('[AppLayout] fetchNotifications failed:', e);
         setNotifications([]);
       } finally {
         setNotifyLoading(false);
@@ -75,8 +76,8 @@ export function AppLayout() {
           prev.map((item) => (item.id === n.id ? { ...item, isRead: true } : item))
         );
         setUnreadCount((c) => Math.max(0, c - 1));
-      } catch {
-        // silent
+      } catch (e) {
+        console.error('[AppLayout] markAsRead failed:', e);
       }
     }
     setDetailNotify(n);
@@ -87,8 +88,8 @@ export function AppLayout() {
       await notificationsApi.markAllAsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
-    } catch {
-      // silent
+    } catch (e) {
+      console.error('[AppLayout] markAllAsRead failed:', e);
     }
   };
 
@@ -104,7 +105,8 @@ export function AppLayout() {
       setNotifications([]);
       setUnreadCount(0);
       setClearConfirm(false);
-    } catch {
+    } catch (e) {
+      console.error('[AppLayout] clearAll failed:', e);
       setToast({ msg: '清空失败', type: 'error' });
       setClearConfirm(false);
     }
@@ -140,7 +142,8 @@ export function AppLayout() {
       setUnreadCount((c) => Math.max(0, c - 1));
       if (detailNotify?.id === id) setDetailNotify(null);
       setDeleteConfirmId(null);
-    } catch {
+    } catch (e) {
+      console.error('[AppLayout] deleteNotification failed:', e);
       setToast({ msg: '删除失败', type: 'error' });
       setDeleteConfirmId(null);
     }

@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta, timezone
 import bcrypt
 from jose import jwt, JWTError
@@ -5,7 +6,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.database import get_db
 
-SECRET_KEY = "innovos-secret-key-change-in-production"
+SECRET_KEY = os.getenv("INNOVOS_JWT_SECRET", "fallback-dev-only-key")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
 

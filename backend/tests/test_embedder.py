@@ -1,6 +1,5 @@
-"""测试 embedder.py — 本地嵌入和远程 API 调用（async）"""
+"""测试 embedder.py — 远程 API 调用（async）"""
 import pytest
-import numpy as np
 
 
 class TestEmbedderInit:
@@ -24,51 +23,6 @@ class TestEmbedderInit:
         assert emb.model == "text-embedding-3-small"
 
 
-class TestLocalEmbed:
-    """_local_embed 是同步方法"""
-
-    def test_local_embed_dimension(self):
-        from app.algorithm.knowledge.embedder import Embedder
-        emb = Embedder()
-        vec = emb._local_embed("test text", dim=384)
-        assert len(vec) == 384
-
-    def test_local_embed_normalized(self):
-        from app.algorithm.knowledge.embedder import Embedder
-        emb = Embedder()
-        vec = emb._local_embed("hello world", dim=384)
-        norm = np.linalg.norm(vec)
-        assert abs(norm - 1.0) < 1e-6
-
-    def test_local_embed_deterministic(self):
-        from app.algorithm.knowledge.embedder import Embedder
-        emb = Embedder()
-        v1 = emb._local_embed("test", dim=256)
-        v2 = emb._local_embed("test", dim=256)
-        assert v1 == v2
-
-    def test_local_embed_different_inputs(self):
-        from app.algorithm.knowledge.embedder import Embedder
-        emb = Embedder()
-        v1 = emb._local_embed("hello", dim=256)
-        v2 = emb._local_embed("world", dim=256)
-        assert v1 != v2
-
-    def test_local_embed_default_dim(self):
-        from app.algorithm.knowledge.embedder import Embedder
-        emb = Embedder()
-        vec = emb._local_embed("test")
-        assert len(vec) == 384
-
-    def test_local_embed_empty_string(self):
-        from app.algorithm.knowledge.embedder import Embedder
-        emb = Embedder()
-        vec = emb._local_embed("", dim=384)
-        assert len(vec) == 384
-        # 空字符串无 bigram，向量全零，norm = 0.0（除零保护）
-        assert all(v == 0.0 for v in vec)
-
-
 class TestEmbed:
     """embed() 是 async 方法"""
 
@@ -80,14 +34,12 @@ class TestEmbed:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_embed_fallback_to_local(self):
-        """无 API 配置时降级到本地嵌入"""
+    async def test_embed_no_api_raises(self):
+        """无 API 配置时抛出 RuntimeError"""
         from app.algorithm.knowledge.embedder import Embedder
         emb = Embedder()  # no api_key/api_host
-        result = await emb.embed(["hello", "world"])
-        assert len(result) == 2
-        assert len(result[0]) == 384
-        assert len(result[1]) == 384
+        with pytest.raises(RuntimeError, match="未配置嵌入模型 API"):
+            await emb.embed(["hello", "world"])
 
     @pytest.mark.asyncio
     async def test_embed_remote_success(self, monkeypatch):
@@ -122,8 +74,8 @@ class TestEmbed:
         assert result[0] != result[1]  # different embeddings
 
     @pytest.mark.asyncio
-    async def test_embed_remote_failure_fallback(self, monkeypatch):
-        """远程失败时降级到本地"""
+    async def test_embed_remote_failure_propagates(self, monkeypatch):
+        """远程失败时异常冒泡（无降级）"""
         from app.algorithm.knowledge.embedder import Embedder
 
         class FailingAsyncClient:
@@ -138,9 +90,8 @@ class TestEmbed:
 
         monkeypatch.setattr("httpx.AsyncClient", FailingAsyncClient)
         emb = Embedder(api_key="sk-test", api_host="https://api.test.com")
-        result = await emb.embed(["hello"])
-        assert len(result) == 1
-        assert len(result[0]) == 384  # fallback to local
+        with pytest.raises(Exception, match="Connection failed"):
+            await emb.embed(["hello"])
 
     def test_dimension_property(self):
         from app.algorithm.knowledge.embedder import Embedder

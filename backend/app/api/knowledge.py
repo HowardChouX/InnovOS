@@ -7,7 +7,7 @@ from app.database import get_db
 from app.utils import utc_iso
 from app.algorithm.knowledge.retriever import get_retriever
 from app.algorithm.knowledge.pipeline import KnowledgePipeline
-from app.services.knowledge_service_v2 import KnowledgeItemService
+from app.services.knowledge_item_service import KnowledgeItemService
 from app.services.file_storage_service import file_storage
 from app.services.knowledge_job_manager import (
     JOB_TYPE_INDEX_DOCUMENTS,
@@ -72,7 +72,7 @@ async def upload_file(
     if s3_key:
         item_data["s3Key"] = s3_key
 
-    item = KnowledgeItemService.create_item(
+    item = KnowledgeItemService.create(
         user["id"], base_id,
         {
             "type": "file",
@@ -106,9 +106,9 @@ def list_items(
     groupId: str = "",
     user: dict = Depends(get_current_user),
 ):
-    result = KnowledgeItemService.list_items(
+    result = KnowledgeItemService.list(
         user["id"], base_id, page=page, limit=limit,
-        item_type=type, group_id=groupId,
+        type=type or None, groupId=groupId or None,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="知识库不存在")
@@ -152,7 +152,7 @@ def update_item(item_id: str, body: UpdateItemInput, user: dict = Depends(get_cu
 
 @router.delete("/items/{item_id}")
 def delete_item(item_id: str, user: dict = Depends(get_current_user)):
-    ok = KnowledgeItemService.delete_item(user["id"], item_id)
+    ok = KnowledgeItemService.delete(user["id"], item_id)
     if not ok:
         raise HTTPException(status_code=404, detail="知识项不存在")
     return {"message": "deleted", "code": 200}
@@ -257,6 +257,35 @@ async def download_item_file(
 def get_embed_config(user: dict = Depends(get_current_user)):
     config = get_embedding_api_config()
     return {"data": config, "message": "success", "code": 200}
+
+
+# ─── 类型计数 API ────────────────────────────────────
+
+@router.get("/bases/{base_id}/items/type-counts")
+def get_item_type_counts(base_id: str, user: dict = Depends(get_current_user)):
+    """获取知识项类型计数（替代全量拉取 9999 条）"""
+    db = get_db()
+    try:
+        base = db.execute(
+            "SELECT id FROM knowledge_bases WHERE id=? AND user_id=?",
+            (base_id, user["id"]),
+        ).fetchone()
+        if not base:
+            raise HTTPException(status_code=404, detail="知识库不存在")
+
+        rows = db.execute(
+            """SELECT type, COUNT(*) as count FROM knowledge_items
+               WHERE base_id=? AND status != 'deleting'
+               GROUP BY type""",
+            (base_id,),
+        ).fetchall()
+        counts = {"file": 0, "note": 0, "directory": 0, "url": 0}
+        for r in rows:
+            if r["type"] in counts:
+                counts[r["type"]] = r["count"]
+        return {"data": counts, "message": "success", "code": 200}
+    finally:
+        db.close()
 
 
 # ─── 分组 API ────────────────────────────────────────

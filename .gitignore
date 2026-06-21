@@ -1,15 +1,55 @@
-node_modules
-dist
-.env.local
-.env.production
-__pycache__
+# ── Dependencies ──
+node_modules/
+.pnpm-store/
+.venv/
+venv/
+virtualenv/
+
+# ── Build output ──
+dist/
+build/
+*.egg-info/
+
+# ── Python ──
+__pycache__/
 *.pyc
-.venv
-venv
-*.egg-info
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage/
+htmlcov/
+
+# ── Environment ──
+.env
+.env.local
+.env.*.local
+.env.production
+*.env
+
+# ── IDE / Editor ──
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.vs/
+
+# ── OS ──
 .DS_Store
+Thumbs.db
+*.log
+
+# ── Project specific ──
+backend/data/uploads/
+backend/storage/patents/
 *.db
 .zshenv
 *.zshenv
-backend/data/uploads/
-backend/storage/patents/
+
+# ── Pre-commit / Hooks ──
+.husky/_
+
+# ── Docker ──
+.docker/

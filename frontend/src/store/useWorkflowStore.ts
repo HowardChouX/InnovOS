@@ -90,7 +90,8 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         loading: false,
         isRunning: workflow.status === 'running',
       });
-    } catch {
+    } catch (e) {
+      console.error('[useWorkflowStore] fetchWorkflow failed:', e);
       set({ workflow: null, loading: false });
     }
   },
@@ -114,7 +115,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
     };
 
     poll();
-    pollTimer = setInterval(poll, 1000);
+    pollTimer = setInterval(poll, 3000);
   },
   stopPolling: () => {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }

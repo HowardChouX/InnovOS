@@ -317,7 +317,7 @@ def test_propagate_status_upwards_processes_chain(mock_db):
         }
     )
     # Stats query: 0 active, 0 failed → container moves to "completed"
-    mock_db.cursor.add_fetchone_result({"activeCount": 0, "failedCount": 0})
+    mock_db.cursor.add_fetchone_result({"activecount": 0, "failedcount": 0})
 
     KnowledgeItemService._reconcile_containers(
         user_id=1, base_id="base-1",
@@ -326,7 +326,7 @@ def test_propagate_status_upwards_processes_chain(mock_db):
 
     # Should see an aggregation query (SUM with CASE)
     agg_sql = next(
-        (s for s in mock_db.all_sql if "SUM(CASE" in s and "activeCount" in s),
+        (s for s in mock_db.all_sql if "SUM(CASE" in s and "activecount" in s),
         "",
     )
     assert "SUM(CASE" in agg_sql

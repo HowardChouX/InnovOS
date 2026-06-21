@@ -61,7 +61,7 @@ export function KeyManagementPage() {
         const first = res.data.find(p => p.isConfigured) || res.data[0];
         setSelectedId(first.providerId);
       }
-    } catch { /* */ } finally { setLoading(false); }
+    } catch (e) { console.error('[KeyManagementPage] load providers failed:', e); } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
@@ -69,7 +69,7 @@ export function KeyManagementPage() {
 
   // 加载模型分配数据
   useEffect(() => {
-    settingsApi.getAvailable().then(r => setAvailableModels(r.data)).catch(() => {});
+    settingsApi.getAvailable().then(r => setAvailableModels(r.data)).catch((e) => { console.error('[KeyManagementPage] getAvailable failed:', e); });
     settingsApi.getAssigned().then(r => {
       const a = r.data;
       setAssignedModels({
@@ -79,7 +79,7 @@ export function KeyManagementPage() {
         vision: a.ocr_model || '',
         extract: a.extract_model || '',
       });
-    }).catch(() => {});
+    }).catch((e) => { console.error('[KeyManagementPage] getAssigned failed:', e); });
   }, []);
 
   useEffect(() => {
@@ -108,7 +108,7 @@ export function KeyManagementPage() {
       }
       setToast({ msg: '保存成功', type: 'success' });
       await load();
-    } catch (e) { setToast({ msg: e instanceof Error ? e.message : '保存失败', type: 'error' }); }
+    } catch (e) { console.error('[KeyManagementPage] save failed:', e); setToast({ msg: e instanceof Error ? e.message : '保存失败', type: 'error' }); }
     finally { setSaving(false); }
   };
 
@@ -122,7 +122,7 @@ export function KeyManagementPage() {
       setToast(r.data.status === 'ok'
         ? { msg: `${testModel} ${r.data.latency_ms}ms`, type: 'success' }
         : { msg: r.data.message || `${testModel} 连接失败`, type: 'error' });
-    }).catch(() => setToast({ msg: `${testModel} 连接失败`, type: 'error' }))
+    }).catch((e) => { console.error('[KeyManagementPage] check failed:', e); setToast({ msg: `${testModel} 连接失败`, type: 'error' }); })
     .finally(() => setChecking(false));
   };
 
@@ -135,14 +135,14 @@ export function KeyManagementPage() {
 
   const handleToggle = async () => {
     if (!selected) return;
-    try { await providersApi.update(selected.providerId, { is_enabled: !selected.isEnabled }); await load(); } catch { /* */ }
+    try { await providersApi.update(selected.providerId, { is_enabled: !selected.isEnabled }); await load(); } catch (e) { console.error('[KeyManagementPage] toggle failed:', e); }
   };
 
   const handleDelete = async () => {
     if (!selected) return;
     setConfirmDelete(false);
     try { await providersApi.delete(selected.providerId); setSelectedId(null); await load(); }
-    catch { setToast({ msg: '删除失败', type: 'error' }); }
+    catch (e) { console.error('[KeyManagementPage] delete failed:', e); setToast({ msg: '删除失败', type: 'error' }); }
   };
 
   const handleDetectModels = async () => {
@@ -155,7 +155,7 @@ export function KeyManagementPage() {
       setDetectedModels(models);
       if (models.length > 0) setShowModelSelector(true);
       else setToast({ msg: '未检测到模型', type: 'error' });
-    } catch { setToast({ msg: '检测失败', type: 'error' }); }
+    } catch (e) { console.error('[KeyManagementPage] detectModels failed:', e); setToast({ msg: '检测失败', type: 'error' }); }
     finally { setDetecting(false); }
   };
 
@@ -169,7 +169,7 @@ export function KeyManagementPage() {
       const failed = res.data.models.filter(m => m.status !== 'ok');
       if (failed.length === 0) setToast({ msg: `全部 ${res.data.models.length} 个模型检查通过`, type: 'success' });
       else setToast({ msg: `${failed.length}/${res.data.models.length} 个模型连接失败`, type: 'error' });
-    } catch { setToast({ msg: '批量检查失败', type: 'error' }); }
+    } catch (e) { console.error('[KeyManagementPage] batchCheck failed:', e); setToast({ msg: '批量检查失败', type: 'error' }); }
     finally { setBatchChecking(false); }
   };
 
@@ -190,7 +190,7 @@ export function KeyManagementPage() {
         extract_model: assignedModels.extract || null,
       });
       setToast({ msg: '模型分配已保存', type: 'success' });
-    } catch { setToast({ msg: '保存模型分配失败', type: 'error' }); }
+    } catch (e) { console.error('[KeyManagementPage] saveAssignment failed:', e); setToast({ msg: '保存模型分配失败', type: 'error' }); }
     finally { setSavingAssignment(false); }
   };
 
@@ -201,7 +201,7 @@ export function KeyManagementPage() {
     try {
       await providersApi.add({ ...newP, api_model: '', priority: 0, max_rpm: 60 });
       setShowAdd(false); setNewP({ provider_id: '', name: '', api_host: '', api_key: '' }); await load();
-    } catch (e) { setToast({ msg: e instanceof Error ? e.message : '添加失败', type: 'error' }); }
+    } catch (e) { console.error('[KeyManagementPage] add provider failed:', e); setToast({ msg: e instanceof Error ? e.message : '添加失败', type: 'error' }); }
     finally { setAdding(false); }
   };
 
@@ -489,6 +489,8 @@ function RagGlobalConfig() {
         payload[key] = val || null;
       }
       await settingsApi.setRagConfig(payload as any);
+    } catch (e) {
+      console.error('[RagGlobalConfig] save failed:', e);
     } finally {
       setSaving(false);
     }

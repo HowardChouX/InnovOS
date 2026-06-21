@@ -65,8 +65,6 @@ def real_db(monkeypatch):
             monkeypatch.setattr(t, lambda: fake_db)
         except AttributeError:
             pass
-    monkeypatch.setattr("app.database.Database", lambda: fake_db)
-
     yield fake_db, conn
     conn.close()
 

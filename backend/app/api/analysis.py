@@ -58,7 +58,7 @@ def update_workflow_step(db, task_id: int, agent_id: str, status: str, descripti
 
     row = db.execute("SELECT steps FROM workflows WHERE task_id=?", (task_id,)).fetchone()
     if not row:
-        print(f"[DEBUG] Workflow not found for task_id={task_id}", flush=True)
+        logger.debug(f"Workflow not found for task_id={task_id}")
         return
 
     steps = json.loads(row["steps"])
@@ -80,7 +80,7 @@ def update_workflow_step(db, task_id: int, agent_id: str, status: str, descripti
                 step["duration"] = duration
             if output:
                 step["output"] = output
-            print(f"[DEBUG] Updated step {agent_id} to status={status} for task_id={task_id}", flush=True)
+            logger.debug(f"Updated step {agent_id} to status={status} for task_id={task_id}")
             break
 
     has_running = any(s["status"] == "running" for s in steps)
@@ -104,7 +104,7 @@ def update_workflow_step(db, task_id: int, agent_id: str, status: str, descripti
         (workflow_status, json.dumps(steps), task_id),
     )
     db.commit()
-    print(f"[DEBUG] Committed workflow status={workflow_status} for task_id={task_id}", flush=True)
+    logger.debug(f"Committed workflow status={workflow_status} for task_id={task_id}")
 
 
 async def _update_problem_modeling(db, task_id: int, task_description: str, analysis_result: dict, 
@@ -279,7 +279,7 @@ async def _update_problem_modeling(db, task_id: int, task_description: str, anal
             db.commit()
             
     except Exception as e:
-        print(f"Problem modeling update error for {step}: {e}")
+        logger.error(f"Problem modeling update error for {step}: {e}")
         pass
 
 
@@ -300,7 +300,7 @@ async def _search_knowledge_bases(user_id: int, base_ids: list[str], query: str,
                     "score": r.get("score", 0),
                 })
         except Exception as e:
-            print(f"[WARN] KB search failed for base {base_id}: {e}", flush=True)
+            logger.warning(f"KB search failed for base {base_id}: {e}")
 
     if not all_results:
         return ""
@@ -336,19 +336,19 @@ def _create_ai_base() -> AIBase | None:
             model=resolved.model_id,
         )
     except Exception as e:
-        print(f"[WARN] Failed to create AIBase: {e}", flush=True)
+        logger.warning(f"Failed to create AIBase: {e}")
         return None
 
 
 async def run_demand_portrait(task_id: int, user_id: int, task_description: str, knowledge_base_ids: Optional[list[str]] = None):
     """只运行需求洞察步骤，等待用户评分"""
-    print(f"[DEBUG] Demand portrait started for task_id={task_id}", flush=True)
+    logger.debug(f"Demand portrait started for task_id={task_id}")
     db = get_db()
 
     # 搜索知识库
     kb_context = ""
     if knowledge_base_ids:
-        print(f"[DEBUG] Searching knowledge bases: {knowledge_base_ids}", flush=True)
+        logger.debug(f"Searching knowledge bases: {knowledge_base_ids}")
         update_workflow_step(db, task_id, "agent1", "running",
                            description="正在检索知识库...")
         kb_context = await _search_knowledge_bases(user_id, knowledge_base_ids, task_description)
@@ -380,11 +380,11 @@ async def run_demand_portrait(task_id: int, user_id: int, task_description: str,
         )
         db.commit()
 
-        print(f"[DEBUG] Demand portrait completed for task_id={task_id}, {len(demands)} demands", flush=True)
+        logger.debug(f"Demand portrait completed for task_id={task_id}, {len(demands)} demands")
         return result
 
     except Exception as e:
-        print(f"[ERROR] Demand portrait failed: {e}", flush=True)
+        logger.error(f"Demand portrait failed: {e}")
         update_workflow_step(db, task_id, "agent1", "failed",
                            description=f"执行失败: {str(e)}")
         return None
@@ -414,18 +414,27 @@ def _fallback_patent_search(db, task_description: str, patent_keywords: list) ->
         params.extend([like, like])
     sql = f"SELECT * FROM patents WHERE {' OR '.join(or_conditions)} ORDER BY relevance_score DESC LIMIT 10"
     rows = db.execute(sql, params).fetchall()
-    return [{"title": r["title"], "abstract": r["abstract"], "relevance": r["relevance_score"]} for r in rows]
+    return [{
+        "id": r["id"], "title": r["title"], "abstract": r["abstract"],
+        "relevance": r["relevance_score"],
+        "applicants": json.loads(r["applicants"]),
+        "inventors": json.loads(r["inventors"]),
+        "patent_number": r["patent_number"],
+        "filing_date": r["filing_date"],
+        "publication_date": r["publication_date"],
+        "ipc_codes": json.loads(r["ipc_codes"]),
+    } for r in rows]
 
 
 async def run_analysis_background(task_id: int, user_id: int, task_description: str, knowledge_base_ids: Optional[list[str]] = None, start_from: str = "agent1"):
     """后台执行分析任务"""
     # 并发锁：防止同一个 task_id 的多个后台任务同时执行
     if task_id in _running_workflows:
-        print(f"[WARN] Workflow {task_id} already running, skipping duplicate", flush=True)
+        logger.warning(f"Workflow {task_id} already running, skipping duplicate")
         return
     _running_workflows.add(task_id)
 
-    print(f"[DEBUG] Background task started for task_id={task_id}, start_from={start_from}", flush=True)
+    logger.debug(f"Background task started for task_id={task_id}, start_from={start_from}")
     db = get_db()
 
     # 崩溃恢复：将之前卡在 "running" 状态的步骤重置为 "pending"
@@ -435,7 +444,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
         recovered = False
         for step in steps:
             if step["status"] == "running" and step["agent_id"] != start_from:
-                print(f"[RECOVER] Resetting stuck step {step['agent_id']} from running to pending", flush=True)
+                logger.warning(f"Resetting stuck step {step['agent_id']} from running to pending")
                 step["status"] = "pending"
                 step["started_at"] = None
                 step["completed_at"] = None
@@ -450,7 +459,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
     # 构建带知识库上下文的任务描述（仅首次运行需要）
     enriched_description = task_description
     if start_from == "agent1" and knowledge_base_ids:
-        print(f"[DEBUG] Searching knowledge bases: {knowledge_base_ids}", flush=True)
+        logger.debug(f"Searching knowledge bases: {knowledge_base_ids}")
         update_workflow_step(db, task_id, "agent1", "running",
                            description="正在检索知识库...")
         kb_context = await _search_knowledge_bases(user_id, knowledge_base_ids, task_description)
@@ -460,9 +469,9 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
     try:
         # Step 1: 需求洞察（仅 first run，proceed 时跳过）
         if start_from == "agent1":
-            print(f"[DEBUG] Setting agent1 to running for task_id={task_id}", flush=True)
+            logger.debug(f"Setting agent1 to running for task_id={task_id}")
             update_workflow_step(db, task_id, "agent1", "running")
-            print(f"[DEBUG] Agent1 set to running successfully", flush=True)
+            logger.debug(f"Agent1 set to running successfully")
             
             analysis_result = await engine.analyze(enriched_description)
             
@@ -532,6 +541,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
 
             patent_info = []
             direction_patents = {}
+            search_note = ""
             try:
                 all_directions = [task_description[:200]]  # fallback
                 row_steps = db.execute("SELECT steps FROM workflows WHERE task_id=?", (task_id,)).fetchone()
@@ -559,16 +569,38 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
                 patent_searcher = PatentSearchEngine()
                 seen_ids = set()
                 patent_info = []
-                for q in all_directions:
-                    results = await patent_searcher.search(q, top_k=1)
-                    for r in results:
-                        pid = r.get("id")
-                        if pid and pid not in seen_ids:
-                            seen_ids.add(pid)
-                            patent_info.append(r)
-                    direction_patents[q] = [r.get("title") or r.get("_title") or "未命名专利" for r in results]
+
+                # 尝试向量搜索
+                vec_ok = patent_searcher.embedder is not None
+                if vec_ok:
+                    for q in all_directions:
+                        try:
+                            results = await patent_searcher.search(q, top_k=1)
+                            for r in results:
+                                pid = r.get("id")
+                                if pid and pid not in seen_ids:
+                                    seen_ids.add(pid)
+                                    patent_info.append(r)
+                            direction_patents[q] = [r.get("title") or r.get("_title") or "未命名专利" for r in results]
+                        except Exception as vec_e:
+                            logger.warning(f"向量搜索失败(q={q[:30]}): {vec_e}")
+
+                # 关键词回退：向量搜索无结果或未配置嵌入模型时，使用 LIKE 检索
+                if not patent_info:
+                    logger.info("向量搜索无结果，降级到关键词搜索...")
+                    try:
+                        patent_keywords = [q for q in all_directions if q][:3]
+                        kw_results = _fallback_patent_search(db, task_description, patent_keywords)
+                        for r in kw_results:
+                            if r.get("id") and r["id"] not in seen_ids:
+                                seen_ids.add(r["id"])
+                                patent_info.append(r)
+                                direction_patents.setdefault(r.get("title", ""), [r.get("title", "")])
+                        logger.info(f"关键词搜索找到 {len(kw_results)} 条专利")
+                    except Exception as kw_e:
+                        logger.warning(f"关键词搜索也失败: {kw_e}")
             except Exception as e:
-                print(f"[WARN] 专利检索失败: {e}", flush=True)
+                logger.warning(f"专利检索失败: {e}")
 
             update_workflow_step(db, task_id, "agent5", "completed",
                                description=f"检索到 {len(patent_info)} 条相关专利",
@@ -581,7 +613,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
             db.execute("UPDATE workflows SET status=? WHERE task_id=?", ("awaiting_rating", task_id))
             db.commit()
 
-            print(f"[DEBUG] Step 3 completed for task_id={task_id}, patent_info={len(patent_info)}", flush=True)
+            logger.debug(f"Step 3 completed for task_id={task_id}, patent_info={len(patent_info)}")
             return
 
         # Step 4: 方案生成 - AI生成解决方案
@@ -672,7 +704,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
             if start_from != "agent1":
                 db.execute("UPDATE workflows SET status=? WHERE task_id=?", ("awaiting_rating", task_id))
                 db.commit()
-                print(f"[DEBUG] Step 4 completed for task_id={task_id}, pausing for user confirmation", flush=True)
+                logger.debug(f"Step 4 completed for task_id={task_id}, pausing for user confirmation")
                 return
 
         # Step 5: 方案评估 - AI评估方案
@@ -728,7 +760,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
             if start_from != "agent1":
                 db.execute("UPDATE workflows SET status=? WHERE task_id=?", ("awaiting_rating", task_id))
                 db.commit()
-                print(f"[DEBUG] Step 5 completed for task_id={task_id}, pausing for user confirmation", flush=True)
+                logger.debug(f"Step 5 completed for task_id={task_id}, pausing for user confirmation")
                 return
 
         # Step 6: 成果转化 - 生成完整报告
@@ -750,7 +782,8 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
                         try:
                             agent2_out = json.loads(agent2["output"])
                             innovations = agent2_out.get("innovations", [])
-                        except: pass
+                        except Exception:
+                            pass
 
                     agent5 = next((s for s in all_steps if s["agent_id"] == "agent5"), None)
                     if agent5 and agent5.get("output"):
@@ -760,7 +793,8 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
                                 patent_info = agent5_out.get("patents", [])
                             else:
                                 patent_info = agent5_out
-                        except: pass
+                        except Exception:
+                            pass
 
                 # 读取方案和评估
                 sol_rows = db.execute("SELECT title, description FROM solutions WHERE task_id=?", (task_id,)).fetchall()
@@ -795,7 +829,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
                                    description=report.get("title", "分析报告"),
                                    output=json.dumps(report, ensure_ascii=False))
             except Exception as e:
-                print(f"[ERROR] 报告生成失败: {e}", flush=True)
+                logger.error(f"报告生成失败: {e}")
                 update_workflow_step(db, task_id, "agent6", "completed",
                                    description="报告生成异常",
                                    output=json.dumps({"title": "分析报告", "summary": f"报告生成失败: {e}",
@@ -809,7 +843,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
         db.commit()
 
     except Exception as e:
-        print(f"[ERROR] Background task failed for task_id={task_id}: {e}")
+        logger.error(f"Background task failed for task_id={task_id}: {e}")
         db.execute(
             "UPDATE tasks SET status='failed', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
             (task_id,)
@@ -825,7 +859,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
                         update_workflow_step(db, task_id, step["agent_id"], "failed",
                                            description=f"执行失败: {str(e)}")
                         break
-        except:
+        except Exception:
             pass
 
     finally:

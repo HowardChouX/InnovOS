@@ -162,6 +162,10 @@ export const knowledgeApi = {
     return apiRequest(`/api/knowledge/groups/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
   },
 
+  async getItemTypeCounts(baseId: string): Promise<{ data: Record<string, number> }> {
+    return apiRequest(`/api/knowledge/bases/${baseId}/items/type-counts`);
+  },
+
   async reindexItem(baseId: string, itemId: string): Promise<void> {
     await apiRequest(`/api/knowledge-bases/${baseId}/items/${itemId}/reindex`, { method: 'POST' });
   },

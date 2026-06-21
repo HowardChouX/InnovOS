@@ -1,9 +1,11 @@
-import json, os, shutil, re
+import json, os, shutil, re, time, logging
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from pydantic import BaseModel
 from app.database import get_db
 from app.auth import get_current_user, require_admin
 from app.algorithm.patent_search_engine import PatentSearchEngine
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/patents", tags=["admin-patent-db"])
 
@@ -121,7 +123,7 @@ def create_patent(body: PatentCreate, user: dict = Depends(require_admin)):
     import asyncio
     try:
         engine = PatentSearchEngine()
-        asyncio.create_task(engine.index_patent(row_id, body.title or "", body.abstract or "", body.claims or ""))
+        asyncio.create_task(engine.index_patent(row_id, body.title or "", body.abstract or "", body.claims or "", body.description or ""))
     except Exception:
         pass
     return row_to_patent(patent)
@@ -155,7 +157,7 @@ def update_patent(patent_id: int, body: PatentUpdate, user: dict = Depends(requi
     import asyncio
     try:
         engine = PatentSearchEngine()
-        asyncio.create_task(engine.index_patent(patent_id, body.title or "", body.abstract or "", body.claims or ""))
+        asyncio.create_task(engine.index_patent(patent_id, body.title or "", body.abstract or "", body.claims or "", body.description or ""))
     except Exception:
         pass
     return row_to_patent(patent)
@@ -218,7 +220,7 @@ async def upload_patent_pdf(
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "仅支持 PDF 文件")
 
-    safe_name = f"{user['id']}_{int(__import__('time').time())}_{file.filename}"
+    safe_name = f"{user['id']}_{int(time.time())}_{file.filename}"
     pdf_path = os.path.join(PATENT_PDF_DIR, safe_name)
     with open(pdf_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
@@ -292,12 +294,15 @@ async def upload_patent_pdf(
         pass
 
     import asyncio
-    # 向量化：优先用 abstract+claims，没有则用 pdfminer 全文
-    raw_text = fields.get("abstract", "") or ""
-    claims_text = fields.get("claims", "") or ""
-    content = f"{raw_text}\n{claims_text}" if raw_text or claims_text else full_text
+    # 向量化：用提取到的完整字段（abstract + claims + description），无全文则用 pdfminer 原文
+    parts = [
+        fields.get("abstract", "") or "",
+        fields.get("claims", "") or "",
+        fields.get("description", "") or "",
+    ]
+    content = "\n".join(p for p in parts if p.strip()) or full_text
     if len(content) > 100:
-        asyncio.create_task(_index_patent_vectors(row_id, content[:1500]))
+        asyncio.create_task(_index_patent_vectors(row_id, content))
 
     return {**row_to_patent(patent), "mode": mode, "extractSource": parsed["type"]}
 
@@ -308,8 +313,6 @@ async def _index_patent_vectors(patent_id: int, content: str):
         from app.algorithm.patent_search_engine import PatentSearchEngine
         engine = PatentSearchEngine()
         await engine.index_patent_with_content(patent_id, content)
-        logger = __import__("logging").getLogger(__name__)
         logger.info(f"专利 {patent_id} 向量索引完成")
     except Exception as e:
-        logger = __import__("logging").getLogger(__name__)
         logger.warning(f"专利 {patent_id} 向量索引失败: {e}")

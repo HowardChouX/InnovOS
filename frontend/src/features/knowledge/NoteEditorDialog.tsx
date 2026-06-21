@@ -31,7 +31,9 @@ export default function NoteEditorDialog({ open, onClose }: Props) {
       editorRef.current.clear();
       setTitle('');
       onClose();
-    } catch { /* */ } finally {
+    } catch (e) {
+      console.error('[NoteEditorDialog] handleSave failed:', e);
+    } finally {
       setSubmitting(false);
     }
   }, [selectedBaseId, addItem, onClose, title]);

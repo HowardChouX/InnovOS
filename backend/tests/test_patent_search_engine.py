@@ -8,23 +8,22 @@ import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-# ── PatentSearchEngine 初始化（mock embedder 防止 API 调用） ──
+# ── PatentSearchEngine 初始化（mock embed_text 防止 API 调用） ──
 
-
-@pytest.fixture(autouse=True)
-def mock_embedder(monkeypatch):
-    """替换 PatentSearchEngine.embed_text 为固定向量（1024-dim）"""
-    fake_vec = [0.1] * 1024
-    monkeypatch.setattr(
-        "app.algorithm.patent_search_engine.PatentSearchEngine.embed_text",
-        AsyncMock(return_value=fake_vec),
-    )
+FAKE_VEC = [0.1] * 1024
 
 
 @pytest.fixture
 def engine():
     from app.algorithm.patent_search_engine import PatentSearchEngine
-    return PatentSearchEngine()
+
+    e = PatentSearchEngine()
+    # Set embed_text as an instance attribute (bypasses descriptor protocol)
+    async def mock_embed_text(text):
+        return FAKE_VEC
+
+    e.embed_text = mock_embed_text
+    return e
 
 
 @pytest.fixture
@@ -32,6 +31,9 @@ def mock_db(monkeypatch):
     """Mock get_db 返回可控的 MagicMock"""
     conn = MagicMock()
     monkeypatch.setattr("app.database.get_db", lambda: conn)
+    # The module caches 'from app.database import get_db' at import time,
+    # so we must also patch the local reference.
+    monkeypatch.setattr("app.algorithm.patent_search_engine.get_db", lambda: conn)
     return conn
 
 
@@ -100,45 +102,27 @@ class TestSearch:
 
     async def test_search_pg_calls_operator(self, engine, monkeypatch):
         """PG 环境下应使用 <=> 算子"""
-        # Mock is_postgres -> True
-        monkeypatch.setattr("app.database.is_postgres", lambda: True)
-
-        conn = MagicMock()
-        monkeypatch.setattr("app.database.get_db", lambda: conn)
-
-        fake_rows = [
-            {"id": 1, "title": "散热结构", "abstract": "摘要", "patent_number": "CN123", "applicant": "华为",
-             "relevance": 0.95}
+        # _vector_search uses psycopg2.connect(DATABASE_URL) directly
+        mock_cursor = MagicMock()
+        mock_cursor.description = [("id",), ("title",), ("abstract",),
+                                   ("description",), ("patent_number",),
+                                   ("applicants",), ("relevance",)]
+        mock_cursor.fetchall.return_value = [
+            (1, "散热结构", "摘要", "", "CN123", '["华为"]', 0.95)
         ]
-        conn.execute.return_value.fetchall.return_value = fake_rows
 
-        results = await engine.search("散热")
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        with patch("psycopg2.connect", return_value=mock_conn):
+            results = await engine.search("散热")
+
         assert len(results) == 1
         assert results[0]["relevance"] == 0.95
 
         # 验证使用了 <=> 算子
-        call_sql = conn.execute.call_args[0][0]
+        call_sql = mock_cursor.execute.call_args[0][0]
         assert "<->" in call_sql or "<=>" in call_sql
-
-    async def test_search_sqlite_fallback(self, engine, monkeypatch):
-        """SQLite 环境应使用全表扫描 + numpy"""
-        monkeypatch.setattr("app.database.is_postgres", lambda: False)
-
-        conn = MagicMock()
-        monkeypatch.setattr("app.database.get_db", lambda: conn)
-
-        # 返回 fake rows 包含 embedding JSON
-        fake_vec_str = json.dumps([0.1] * 1024)
-        fake_rows = [
-            {"patent_id": 1, "embedding": fake_vec_str, "title": "散热结构", "abstract": "摘要",
-             "patent_number": "CN123", "applicant": "华为"}
-        ]
-        conn.execute.return_value.fetchall.return_value = fake_rows
-
-        results = await engine.search("散热", top_k=3)
-        assert len(results) == 1
-        # 余弦相似度应为 1.0（向量完全一样）
-        assert results[0]["relevance"] == 1.0
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -155,15 +139,17 @@ class TestBackfill:
         assert count == 0
 
     async def test_backfill_indexes_missing(self, engine, mock_db):
-        """未索引的专利应逐个嵌入"""
+        """未索引的专利应逐个嵌入（backfill 内联嵌入，不调用 index_patent）"""
         mock_db.execute.return_value.fetchall.return_value = [
-            {"id": 1, "title": "散热结构", "abstract": "新结构"},
-            {"id": 2, "title": "无线充电", "abstract": "新方案"},
+            {"id": 1, "title": "散热结构", "abstract": "新结构", "claims": "", "description": ""},
+            {"id": 2, "title": "无线充电", "abstract": "新方案", "claims": "", "description": ""},
         ]
-        with patch.object(engine, 'index_patent', AsyncMock(return_value=True)):
-            count = await engine.backfill()
-            assert count == 2
-            assert engine.index_patent.call_count == 2
+        count = await engine.backfill()
+        assert count == 2
+        # backfill 内部直接嵌入+INSERT，每行一次 INSERT
+        insert_sqls = [args[0] for args in mock_db.execute.call_args_list
+                       if "INSERT INTO patent_vectors" in str(args[0])]
+        assert len(insert_sqls) == 2
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -174,14 +160,8 @@ class TestEmbedText:
 
     async def test_embedder_not_configured_raises(self, monkeypatch):
         """embedder 为 None 时应抛 RuntimeError"""
-        monkeypatch.setattr(
-            "app.algorithm.patent_search_engine.PatentSearchEngine",
-            "embedder",
-            None,
-        )
-        # 重新创建 engine 用没有 embedder 的配置
         from app.algorithm.patent_search_engine import PatentSearchEngine, _get_embedder_config
-        # Patch _get_embedder_config -> None
+        # Patch _get_embedder_config -> None so embedder stays None
         monkeypatch.setattr("app.algorithm.patent_search_engine._get_embedder_config", lambda: None)
         engine = PatentSearchEngine()
         assert engine.embedder is None

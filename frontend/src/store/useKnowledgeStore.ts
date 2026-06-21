@@ -12,6 +12,7 @@ interface KnowledgeStore {
   itemsPage: number;
   tabCounts: Record<KnowledgeTabKey, number>;
   loading: boolean;
+  error: string | null;
   activeTab: KnowledgeTabKey;
   searchQuery: string;
   isRecallTestOpen: boolean;
@@ -65,6 +66,7 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
   itemsPage: 1,
   tabCounts: { file: 0, note: 0, directory: 0, url: 0 },
   loading: false,
+  error: null,
   activeTab: 'file',
   searchQuery: '',
   isRecallTestOpen: false,
@@ -85,8 +87,9 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
         set({ selectedBaseId: bases[0].id });
         await get().fetchItems(bases[0].id);
       }
-    } catch {
-      set({ bases: [] });
+    } catch (e) {
+      console.error('[useKnowledgeStore] fetchBases failed:', e);
+      set({ bases: [], error: e instanceof Error ? e.message : '加载知识库列表失败' });
     } finally {
       set({ loading: false });
     }
@@ -96,8 +99,9 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
     try {
       const res = await knowledgeApi.listGroups();
       set({ groups: res.data || [] });
-    } catch {
-      set({ groups: [] });
+    } catch (e) {
+      console.error('[useKnowledgeStore] fetchGroups failed:', e);
+      set({ groups: [], error: e instanceof Error ? e.message : '加载知识库分组失败' });
     }
   },
 
@@ -168,23 +172,19 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
     if (!skipLoading) set({ loading: true });
     try {
       const type = get().activeTab;
-      const [filteredRes, allRes] = await Promise.all([
+      const [filteredRes, countsRes] = await Promise.all([
         knowledgeApi.listItems(bid, { page, limit: 20, type }),
-        knowledgeApi.listItems(bid, { page: 1, limit: 9999, type: undefined }),
+        knowledgeApi.getItemTypeCounts(bid),
       ]);
-      const allItems = allRes.data?.items || [];
-      const counts: Record<KnowledgeTabKey, number> = { file: 0, note: 0, directory: 0, url: 0 };
-      for (const item of allItems) {
-        if (item.type in counts) counts[item.type as KnowledgeTabKey]++;
-      }
       set({
         items: filteredRes.data?.items || [],
         itemsTotal: filteredRes.data?.total || 0,
         itemsPage: filteredRes.data?.page || 1,
-        tabCounts: counts,
+        tabCounts: (countsRes.data || { file: 0, note: 0, directory: 0, url: 0 }) as Record<KnowledgeTabKey, number>,
       });
-    } catch {
-      set({ items: [], itemsTotal: 0, tabCounts: { file: 0, note: 0, directory: 0, url: 0 } });
+    } catch (e) {
+      console.error('[useKnowledgeStore] fetchItems failed:', e);
+      set({ items: [], itemsTotal: 0, tabCounts: { file: 0, note: 0, directory: 0, url: 0 }, error: e instanceof Error ? e.message : '加载知识项失败' });
     } finally {
       set({ loading: false });
     }

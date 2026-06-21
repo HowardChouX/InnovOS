@@ -248,8 +248,8 @@ function DocRow({ doc, onDelete, onClick }: { doc: KnowledgeItem; onDelete: () =
     setReindexing(true);
     try {
       await reindexItem(doc.id);
-    } catch {
-      // error handled by store
+    } catch (e) {
+      console.error('[KnowledgeDetail] reindexItem failed:', e);
     } finally {
       setReindexing(false);
     }

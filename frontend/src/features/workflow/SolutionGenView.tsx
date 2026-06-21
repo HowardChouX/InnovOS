@@ -17,6 +17,7 @@ export function SolutionGenView({ output }: { output: SolutionItem[] | null }) {
   const [ratings, setRatings] = useState<Record<string, number>>({})
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const solutions = Array.isArray(output) ? output : [];
 
@@ -35,6 +36,7 @@ export function SolutionGenView({ output }: { output: SolutionItem[] | null }) {
       fetchWorkflow(selectedTaskId);
     } catch (err) {
       console.error('确认方案失败:', err);
+      setSubmitError(err instanceof Error ? err.message : '确认方案失败');
     } finally {
       setSubmitting(false);
     }
@@ -44,7 +46,7 @@ export function SolutionGenView({ output }: { output: SolutionItem[] | null }) {
     return (
       <div className="card" style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        minHeight: 200, gap: 12,
+        flex: 1, minHeight: 0, gap: 12,
       }}>
         <i className="fa-solid fa-wand-magic-sparkles" style={{ fontSize: 32, color: 'var(--text-tertiary)', opacity: 0.3 }} />
         <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>暂无方案数据</span>
@@ -52,12 +54,12 @@ export function SolutionGenView({ output }: { output: SolutionItem[] | null }) {
     );
   }
 
-  // 已确认且 workflow 正在运行下一步 → 显示加载状态
-  if (submitted && workflow?.status === 'running') {
+  // 已确认 → 显示加载状态，直到组件因 phase 切换而卸载
+  if (submitted) {
     return (
       <div className="card" style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        minHeight: 200, gap: 16,
+        flex: 1, minHeight: 0, gap: 16,
       }}>
         <div style={{
           width: 48, height: 48, borderRadius: '50%',
@@ -161,6 +163,11 @@ export function SolutionGenView({ output }: { output: SolutionItem[] | null }) {
         ))}
       </div>
 
+      {submitError && (
+        <div style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--accent-red)', fontSize: 12 }}>
+          {submitError}
+        </div>
+      )}
       {workflow?.status === 'awaiting_rating' && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
           <button onClick={handleSubmit} disabled={!allRated || submitting || submitted}
