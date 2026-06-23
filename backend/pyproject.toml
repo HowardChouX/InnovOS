@@ -5,7 +5,6 @@ description = "InnovOS 创新智能操作系统后端"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.0",
-    "sqlmodel>=0.0.22",
     "uvicorn[standard]>=0.30.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
@@ -25,8 +24,6 @@ dependencies = [
     "readability-lxml>=0.8.0",
     "html2text>=2024.0.0",
     "lxml>=5.0.0",
-    "pdf2image>=1.17.0",
-    "pillow>=12.2.0",
     "pdf2image>=1.17.0",
     "pillow>=12.2.0",
     "alembic>=1.18.4",

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useKnowledgeStore } from '../../store/useKnowledgeStore';
 import { knowledgeApi } from '../../api/knowledge';
+import type { KnowledgeSearchMode } from '../../types/knowledge';
 import KnowledgePanelShell from './components/KnowledgePanelShell';
 import { KnowledgeDialogFooter } from './components/KnowledgeDialogLayout';
 import ChunkingSection from './panels/ragConfig/ChunkingSection';
@@ -12,6 +13,19 @@ import RetrievalSection from './panels/ragConfig/RetrievalSection';
 export interface KnowledgeRestoreBaseInitialValues {
   embeddingModelId?: string | null;
   dimensions?: number | null;
+}
+
+interface RagConfigFormValues {
+  fileProcessorId: string | null;
+  chunkSize: string;
+  chunkOverlap: string;
+  embeddingModelId: string | null;
+  rerankModelId: string | null;
+  dimensions: string;
+  documentCount: number;
+  threshold: number;
+  searchMode: KnowledgeSearchMode;
+  hybridAlpha: number | null;
 }
 
 interface Props {
@@ -33,11 +47,19 @@ const parseRequiredInteger = (value: string) => {
   return parsed;
 };
 
-const getKnowledgeRagChunkValidationErrors = (values: { chunkOverlap: string; chunkSize: string; dimensions?: string }) => {
+const getKnowledgeRagChunkValidationErrors = (values: {
+  chunkOverlap: string;
+  chunkSize: string;
+  dimensions?: string;
+}) => {
   const chunkSize = parseOptionalInteger(values.chunkSize);
   const chunkOverlap = parseOptionalInteger(values.chunkOverlap);
   const dimensions = values.dimensions == null ? null : parseOptionalInteger(values.dimensions);
-  const errors: { chunkOverlap?: 'chunkOverlapInvalid' | 'chunkOverlapMustBeSmaller'; chunkSize?: 'chunkSizeInvalid'; dimensions?: 'dimensionsInvalid' } = {};
+  const errors: {
+    chunkOverlap?: 'chunkOverlapInvalid' | 'chunkOverlapMustBeSmaller';
+    chunkSize?: 'chunkSizeInvalid';
+    dimensions?: 'dimensionsInvalid';
+  } = {};
 
   if (values.chunkSize && (!chunkSize || chunkSize <= 0)) {
     errors.chunkSize = 'chunkSizeInvalid';
@@ -55,13 +77,27 @@ const getKnowledgeRagChunkValidationErrors = (values: { chunkOverlap: string; ch
 };
 
 const getKnowledgeRagConfigFormState = (
-  initialValues: { [key: string]: any },
-  currentValues: { chunkOverlap: string; chunkSize: string; dimensions?: string } & Record<string, any>
+  initialValues: RagConfigFormValues,
+  currentValues: RagConfigFormValues,
 ) => {
   const validationErrorCodes = getKnowledgeRagChunkValidationErrors(currentValues);
-  const hasEmptyChunkFields = currentValues.chunkSize === '' || currentValues.chunkOverlap === '' || currentValues.dimensions === '';
+  const hasEmptyChunkFields =
+    currentValues.chunkSize === '' ||
+    currentValues.chunkOverlap === '' ||
+    currentValues.dimensions === '';
   const hasValidationErrors = Object.values(validationErrorCodes).some(Boolean);
-  const ragKeys = ['fileProcessorId', 'chunkSize', 'chunkOverlap', 'embeddingModelId', 'dimensions', 'rerankModelId', 'documentCount', 'threshold', 'searchMode', 'hybridAlpha'];
+  const ragKeys: (keyof RagConfigFormValues)[] = [
+    'fileProcessorId',
+    'chunkSize',
+    'chunkOverlap',
+    'embeddingModelId',
+    'dimensions',
+    'rerankModelId',
+    'documentCount',
+    'threshold',
+    'searchMode',
+    'hybridAlpha',
+  ];
   const isDirty = ragKeys.some((key) => initialValues[key] !== currentValues[key]);
 
   return {
@@ -69,29 +105,35 @@ const getKnowledgeRagConfigFormState = (
     hasEmptyChunkFields,
     hasValidationErrors,
     isDirty,
-    canSave: isDirty && !hasEmptyChunkFields && !hasValidationErrors
+    canSave: isDirty && !hasEmptyChunkFields && !hasValidationErrors,
   };
 };
 
-const createKnowledgeRagConfigFormValues = (base: any) => ({
-  fileProcessorId: base.fileProcessorId ?? null,
-  chunkSize: String(base.chunkSize || 1024),
-  chunkOverlap: String(base.chunkOverlap || 200),
-  embeddingModelId: base.embeddingModelId ?? null,
-  rerankModelId: base.rerankModelId ?? null,
-  dimensions: base.dimensions == null ? '' : String(base.dimensions),
-  documentCount: base.documentCount ?? 10,
-  threshold: base.threshold ?? 0.0,
-  searchMode: base.searchMode || 'hybrid',
-  hybridAlpha: base.hybridAlpha ?? null
-});
+const createKnowledgeRagConfigFormValues = (base: unknown): RagConfigFormValues => {
+  const b = base as Record<string, unknown>;
+  const rawSearchMode = (b.searchMode as string) || 'hybrid';
+  return {
+    fileProcessorId: (b.fileProcessorId as string | null) ?? null,
+    chunkSize: String(b.chunkSize || 1024),
+    chunkOverlap: String(b.chunkOverlap || 200),
+    embeddingModelId: (b.embeddingModelId as string | null) ?? null,
+    rerankModelId: (b.rerankModelId as string | null) ?? null,
+    dimensions: b.dimensions == null ? '' : String(b.dimensions),
+    documentCount: (b.documentCount as number) ?? 10,
+    threshold: (b.threshold as number) ?? 0.0,
+    searchMode: (rawSearchMode === 'default' || rawSearchMode === 'bm25'
+      ? rawSearchMode
+      : 'hybrid') as KnowledgeSearchMode,
+    hybridAlpha: (b.hybridAlpha as number | null) ?? null,
+  };
+};
 
 export function RagConfigPanel({ open, onClose }: Props) {
   const { bases, selectedBaseId } = useKnowledgeStore();
-  const base = bases.find(b => b.id === selectedBaseId);
+  const base = bases.find((b) => b.id === selectedBaseId);
 
-  const [values, setValues] = useState<any>(null);
-  const [initialValues, setInitialValues] = useState<any>(null);
+  const [values, setValues] = useState<RagConfigFormValues | null>(null);
+  const [initialValues, setInitialValues] = useState<RagConfigFormValues | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingDimensions, setIsFetchingDimensions] = useState(false);
   const [embeddingModels, setEmbeddingModels] = useState<Array<{ id: string; label: string }>>([]);
@@ -100,36 +142,62 @@ export function RagConfigPanel({ open, onClose }: Props) {
 
   useEffect(() => {
     if (base) {
-      const iv = createKnowledgeRagConfigFormValues(base);
-      setInitialValues(iv);
-      setValues(iv);
+      const id = requestAnimationFrame(() => {
+        const iv = createKnowledgeRagConfigFormValues(base);
+        setInitialValues(iv);
+        setValues(iv);
+      });
+      return () => cancelAnimationFrame(id);
     }
   }, [base]);
 
   useEffect(() => {
     if (!open) return;
-    knowledgeApi.listEmbeddingModels().then(res => {
-      setEmbeddingModels(res.data?.map((m: any) => ({ id: m.id, label: m.label || m.id })) || []);
-    }).catch(() => {});
-    knowledgeApi.listRerankModels().then(res => {
-      setRerankModels(res.data?.map((m: any) => ({ id: m.id, label: m.label || m.id })) || []);
-    }).catch(() => {});
+    knowledgeApi
+      .listEmbeddingModels()
+      .then((res) => {
+        setEmbeddingModels(
+          res.data?.map((m: { id: string; label?: string }) => ({
+            id: m.id,
+            label: m.label || m.id,
+          })) || [],
+        );
+      })
+      .catch(() => {});
+    knowledgeApi
+      .listRerankModels()
+      .then((res) => {
+        setRerankModels(
+          res.data?.map((m: { id: string; label?: string }) => ({
+            id: m.id,
+            label: m.label || m.id,
+          })) || [],
+        );
+      })
+      .catch(() => {});
   }, [open]);
 
   const formState = useMemo(() => {
     if (!initialValues || !values) {
       return {
-        validationErrorCodes: {} as { chunkSize?: 'chunkSizeInvalid'; chunkOverlap?: 'chunkOverlapInvalid' | 'chunkOverlapMustBeSmaller'; dimensions?: 'dimensionsInvalid' },
+        validationErrorCodes: {} as {
+          chunkSize?: 'chunkSizeInvalid';
+          chunkOverlap?: 'chunkOverlapInvalid' | 'chunkOverlapMustBeSmaller';
+          dimensions?: 'dimensionsInvalid';
+        },
         isDirty: false,
-        canSave: false
+        canSave: false,
       };
     }
     return getKnowledgeRagConfigFormState(initialValues, values);
   }, [initialValues, values]);
   const { validationErrorCodes, isDirty, canSave } = formState;
-  const selectedEmbeddingModel = embeddingModels.find((model) => model.id === values?.embeddingModelId);
+  const selectedEmbeddingModel = embeddingModels.find(
+    (model) => model.id === values?.embeddingModelId,
+  );
   const embeddingConfigChanged =
-    values?.embeddingModelId !== initialValues?.embeddingModelId || values?.dimensions !== initialValues?.dimensions;
+    values?.embeddingModelId !== initialValues?.embeddingModelId ||
+    values?.dimensions !== initialValues?.dimensions;
 
   const searchModeOptions = [
     { value: 'hybrid', label: '混合检索' },
@@ -137,9 +205,7 @@ export function RagConfigPanel({ open, onClose }: Props) {
     { value: 'bm25', label: '关键词检索' },
   ];
 
-  const fileProcessorOptions = [
-    { value: 'default', label: '默认处理器' },
-  ];
+  const fileProcessorOptions = [{ value: 'default', label: '默认处理器' }];
 
   if (!open || !base || !values) return null;
 
@@ -151,7 +217,10 @@ export function RagConfigPanel({ open, onClose }: Props) {
     setIsFetchingDimensions(true);
     try {
       // InnovOS may not have embedMany endpoint; simulate with a fixed dimension or call API
-      setValues((currentValues: any) => ({ ...currentValues, dimensions: '1536' }));
+      setValues((currentValues: RagConfigFormValues | null) => ({
+        ...currentValues!,
+        dimensions: '1536',
+      }));
     } catch (error) {
       setErrorMessage(`获取维度失败: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -160,14 +229,14 @@ export function RagConfigPanel({ open, onClose }: Props) {
   };
 
   const handleSave = async () => {
-    if (!canSave || !selectedBaseId) return;
+    if (!canSave || !selectedBaseId || !initialValues) return;
 
     if (embeddingConfigChanged) {
       // If embedding config changed, we need to restore the base
       setIsLoading(true);
       try {
         await knowledgeApi.updateBase(selectedBaseId, {
-          embeddingModelId: values.embeddingModelId,
+          embeddingModelId: values.embeddingModelId ?? undefined,
           dimensions: parseRequiredInteger(values.dimensions),
           status: 'completed',
           error: undefined,
@@ -183,15 +252,20 @@ export function RagConfigPanel({ open, onClose }: Props) {
 
     setIsLoading(true);
     try {
-      const patch: any = {};
-      if (values.fileProcessorId !== initialValues.fileProcessorId) patch.fileProcessorId = values.fileProcessorId;
-      if (values.chunkSize !== initialValues.chunkSize) patch.chunkSize = parseRequiredInteger(values.chunkSize);
-      if (values.chunkOverlap !== initialValues.chunkOverlap) patch.chunkOverlap = parseRequiredInteger(values.chunkOverlap);
-      if (values.rerankModelId !== initialValues.rerankModelId) patch.rerankModelId = values.rerankModelId;
-      if (values.documentCount !== initialValues.documentCount) patch.documentCount = values.documentCount;
-      if (values.threshold !== initialValues.threshold) patch.threshold = values.threshold;
-      if (values.searchMode !== initialValues.searchMode) patch.searchMode = values.searchMode;
-      if (values.searchMode === 'hybrid' && values.hybridAlpha !== initialValues.hybridAlpha) patch.hybridAlpha = values.hybridAlpha ?? undefined;
+      const iv = initialValues;
+      const patch: Record<string, unknown> = {};
+      if (values.fileProcessorId !== iv.fileProcessorId)
+        patch.fileProcessorId = values.fileProcessorId;
+      if (values.chunkSize !== iv.chunkSize)
+        patch.chunkSize = parseRequiredInteger(values.chunkSize);
+      if (values.chunkOverlap !== iv.chunkOverlap)
+        patch.chunkOverlap = parseRequiredInteger(values.chunkOverlap);
+      if (values.rerankModelId !== iv.rerankModelId) patch.rerankModelId = values.rerankModelId;
+      if (values.documentCount !== iv.documentCount) patch.documentCount = values.documentCount;
+      if (values.threshold !== iv.threshold) patch.threshold = values.threshold;
+      if (values.searchMode !== iv.searchMode) patch.searchMode = values.searchMode;
+      if (values.searchMode === 'hybrid' && values.hybridAlpha !== iv.hybridAlpha)
+        patch.hybridAlpha = values.hybridAlpha ?? undefined;
       await knowledgeApi.updateBase(selectedBaseId, patch);
       onClose();
     } catch (error) {
@@ -213,12 +287,15 @@ export function RagConfigPanel({ open, onClose }: Props) {
             type="button"
             className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90"
             onClick={() => {
-              setValues((v: any) => ({ ...v }));
+              setValues((v: RagConfigFormValues | null) => (v ? { ...v } : v));
               // Reset to active state by clearing error
               if (selectedBaseId) {
-                knowledgeApi.updateBase(selectedBaseId, { status: 'completed', error: undefined }).catch(() => {});
+                knowledgeApi
+                  .updateBase(selectedBaseId, { status: 'completed', error: undefined })
+                  .catch(() => {});
               }
-            }}>
+            }}
+          >
             恢复配置
           </button>
         </div>
@@ -232,7 +309,10 @@ export function RagConfigPanel({ open, onClose }: Props) {
             fileProcessorId={values.fileProcessorId}
             fileProcessorOptions={fileProcessorOptions}
             onFileProcessorChange={(fileProcessorId) =>
-              setValues((currentValues: any) => ({ ...currentValues, fileProcessorId }))
+              setValues((currentValues: RagConfigFormValues | null) => ({
+                ...currentValues!,
+                fileProcessorId,
+              }))
             }
           />
 
@@ -242,10 +322,16 @@ export function RagConfigPanel({ open, onClose }: Props) {
             chunkSizeErrorCode={validationErrorCodes.chunkSize}
             chunkOverlapErrorCode={validationErrorCodes.chunkOverlap}
             onChunkSizeChange={(chunkSize) =>
-              setValues((currentValues: any) => ({ ...currentValues, chunkSize: chunkSize.replace(/\D/g, '') }))
+              setValues((currentValues: RagConfigFormValues | null) => ({
+                ...currentValues!,
+                chunkSize: chunkSize.replace(/\D/g, ''),
+              }))
             }
             onChunkOverlapChange={(chunkOverlap) =>
-              setValues((currentValues: any) => ({ ...currentValues, chunkOverlap: chunkOverlap.replace(/\D/g, '') }))
+              setValues((currentValues: RagConfigFormValues | null) => ({
+                ...currentValues!,
+                chunkOverlap: chunkOverlap.replace(/\D/g, ''),
+              }))
             }
           />
 
@@ -256,10 +342,16 @@ export function RagConfigPanel({ open, onClose }: Props) {
             dimensionsErrorCode={validationErrorCodes.dimensions}
             isFetchingDimensions={isFetchingDimensions}
             onEmbeddingModelChange={(embeddingModelId) =>
-              setValues((currentValues: any) => ({ ...currentValues, embeddingModelId }))
+              setValues((currentValues: RagConfigFormValues | null) => ({
+                ...currentValues!,
+                embeddingModelId,
+              }))
             }
             onDimensionsChange={(dimensions) =>
-              setValues((currentValues: any) => ({ ...currentValues, dimensions: dimensions.replace(/\D/g, '') }))
+              setValues((currentValues: RagConfigFormValues | null) => ({
+                ...currentValues!,
+                dimensions: dimensions.replace(/\D/g, ''),
+              }))
             }
             onRefreshDimensions={handleRefreshDimensions}
           />
@@ -273,12 +365,35 @@ export function RagConfigPanel({ open, onClose }: Props) {
             hybridAlpha={values.hybridAlpha}
             rerankModelId={values.rerankModelId}
             onDocumentCountChange={(documentCount) =>
-              setValues((currentValues: any) => ({ ...currentValues, documentCount }))
+              setValues((currentValues: RagConfigFormValues | null) => ({
+                ...currentValues!,
+                documentCount,
+              }))
             }
-            onThresholdChange={(threshold) => setValues((currentValues: any) => ({ ...currentValues, threshold }))}
-            onSearchModeChange={(searchMode) => setValues((currentValues: any) => ({ ...currentValues, searchMode }))}
-            onHybridAlphaChange={(hybridAlpha) => setValues((currentValues: any) => ({ ...currentValues, hybridAlpha }))}
-            onRerankModelChange={(rerankModelId) => setValues((currentValues: any) => ({ ...currentValues, rerankModelId }))}
+            onThresholdChange={(threshold) =>
+              setValues((currentValues: RagConfigFormValues | null) => ({
+                ...currentValues!,
+                threshold,
+              }))
+            }
+            onSearchModeChange={(searchMode) =>
+              setValues((currentValues: RagConfigFormValues | null) => ({
+                ...currentValues!,
+                searchMode,
+              }))
+            }
+            onHybridAlphaChange={(hybridAlpha) =>
+              setValues((currentValues: RagConfigFormValues | null) => ({
+                ...currentValues!,
+                hybridAlpha,
+              }))
+            }
+            onRerankModelChange={(rerankModelId) =>
+              setValues((currentValues: RagConfigFormValues | null) => ({
+                ...currentValues!,
+                rerankModelId,
+              }))
+            }
           />
         </div>
       </div>
@@ -288,7 +403,8 @@ export function RagConfigPanel({ open, onClose }: Props) {
           type="button"
           disabled={!isDirty || isLoading}
           className="mr-auto flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-foreground-muted hover:bg-accent hover:text-foreground disabled:opacity-50"
-          onClick={() => setValues(initialValues)}>
+          onClick={() => setValues(initialValues)}
+        >
           <i className="fa-solid fa-rotate-left text-xs" />
           重置
         </button>
@@ -296,7 +412,8 @@ export function RagConfigPanel({ open, onClose }: Props) {
           type="button"
           disabled={!canSave || isLoading}
           className="rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          onClick={handleSave}>
+          onClick={handleSave}
+        >
           {embeddingConfigChanged ? '恢复并保存' : isLoading ? '保存中...' : '保存'}
         </button>
       </KnowledgeDialogFooter>
@@ -304,33 +421,41 @@ export function RagConfigPanel({ open, onClose }: Props) {
   );
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50"
+      onClick={onClose}
+    >
       <div
         className="flex w-[560px] max-w-[90vw] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl"
         style={{ maxHeight: '85vh' }}
-        onClick={e => e.stopPropagation()}>
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex shrink-0 items-center justify-between border-b border-border-muted px-5 py-3.5">
           <span className="text-base font-semibold text-foreground">RAG 配置</span>
-          <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-muted hover:bg-accent">
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-muted hover:bg-accent"
+          >
             <i className="fa-solid fa-xmark" />
           </button>
         </div>
 
-        <KnowledgePanelShell className="min-h-0 flex-1">
-          {panelBody}
-        </KnowledgePanelShell>
+        <KnowledgePanelShell className="min-h-0 flex-1">{panelBody}</KnowledgePanelShell>
 
         {/* Error Toast */}
         {errorMessage ? (
           <div className="absolute bottom-4 right-4 z-[9999] rounded-lg badge-danger px-4 py-2 text-sm">
             {errorMessage}
-            <button onClick={() => setErrorMessage(null)} className="ml-2 text-accent-danger hover:opacity-80">
+            <button
+              onClick={() => setErrorMessage(null)}
+              className="ml-2 text-accent-danger hover:opacity-80"
+            >
               <i className="fa-solid fa-xmark" />
             </button>
           </div>
         ) : null}
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

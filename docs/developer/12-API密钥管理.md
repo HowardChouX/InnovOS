@@ -12,22 +12,21 @@
 
 ```sql
 CREATE TABLE model_providers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     provider_id TEXT UNIQUE NOT NULL,      -- 'deepseek', 'openai', 'silicon'
     name TEXT NOT NULL,                    -- 显示名称
     protocol TEXT DEFAULT 'openai',        -- 'openai' | 'anthropic' | 'custom'
     api_host TEXT NOT NULL,                -- API 端点地址
-    api_key_encrypted TEXT,                -- AES 加密的 API Key
+    api_key_encrypted TEXT,                -- 保留字段（当前未使用）
     api_model TEXT DEFAULT '',             -- 默认模型
-    models JSON DEFAULT '[]',             -- 支持的模型列表（JSON 数组）
-    priority INTEGER DEFAULT 0,           -- 轮询优先级（越小越优先）
+    models TEXT DEFAULT '[]',              -- 支持的模型列表（JSON 数组）
     max_rpm INTEGER DEFAULT 60,           -- 每分钟最大请求数
     current_rpm INTEGER DEFAULT 0,        -- 当前 RPM
     request_count INTEGER DEFAULT 0,      -- 累积请求次数
     is_enabled INTEGER DEFAULT 1,         -- 是否启用
     last_used_at TEXT,                    -- 最后使用时间
     last_reset_at TEXT,                   -- RPM 重置时间
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))
 );
 ```
 
@@ -35,20 +34,20 @@ CREATE TABLE model_providers (
 
 ```sql
 CREATE TABLE api_keys (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     provider_id TEXT DEFAULT '',           -- 关联 model_providers.provider_id
     key_name TEXT NOT NULL,
-    api_key TEXT NOT NULL,                -- AES 加密存储
-    api_base_url TEXT,
+    api_key TEXT NOT NULL,
+    api_base_url TEXT DEFAULT 'https://api.deepseek.com',
     api_model TEXT DEFAULT 'deepseek-chat',
     is_active INTEGER DEFAULT 1,
     priority INTEGER DEFAULT 0,
     max_rpm INTEGER DEFAULT 60,
     current_rpm INTEGER DEFAULT 0,
-    request_count INTEGER DEFAULT 0,
-    last_used_at TEXT,
     last_reset_at TEXT,
-    created_at TEXT DEFAULT (datetime('now'))
+    last_used_at TEXT,
+    request_count INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))
 );
 ```
 
@@ -58,15 +57,15 @@ CREATE TABLE api_keys (
 
 `algorithm/providers_registry.py` 内置 7 个常用供应商：
 
-| 供应商 | ID | API Host | 类别 |
-|--------|----|----------|------|
-| DeepSeek | `deepseek` | `https://api.deepseek.com` | 国内 |
-| SiliconFlow | `silicon` | `https://api.siliconflow.cn` | 国内 |
-| 阿里百炼 | `dashscope` | `https://dashscope.aliyuncs.com/compatible-mode/v1/` | 国内 |
-| OpenAI | `openai` | `https://api.openai.com` | 国际 |
-| 智谱 AI | `zhipu` | `https://open.bigmodel.cn/api/paas/v4/` | 国内 |
-| Moonshot AI | `moonshot` | `https://api.moonshot.cn` | 国内 |
-| Ollama | `ollama` | `http://localhost:11434` | 本地 |
+| 供应商      | ID          | API Host                                             | 类别 |
+| ----------- | ----------- | ---------------------------------------------------- | ---- |
+| DeepSeek    | `deepseek`  | `https://api.deepseek.com`                           | 国内 |
+| SiliconFlow | `silicon`   | `https://api.siliconflow.cn`                         | 国内 |
+| 阿里百炼    | `dashscope` | `https://dashscope.aliyuncs.com/compatible-mode/v1/` | 国内 |
+| OpenAI      | `openai`    | `https://api.openai.com`                             | 国际 |
+| 智谱 AI     | `zhipu`     | `https://open.bigmodel.cn/api/paas/v4/`              | 国内 |
+| Moonshot AI | `moonshot`  | `https://api.moonshot.cn`                            | 国内 |
+| Ollama      | `ollama`    | `http://localhost:11434`                             | 本地 |
 
 每个内置供应商包含 `website`、`key_url`、`docs_url` 参考链接。
 
@@ -116,27 +115,27 @@ async def chat_completion(system_prompt, user_prompt, ..., provider_id: str = ""
 
 ### 5.1 供应商管理
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/admin/providers/builtin` | GET | 内置供应商列表（含配置状态） |
-| `/api/admin/providers` | GET | 所有已配置供应商 |
-| `/api/admin/providers` | POST | 添加/配置供应商 |
-| `/api/admin/providers/{id}` | PUT | 更新供应商配置 |
-| `/api/admin/providers/{id}` | DELETE | 删除供应商 |
-| `/api/admin/providers/{id}/check` | POST | 检查连接 |
-| `/api/admin/providers/{id}/detect-models` | POST | 检测可用模型列表 |
-| `/api/admin/providers/{id}/toggle` | PUT | 启用/禁用切换 |
+| 端点                                      | 方法   | 说明                         |
+| ----------------------------------------- | ------ | ---------------------------- |
+| `/api/admin/providers/builtin`            | GET    | 内置供应商列表（含配置状态） |
+| `/api/admin/providers`                    | GET    | 所有已配置供应商             |
+| `/api/admin/providers`                    | POST   | 添加/配置供应商              |
+| `/api/admin/providers/{id}`               | PUT    | 更新供应商配置               |
+| `/api/admin/providers/{id}`               | DELETE | 删除供应商                   |
+| `/api/admin/providers/{id}/check`         | POST   | 检查连接                     |
+| `/api/admin/providers/{id}/detect-models` | POST   | 检测可用模型列表             |
+| `/api/admin/providers/{id}/toggle`        | PUT    | 启用/禁用切换                |
 
 ### 5.2 Key 池管理
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/admin/keys` | GET | Key 列表 |
-| `/api/admin/keys` | POST | 创建 Key |
-| `/api/admin/keys/{id}` | PUT | 更新 Key |
-| `/api/admin/keys/{id}` | DELETE | 删除 Key |
-| `/api/admin/keys/{id}/toggle` | PUT | 启用/禁用 Key |
-| `/api/admin/keys/{id}/test` | POST | 测试 Key 连接 |
+| 端点                          | 方法   | 说明          |
+| ----------------------------- | ------ | ------------- |
+| `/api/admin/keys`             | GET    | Key 列表      |
+| `/api/admin/keys`             | POST   | 创建 Key      |
+| `/api/admin/keys/{id}`        | PUT    | 更新 Key      |
+| `/api/admin/keys/{id}`        | DELETE | 删除 Key      |
+| `/api/admin/keys/{id}/toggle` | PUT    | 启用/禁用 Key |
+| `/api/admin/keys/{id}/test`   | POST   | 测试 Key 连接 |
 
 ## 6. 前端界面
 
@@ -169,6 +168,7 @@ async def chat_completion(system_prompt, user_prompt, ..., provider_id: str = ""
 ### 6.2 模型检测弹窗
 
 点击「模型检测」弹出模型选择器：
+
 - 按供应商分组（如 `deepseek-ai/`、`Qwen/`、`BAAI/`）
 - 搜索框过滤
 - 全选/反选分组
@@ -177,17 +177,18 @@ async def chat_completion(system_prompt, user_prompt, ..., provider_id: str = ""
 
 ## 7. 相关文件
 
-| 文件 | 说明 |
-|------|------|
-| `backend/app/tables/model_providers.py` | 供应商表定义 |
-| `backend/app/tables/api_keys.py` | Key 池表定义（含 provider_id） |
-| `backend/app/algorithm/model_service.py` | 模型服务管理器 |
-| `backend/app/algorithm/providers_registry.py` | 内置供应商注册表 |
-| `backend/app/algorithm/key_manager.py` | Key 轮询管理器（Provider 感知） |
-| `backend/app/algorithm/ai_client.py` | AI 客户端（Provider 路由） |
-| `backend/app/algorithm/crypto.py` | AES 加密模块 |
-| `backend/app/api/admin/providers.py` | 供应商管理 API |
-| `backend/app/api/admin/keys.py` | Key 池管理 API |
-| `frontend/src/features/admin/KeyManagementPage.tsx` | 模型服务管理页面 |
-| `frontend/src/components/ui/ModelSelector.tsx` | 模型选择器弹窗组件 |
-| `frontend/src/api/admin/providers.ts` | 供应商前端 API |
+> **注：当前 API Key 通过环境变量注入（`AI_{PROVIDER_ID}_API_KEY`），不再存储加密密钥到数据库。`api_key_encrypted` 字段保留用于未来扩展。密钥轮询、限流和并发控制由 `key_manager.py` 基于环境变量实现。**
+
+| 文件                                                | 说明                                                    |
+| --------------------------------------------------- | ------------------------------------------------------- |
+| `backend/app/tables/pg_schema.py`                   | 数据库表定义（`init_model_providers`, `init_api_keys`） |
+| `backend/app/algorithm/model_service.py`            | 模型服务管理器                                          |
+| `backend/app/algorithm/model_runtime.py`            | 模型运行时（推理调用）                                  |
+| `backend/app/algorithm/providers_registry.py`       | 内置供应商注册表                                        |
+| `backend/app/algorithm/key_manager.py`              | Key 轮询管理器（环境变量读取，Provider 感知）           |
+| `backend/app/algorithm/ai_client.py`                | AI 客户端（Provider 路由）                              |
+| `backend/app/api/admin/providers.py`                | 供应商管理 API                                          |
+| `backend/app/api/admin/monitor.py`                  | 数据监控 API（含密钥使用统计）                          |
+| `frontend/src/features/admin/KeyManagementPage.tsx` | 模型服务管理页面                                        |
+| `frontend/src/components/ui/ModelSelector.tsx`      | 模型选择器弹窗组件                                      |
+| `frontend/src/api/admin/providers.ts`               | 供应商前端 API                                          |

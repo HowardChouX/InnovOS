@@ -1,4 +1,4 @@
-.PHONY: dev backend frontend test lint clean start-db
+.PHONY: dev test lint clean start-db
 
 # ──────────────────────────────────────────────
 #  开发环境 — 一键启动全部服务

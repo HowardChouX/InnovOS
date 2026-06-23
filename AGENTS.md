@@ -35,7 +35,7 @@ PostgreSQL only (SQLite phased out). `knowledge_vectors.embedding` is `vector(40
 **Schema caveats:**
 
 - PG lowercase-izes unquoted SQL aliases: `AS activeCount` → `activecount` in results. Always use lowercase aliases.
-- `models` table uses composite PK `(provider_id, model_id)` — no auto-increment `id`.
+- `models` table uses SERIAL PRIMARY KEY `id`, with UNIQUE INDEX on `(provider_id, model_id)`
 - Timestamps stored as TEXT (`YYYY-MM-DD HH24:MI:SS`) for backward compat; prefer `TIMESTAMPTZ` in new columns.
 
 ## Project Structure
@@ -43,11 +43,23 @@ PostgreSQL only (SQLite phased out). `knowledge_vectors.embedding` is `vector(40
 ```
 backend/
   app/
-    api/          # FastAPI routes (auth, knowledge, admin, sidebar, workflow, etc.)
-    algorithm/    # AI core: model_runtime, embedder, reranker, retriever, pipeline, crypto, key_manager
-    services/     # Business logic: knowledge_base_service, knowledge_item_service, job system, orchestration
-    tables/       # DB schema definitions (pg_schema.py — PostgreSQL only)
-    main.py       # App entrypoint — logging config, router registration, startup hooks
+    __init__.py
+    main.py               # FastAPI entrypoint — logging config, router registration, startup hooks
+    auth.py               # JWT authentication
+    database.py           # PostgreSQL connection pool (psycopg2, max 50) + db_session()
+    middleware.py          # SecurityHeaders + RequestID + GlobalException
+    rate_limit.py          # In-memory sliding window rate limiter
+    logging_config.py     # Structured JSON logging
+    seed_data.py          # Idempotent seed_admin_user()
+    utils.py              # Utility functions
+    api/                  # FastAPI routes (auth, knowledge, admin, sidebar, workflow, etc.)
+    algorithm/            # AI core: model_runtime, embedder, reranker, retriever, pipeline, key_manager
+    core/                 # Config, security (Pydantic settings, bcrypt)
+    crud/                 # Generic CRUD helpers
+    models/               # Pydantic models (user, feedback)
+    services/             # Business logic: knowledge_base_service, knowledge_item_service, job system, orchestration
+    tables/               # DB schema definitions (pg_schema.py — PostgreSQL only)
+    data/                 # Static data (models.json, provider-models.json)
 frontend/
   src/
     features/     # Feature-based pages (knowledge, admin, dashboard, workflow, auth, etc.)
@@ -64,14 +76,14 @@ frontend/
 - **Job system**: 5 job types in `backend/app/services/knowledge_jobs/` — `prepare-root`, `index-documents`, `check-file-processing-result`, `delete-subtree`, `reindex-subtree`. Enqueued with idempotency keys, retry 3x with exponential backoff. Error callbacks on all async tasks.
 - **Model registry**: `backend/app/algorithm/model_registry.py` loads 2600+ model entries lazily on first access. Capabilities (embedding, rerank, chat) determined by registry lookup → regex inference fallback.
 - **Model config resolution**: 3-tier fallback — knowledge-base-level → global system settings → first available provider.
-- **API Key management**: Provider-based architecture (inspired by CherryStudio). Keys encrypted with AES-256 Fernet + PBKDF2 (600K iterations, random salt). Pooled with per-provider round-robin + rate limiting.
+- **API Key management**: Provider-based architecture (inspired by CherryStudio). Keys loaded from environment variables (`AI_{PROVIDER_ID}_API_KEY`), pooled with per-provider round-robin + rate limiting. No database encryption.
 - **Auth**: JWT tokens (24h expiry), bcrypt password hashing. Production requires `INNOVOS_JWT_SECRET` env var. Password minimum 8 characters.
-- **Admin seeding**: Idempotent — `seed_if_empty()` creates admin only if none exists. Credentials from `INNOVOS_ADMIN_USER`/`INNOVOS_ADMIN_PASSWORD` env vars (default: auto-generated random password logged at startup).
+- **Admin seeding**: Idempotent — `seed_admin_user()` creates admin only if none exists. Credentials from `INNOVOS_ADMIN_USER`/`INNOVOS_ADMIN_PASSWORD` env vars (default: auto-generated random password logged at startup).
 
 ## Security Features
 
 - Security headers: CSP, HSTS, XFO, XSS-Protection, Referrer-Policy, Permissions-Policy
-- Rate limiting: per-IP sliding window (login 10/min, register 3/min, API 60/min)
+- Rate limiting: per-IP sliding window (login 10/min, register 3/min, API 120/min)
 - Request ID tracking (X-Request-ID header)
 - Structured JSON logging in production (ENV=production)
 - Global exception handler with request ID
@@ -93,19 +105,21 @@ frontend/
 ## Style
 
 - Backend: `snake_case` for Python, `camelCase` for API JSON fields (field mapping in services).
-- Frontend: Tailwind utility classes only. Lucide React for icons (not Font Awesome). No component libraries (antd, styled-components).
+- Frontend: Tailwind utility classes only. Icons: primarily FontAwesome 6 (fa-solid classes) in navigation, Lucide React elsewhere. No component libraries (antd, styled-components).
 - All user-visible text in Chinese. Error messages in Chinese.
 - DB calls: always use `with db_session() as db:` or `get_db()` with `try/finally` for guaranteed connection return.
 
-## Crypto & Key Management
+## API Key Management
 
-Encryption keys (`INNOVOS_ENCRYPT_KEY`) must be **persistent and stable** — never rely on auto-generated keys that change on restart:
+API keys are managed through environment variables, not encrypted database storage:
 
-1. **Never delete or comment out** `INNOVOS_ENCRYPT_KEY` from `.env` — doing so will cause all encrypted API keys in the database to become permanently undecryptable.
-2. **No silent fallbacks** — If the env var is unset, the code auto-generates a temp key and logs a warning. This is only for first-time dev setup, not a recovery path. The temp key is lost on restart.
-3. **Key rotation** — If `INNOVOS_ENCRYPT_KEY` must change, existing encrypted keys will fail to decrypt. There is no "plaintext fallback". Plan accordingly: re-encrypt all stored keys with the new key.
-4. **Format** — New encryption format uses version prefix `$` + random salt (16 bytes) + Fernet token, all base64-encoded. Legacy format (`gAAAAA...` prefix, fixed salt) is supported for backward compatibility only.
-5. **`INNOVOS_JWT_SECRET`** is required in production; dev auto-generates a temp key (but it differs per worker in multi-worker mode — use sticky sessions or set the env var).
+1. **Environment variable pattern**: `AI_{PROVIDER_ID}_API_KEY` — the `key_manager.py` scans `os.environ` at runtime for variables matching `AI_*_API_KEY` and groups them by provider.
+2. **Multi-key rotation**: `AI_SILICON_API_KEY_1`, `AI_SILICON_API_KEY_2` etc. for round-robin.
+3. **Key pool**: Keys are grouped by provider (e.g., `silicon`, `deepseek`). The `KeyManager` does round-robin selection within each pool.
+4. **Rate limiting**: Per-key RPM tracking in memory (no DB queries). Default 60 RPM per key.
+5. **Concurrency control**: `asyncio.Semaphore(5)` limits concurrent AI requests.
+6. **No database encryption**: Keys never stored in DB. The old `crypto.py` (AES-256 Fernet + PBKDF2) was removed.
+7. **`INNOVOS_JWT_SECRET`** is required in production (`Secret_KEY` alias); dev auto-generates a temp key.
 
 ## Code Cleanup
 

@@ -26,13 +26,19 @@ export interface BatchNotificationInput {
 }
 
 export const notificationsApi = {
-  async list(params?: { page?: number; pageSize?: number; unreadOnly?: boolean }): Promise<{ data: Notification[]; total: number }> {
+  async list(params?: {
+    page?: number;
+    pageSize?: number;
+    unreadOnly?: boolean;
+  }): Promise<{ data: Notification[]; total: number }> {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.set('page', String(params.page));
     if (params?.pageSize) searchParams.set('page_size', String(params.pageSize));
     if (params?.unreadOnly) searchParams.set('unread_only', 'true');
     const qs = searchParams.toString();
-    const res = await apiRequest<{ data: Notification[]; total: number }>(`/api/notifications${qs ? `?${qs}` : ''}`);
+    const res = await apiRequest<{ data: Notification[]; total: number }>(
+      `/api/notifications${qs ? `?${qs}` : ''}`,
+    );
     return res;
   },
 
@@ -71,20 +77,5 @@ export const notificationsApi = {
 
   async clearAll(): Promise<void> {
     await apiRequest('/api/notifications/clear-all', { method: 'DELETE' });
-  },
-
-  // ─── 管理员端 ─────────────────────────────────────────
-
-  async getSent(params?: { page?: number; pageSize?: number }): Promise<{ data: Notification[]; total: number }> {
-    const searchParams = new URLSearchParams();
-    if (params?.page) searchParams.set('page', String(params.page));
-    if (params?.pageSize) searchParams.set('page_size', String(params.pageSize));
-    const qs = searchParams.toString();
-    const res = await apiRequest<{ data: Notification[]; total: number }>(`/api/notifications/sent${qs ? `?${qs}` : ''}`);
-    return res;
-  },
-
-  async recall(id: number): Promise<void> {
-    await apiRequest(`/api/notifications/${id}/recall`, { method: 'PUT' });
   },
 };

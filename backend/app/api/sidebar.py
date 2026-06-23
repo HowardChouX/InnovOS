@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
 from app.api.deps import CurrentUser
 from app.database import get_db

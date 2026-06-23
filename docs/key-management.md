@@ -6,20 +6,20 @@
 
 ## 1. 功能概述
 
-API Key 管理系统是 InnovOS 的核心基础设施，负责管理 AI 服务的访问凭证。支持企业级 Key 池轮询、并发控制、限流检测、自动切换和 AES-256 加密存储。
+API Key 管理系统是 InnovOS 的核心基础设施，负责管理 AI 服务的访问凭证。支持企业级 Key 池轮询、并发控制、限流检测和自动切换。
 
 **核心能力：**
 
-| 能力 | 说明 |
-|------|------|
-| Key 池管理 | 多个 API Key 统一管理，支持 CRUD |
-| 加密存储 | AES-256 (Fernet) 加密，密钥通过环境变量管理 |
-| 轮询调度 | 按优先级轮询使用，均衡分配请求 |
-| 并发控制 | 信号量限制最大并发数（默认 5） |
-| 限流检测 | 每分钟请求计数，超限自动跳过 |
-| 自动切换 | Key 失效 (401/403) 自动禁用并切换 |
-| 模型池 | 每个 Key 支持多个模型，调用时随机选择 |
-| 权限控制 | 仅管理员可管理，普通用户不可见 |
+| 能力         | 说明                                                |
+| ------------ | --------------------------------------------------- |
+| Key 池管理   | 多个 API Key 统一管理，支持 CRUD                    |
+| 环境变量注入 | 从 `AI_{PROVIDER_ID}_API_KEY` 读取，支持多 Key 轮询 |
+| 轮询调度     | 按 Provider 分组轮询使用，均衡分配请求              |
+| 并发控制     | 信号量限制最大并发数（默认 5）                      |
+| 限流检测     | 每分钟请求计数，超限自动跳过                        |
+| 自动切换     | Key 失效 (401/403) 自动禁用并切换                   |
+| 模型池       | 每个 Key 支持多个模型，调用时随机选择               |
+| 权限控制     | 仅管理员可管理，普通用户不可见                      |
 
 ---
 
@@ -44,7 +44,7 @@ API Key 管理系统是 InnovOS 的核心基础设施，负责管理 AI 服务�
                           │ HTTP / JSON
 ┌─────────────────────────┼────────────────────────────────┐
 │              ┌──────────▼──────────┐                    │
-│              │   keys.py (Router)  │                    │
+│              │   providers.py / monitor.py (Routers)  │                    │
 │              │   仅管理员访问       │                    │
 │              └──────────┬──────────┘                    │
 │                         │                                │
@@ -60,17 +60,26 @@ API Key 管理系统是 InnovOS 的核心基础设施，负责管理 AI 服务�
 │              │  ┌───────────────┐  │                    │
 │              │  │ 限流计数器    │  │                    │
 │              │  └───────────────┘  │                    │
+│              │  ┌───────────────┐  │                    │
+│              │  │ RPM 追踪      │  │                    │
+│              │  │ (内存)        │  │                    │
+│              │  └───────────────┘  │                    │
 │              └──────────┬──────────┘                    │
 │                         │                                │
 │              ┌──────────▼──────────┐                    │
-│              │    crypto.py        │                    │
-│              │  AES-256 加解密     │                    │
+│              │   ModelRuntime      │                    │
+│              │   (ensure /v1)      │                    │
 │              └──────────┬──────────┘                    │
 │                         │                                │
 │              ┌──────────▼──────────┐                    │
-│              │   SQLite 数据库      │                    │
+│              │   AIClient          │                    │
+│              │   (OpenAI SDK v2)   │                    │
+│              └──────────┬──────────┘                    │
+│                         │                                │
+│              ┌──────────▼──────────┐                    │
+│              │   PostgreSQL         │                    │
 │              │   api_keys 表       │                    │
-│              │   (密文存储)        │                    │
+│              │   (元数据存储)      │                    │
 │              └─────────────────────┘                    │
 │                     后端 (FastAPI)                        │
 └──────────────────────────────────────────────────────────┘
@@ -84,45 +93,45 @@ API Key 管理系统是 InnovOS 的核心基础设施，负责管理 AI 服务�
 
 ```sql
 CREATE TABLE api_keys (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-    key_name         TEXT NOT NULL,                    -- Key 名称
-    api_key          TEXT NOT NULL,                     -- API Key（AES-256 加密密文）
-    api_base_url     TEXT DEFAULT 'https://api.deepseek.com',  -- API 基础 URL
-    api_model        TEXT DEFAULT '',                   -- 模型列表（逗号分隔）
-    is_active        INTEGER DEFAULT 1,                -- 是否启用
-    priority         INTEGER DEFAULT 0,                -- 优先级（越小越优先）
-    max_rpm          INTEGER DEFAULT 60,               -- 每分钟最大请求数
-    current_rpm      INTEGER DEFAULT 0,                -- 当前分钟请求数
-    last_reset_at    TEXT,                             -- 上次重置时间
-    last_used_at     TEXT,                             -- 最后使用时间
-    request_count    INTEGER DEFAULT 0,                -- 总使用次数
-    created_at       TEXT DEFAULT (datetime('now'))    -- 创建时间
+    id SERIAL PRIMARY KEY,
+    provider_id TEXT DEFAULT '',
+    key_name TEXT NOT NULL,
+    api_key TEXT NOT NULL,
+    api_base_url TEXT DEFAULT 'https://api.deepseek.com',
+    api_model TEXT DEFAULT 'deepseek-chat',
+    is_active INTEGER DEFAULT 1,
+    priority INTEGER DEFAULT 0,
+    max_rpm INTEGER DEFAULT 60,
+    current_rpm INTEGER DEFAULT 0,
+    last_reset_at TEXT,
+    last_used_at TEXT,
+    request_count INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))
 );
 ```
 
 ### 3.2 字段说明
 
-| 字段 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `id` | INTEGER | 自增 | 主键 |
-| `key_name` | TEXT | - | Key 名称，用于标识 |
-| `api_key` | TEXT | - | AES-256 加密密文（Fernet 格式，`gAAAAA...` 开头） |
-| `api_base_url` | TEXT | `https://api.deepseek.com` | API 端点地址 |
-| `api_model` | TEXT | `''` | 支持的模型，逗号分隔 |
-| `is_active` | INTEGER | `1` | 启用状态（1=启用，0=禁用） |
-| `priority` | INTEGER | `0` | 优先级，数字越小优先级越高 |
-| `max_rpm` | INTEGER | `60` | 每分钟最大请求数 |
-| `current_rpm` | INTEGER | `0` | 当前分钟已请求数 |
-| `last_reset_at` | TEXT | NULL | 上次 RPM 重置时间 |
-| `last_used_at` | TEXT | NULL | 最后使用时间 |
-| `request_count` | INTEGER | `0` | 累计请求次数 |
-| `created_at` | TEXT | `datetime('now')` | 创建时间 |
+| 字段            | 类型    | 默认值                                    | 说明                                                 |
+| --------------- | ------- | ----------------------------------------- | ---------------------------------------------------- |
+| `id`            | SERIAL  | 自增                                      | 主键                                                 |
+| `provider_id`   | TEXT    | `''`                                      | Provider 标识（如 `silicon`, `deepseek`）            |
+| `key_name`      | TEXT    | -                                         | Key 名称，用于标识                                   |
+| `api_key`       | TEXT    | -                                         | API Key（实际 Key 来自环境变量，此表仅作元数据记录） |
+| `api_base_url`  | TEXT    | `https://api.deepseek.com`                | API 端点地址                                         |
+| `api_model`     | TEXT    | `deepseek-chat`                           | 默认模型                                             |
+| `is_active`     | INTEGER | `1`                                       | 启用状态（1=启用，0=禁用）                           |
+| `priority`      | INTEGER | `0`                                       | 优先级，数字越小优先级越高                           |
+| `max_rpm`       | INTEGER | `60`                                      | 每分钟最大请求数                                     |
+| `current_rpm`   | INTEGER | `0`                                       | 当前分钟已请求数                                     |
+| `last_reset_at` | TEXT    | NULL                                      | 上次 RPM 重置时间                                    |
+| `last_used_at`  | TEXT    | NULL                                      | 最后使用时间                                         |
+| `request_count` | INTEGER | `0`                                       | 累计请求次数                                         |
+| `created_at`    | TEXT    | `to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')` | 创建时间                                             |
 
-### 3.3 数据库位置
+### 3.3 数据库
 
-```
-backend/InnovOS_ACCOUNTS.db
-```
+`api_keys` 表使用 PostgreSQL（pgvector），通过 `backend/app/tables/pg_schema.py` 中的 `init_api_keys()` 自动创建。
 
 ---
 
@@ -133,62 +142,45 @@ backend/InnovOS_ACCOUNTS.db
 ```
 backend/app/
 ├── algorithm/
-│   ├── key_manager.py    # Key 管理器（轮询+并发+限流）
-│   ├── ai_client.py      # AI 客户端（自动切换+重试）
-│   └── crypto.py         # AES-256 加解密工具
+│   ├── key_manager.py      # Key 管理器（环境变量扫描+轮询+并发+限流）
+│   ├── model_runtime.py    # 模型运行时（/v1 路径管理+超时配置）
+│   ├── ai_client.py        # AI 客户端（OpenAI SDK v2 调用+重试）
+│   ├── providers_registry.py # Provider 注册表（7 个内置 Provider）
+│   └── model_service.py    # 模型服务（3 层配置解析）
 ├── api/
-│   └── keys.py           # Key 管理 API（仅管理员）
+│   └── keys.py             # Key 管理 API（仅管理员）
 └── tables/
-    └── api_keys.py       # 表定义
+    └── pg_schema.py        # PostgreSQL 表定义（含 api_keys）
 ```
 
-### 4.2 加密模块 (`crypto.py`)
+### 4.2 Key 来源与环境变量注入
 
-**加密算法：** AES-256 (Fernet)
-**密钥来源：** 环境变量 `INNOVOS_ENCRYPT_KEY`
-**依赖：** `cryptography` 库
+**不再使用数据库加密存储 Key。** 所有 API Key 通过环境变量注入，KeyManager 在启动时自动扫描。
 
-```python
-import os
-from cryptography.fernet import Fernet, InvalidToken
+**环境变量命名规则：** `AI_{PROVIDER_ID}_API_KEY`
 
-_encrypt_key = os.getenv("INNOVOS_ENCRYPT_KEY")
+```bash
+# 单 Key
+AI_SILICON_API_KEY=sk-xxxxxxxxxx
+AI_DEEPSEEK_API_KEY=sk-yyyyyyyyyy
 
-if not _encrypt_key:
-    raise RuntimeError(
-        "未设置 INNOVOS_ENCRYPT_KEY 环境变量\n"
-        "请执行: export INNOVOS_ENCRYPT_KEY=$(python -c "
-        "\"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\")"
-    )
-
-_fernet = Fernet(_encrypt_key.encode() if isinstance(_encrypt_key, str) else _encrypt_key)
-
-
-def encrypt_key(plain_text: str) -> str:
-    """加密 API Key"""
-    return _fernet.encrypt(plain_text.encode()).decode()
-
-
-def decrypt_key(cipher_text: str) -> str:
-    """解密 API Key"""
-    try:
-        return _fernet.decrypt(cipher_text.encode()).decode()
-    except InvalidToken:
-        # 兼容旧数据（未加密的 Key）
-        return cipher_text
+# 多 Key 轮询（添加 _1, _2 等后缀）
+AI_SILICON_API_KEY_1=sk-xxxxxxxxxx
+AI_SILICON_API_KEY_2=sk-zzzzzzzzzz
 ```
 
-**加密流程：**
+**KeyManager 发现逻辑：**
+
 ```
-创建 Key:  明文 → encrypt_key() → 密文 → 存入数据库
-读取 Key:  密文 → decrypt_key() → 明文 → 用于 AI 调用
+os.environ 扫描 `AI_*_API_KEY` 变量
+  → 按 Provider ID 分组（如 silicon, deepseek）
+    → 每个 Provider 内做 round-robin 轮询
+      → 每个 Key 独立 RPM 计速（内存追踪，60 RPM 默认）
 ```
 
-**数据库存储示例：**
-```
-明文: sk-db9f0700db34425b804590ae3eb1cecf
-密文: gAAAAABqI7u18pP-E5_O9xLBssWDC7rbzZKFuqTdmbm9lZXh5n
-```
+**并发控制：** `asyncio.Semaphore(5)` 限制最大 5 个并发 AI 请求。
+
+**注意：** `api_keys` 表保留作元数据管理和向后兼容，但运行时 Key 优先来自环境变量。
 
 ### 4.3 Key 管理器 (`key_manager.py`)
 
@@ -206,40 +198,40 @@ class APIKeyManager:
 
 #### 核心方法
 
-| 方法 | 说明 | 参数 |
-|------|------|------|
-| `acquire()` | 获取并发许可 | - |
-| `release()` | 释放并发许可 | - |
-| `get_key_for_request()` | 获取可用 Key | - |
-| `record_usage(key_id)` | 记录使用次数 | key_id: int |
-| `mark_key_failed(key_id, error_type)` | 标记 Key 失败 | key_id: int, error_type: str |
-| `get_key_by_id(key_id)` | 获取单个 Key（自动解密） | key_id: int |
-| `list_keys()` | 获取所有 Key | - |
-| `create_key(...)` | 创建 Key（自动加密） | key_name, api_key, ... |
-| `update_key(key_id, **kwargs)` | 更新 Key（api_key 自动加密） | key_id: int, **kwargs |
-| `delete_key(key_id)` | 删除 Key | key_id: int |
+| 方法                                  | 说明                         | 参数                         |
+| ------------------------------------- | ---------------------------- | ---------------------------- |
+| `acquire()`                           | 获取并发许可                 | -                            |
+| `release()`                           | 释放并发许可                 | -                            |
+| `get_key_for_request()`               | 获取可用 Key                 | -                            |
+| `record_usage(key_id)`                | 记录使用次数                 | key_id: int                  |
+| `mark_key_failed(key_id, error_type)` | 标记 Key 失败                | key_id: int, error_type: str |
+| `get_key_by_id(key_id)`               | 获取单个 Key（自动解密）     | key_id: int                  |
+| `list_keys()`                         | 获取所有 Key                 | -                            |
+| `create_key(...)`                     | 创建 Key（自动加密）         | key_name, api_key, ...       |
+| `update_key(key_id, **kwargs)`        | 更新 Key（api_key 自动加密） | key_id: int, \*\*kwargs      |
+| `delete_key(key_id)`                  | 删除 Key                     | key_id: int                  |
 
-#### 加解密集成
+#### 环境变量 Key 加载
 
 ```python
-# 创建 Key - 加密后存储
-def create_key(self, key_name, api_key, ...):
-    encrypted_key = encrypt_key(api_key)
-    db.execute("INSERT INTO api_keys ...", (key_name, encrypted_key, ...))
+# KeyManager 初始化时扫描环境变量
+def _load_env_keys(self):
+    """扫描 os.environ 中所有 AI_*_API_KEY 变量"""
+    for key, value in os.environ.items():
+        match = re.match(r'^AI_(\w+)_API_KEY(?:_(\d+))?$', key)
+        if match:
+            provider_id = match.group(1).lower()
+            key_index = int(match.group(2)) if match.group(2) else 0
+            self._env_keys.setdefault(provider_id, {})[key_index] = value
 
-# 读取 Key - 自动解密
-def get_key_by_id(self, key_id):
-    row = db.execute("SELECT * FROM api_keys WHERE id=?", (key_id,))
-    result = dict(row)
-    result["api_key"] = decrypt_key(result["api_key"])
-    return result
-
-# 缓存加载 - 自动解密
-def _refresh_keys_cache(self):
-    for k in keys:
-        d = dict(k)
-        d["api_key"] = decrypt_key(d["api_key"])
-        self._keys_cache.append(d)
+# 按 Provider 分组轮询
+def get_key_for_provider(self, provider_id: str) -> str | None:
+    keys = self._env_keys.get(provider_id, {})
+    if not keys:
+        return None
+    idx = self._round_robin[provider_id] % len(keys)
+    self._round_robin[provider_id] = idx + 1
+    return sorted(keys.items())[idx][1]
 ```
 
 #### 轮询逻辑
@@ -247,13 +239,13 @@ def _refresh_keys_cache(self):
 ```python
 def _get_next_key(self) -> dict:
     self._refresh_keys_cache()
-    
+
     if not self._keys_cache:
         raise RuntimeError("未配置任何可用的API Key")
-    
+
     key = self._keys_cache[self._current_index % len(self._keys_cache)]
     self._current_index = (self._current_index + 1) % len(self._keys_cache)
-    
+
     return key
 ```
 
@@ -262,24 +254,22 @@ def _get_next_key(self) -> dict:
 ```python
 def _check_rate_limit(self, key: dict) -> bool:
     db = get_db()
-    
+
     # 每分钟重置计数
     if key.get("last_reset_at"):
         last_reset = datetime.fromisoformat(key["last_reset_at"])
         if datetime.now() - last_reset > timedelta(minutes=1):
             db.execute(
-                "UPDATE api_keys SET current_rpm=0, last_reset_at=datetime('now') WHERE id=?",
+                "UPDATE api_keys SET current_rpm=0, last_reset_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=%s",
                 (key["id"],)
             )
             db.commit()
             key["current_rpm"] = 0
-    
+
     # 检查是否超过限制
     if key.get("current_rpm", 0) >= key.get("max_rpm", 60):
-        db.close()
         return False
-    
-    db.close()
+
     return True
 ```
 
@@ -288,14 +278,13 @@ def _check_rate_limit(self, key: dict) -> bool:
 ```python
 def mark_key_failed(self, key_id: int, error_type: str):
     db = get_db()
-    
+
     if error_type in ("401", "403"):
-        db.execute("UPDATE api_keys SET is_active=0 WHERE id=?", (key_id,))
+        db.execute("UPDATE api_keys SET is_active=0 WHERE id=%s", (key_id,))
     elif error_type == "429":
-        db.execute("UPDATE api_keys SET current_rpm=max_rpm WHERE id=?", (key_id,))
-    
+        db.execute("UPDATE api_keys SET current_rpm=max_rpm WHERE id=%s", (key_id,))
+
     db.commit()
-    db.close()
     self._cache_updated_at = 0
 ```
 
@@ -323,21 +312,21 @@ async def chat_completion(
         await key_manager.acquire()
         try:
             key_config = await key_manager.get_key_for_request()
-            
+
             client = OpenAI(
                 api_key=key_config["api_key"],
                 base_url=key_config["api_base_url"]
             )
-            
+
             resp = client.chat.completions.create(
                 model=pick_model(key_config["api_model"]),
                 messages=[...],
                 temperature=temperature,
             )
-            
+
             key_manager.record_usage(key_config["id"])
             return resp.choices[0].message.content
-            
+
         except Exception as e:
             error_msg = str(e)
             if "401" in error_msg or "403" in error_msg:
@@ -379,12 +368,9 @@ class UpdateKeyInput(BaseModel):
 
 ```python
 def row_to_dict(row: dict) -> dict:
-    # 解密后取前缀脱敏，不暴露加密格式
-    try:
-        plain_key = decrypt_key(row["api_key"])
-        masked = plain_key[:7] + "****" if len(plain_key) > 7 else "****"
-    except Exception:
-        masked = "****"
+    # 取前缀脱敏，不暴露完整 Key
+    plain_key = row.get("api_key", "")
+    masked = plain_key[:7] + "****" if len(plain_key) > 7 else "****"
     return {
         "id": row["id"],
         "keyName": row["key_name"],
@@ -432,22 +418,23 @@ frontend/src/
    → 展示模型列表（带勾选框）
 3. 多选所需模型
 4. 设置优先级和 RPM
-5. 点击"创建" → 后端加密存储
+5. 点击"创建" → 后端写入 api_keys 表（元数据记录）
 ```
 
 #### 核心状态
 
 ```typescript
 interface KeyManagementPageState {
-  keys: ApiKey[];           // Key 列表
-  loading: boolean;         // 加载状态
-  showCreate: boolean;      // 显示创建弹窗
-  models: ModelInfo[];      // 可用模型列表
-  modelsLoading: boolean;   // 模型加载状态
+  keys: ApiKey[]; // Key 列表
+  loading: boolean; // 加载状态
+  showCreate: boolean; // 显示创建弹窗
+  models: ModelInfo[]; // 可用模型列表
+  modelsLoading: boolean; // 模型加载状态
   selectedModels: string[]; // 已选模型
-  createError: string;      // 创建错误
-  creating: boolean;        // 创建中
-  newKey: {                 // 新 Key 数据
+  createError: string; // 创建错误
+  creating: boolean; // 创建中
+  newKey: {
+    // 新 Key 数据
     keyName: string;
     apiKey: string;
     apiBaseUrl: string;
@@ -495,10 +482,9 @@ export const keysApi = {
   },
 
   async test(id: number): Promise<{ message: string; response?: string }> {
-    const res = await apiRequest<{ message: string; response?: string }>(
-      `/api/keys/${id}/test`,
-      { method: 'POST' }
-    );
+    const res = await apiRequest<{ message: string; response?: string }>(`/api/keys/${id}/test`, {
+      method: 'POST',
+    });
     return res;
   },
 };
@@ -656,30 +642,25 @@ async def get_key_for_request():
 
 ```
 请求 → 检查缓存 → 缓存有效 (30s内) → 使用缓存
-                → 缓存过期 → 查询数据库 → 解密 → 更新缓存
+                → 缓存过期 → 查询数据库 → 更新缓存
 ```
 
 ---
 
 ## 8. 安全机制
 
-### 8.1 加密存储
+### 8.1 Key 安全策略
 
-| 层级 | 机制 | 说明 |
-|------|------|------|
-| 存储加密 | AES-256 Fernet | 数据库存储密文（`gAAAAA...` 开头） |
-| 密钥管理 | 环境变量 | `INNOVOS_ENCRYPT_KEY`，代码中不出现 |
-| 前端脱敏 | 自动截断 | 展示时 `sk-xxxx****` |
-| 旧数据兼容 | 自动检测 | `decrypt_key()` 检测未加密数据直接返回原文 |
+Key 管理采用以下安全策略：
 
-**安全模型：**
+| 层级     | 机制        | 说明                                                 |
+| -------- | ----------- | ---------------------------------------------------- |
+| Key 来源 | 环境变量    | `AI_{PROVIDER_ID}_API_KEY`，代码中不出现硬编码       |
+| 前端脱敏 | 自动截断    | 展示时 `sk-xxxx****`                                 |
+| 数据库   | 元数据有限  | `api_keys` 表仅存储配置元数据，真实 Key 来自环境变量 |
+| 传输安全 | JWT + HTTPS | API 调用需 JWT 鉴权，生产环境强制 HTTPS              |
 
-| 攻击方式 | 防护 |
-|---------|------|
-| 代码泄露 | 密钥不在代码中，无法解密 |
-| 数据库泄露 | 无密钥无法解密 |
-| 服务器被入侵 | 需要 root 权限读取环境变量 |
-| 内存读取 | 需要同服务器进程注入 |
+**安全边界：** Key 仅在后端进程内存中存在，不落盘、不进入日志、不返回前端。
 
 ### 8.2 权限控制
 
@@ -709,19 +690,16 @@ async def get_key_for_request():
 ### 9.2 环境变量
 
 ```bash
-# 加密密钥（必须配置，启动时缺失会报错）
-export INNOVOS_ENCRYPT_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
-
-# AI API Key（兜底，Key 池为空时使用）
-DEEPSEEK_API_KEY=sk-xxxxxxxx
-OPENAI_BASE_URL=https://api.deepseek.com
+# AI API Key（必须配置，否则 AI 功能不可用）
+export AI_SILICON_API_KEY=sk-xxxxxxxx
+export AI_DEEPSEEK_API_KEY=sk-yyyyyyyy
 ```
 
 ### 9.3 启动命令
 
 ```bash
-# 1. 生成并设置加密密钥
-export INNOVOS_ENCRYPT_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+# 1. 设置 AI API Key 环境变量
+export AI_SILICON_API_KEY=sk-xxxxxxxx
 
 # 2. 启动后端
 cd backend
@@ -735,11 +713,11 @@ npm run dev
 
 ### 9.4 性能调优
 
-| 参数 | 默认值 | 建议值 | 说明 |
-|------|--------|--------|------|
-| `Semaphore(5)` | 5 | 5-10 | 并发数，根据服务器性能调整 |
-| `max_rpm` | 60 | 60-120 | 每 Key 每分钟请求数 |
-| `_cache_ttl` | 30 | 30-60 | 缓存过期时间（秒） |
+| 参数           | 默认值 | 建议值 | 说明                       |
+| -------------- | ------ | ------ | -------------------------- |
+| `Semaphore(5)` | 5      | 5-10   | 并发数，根据服务器性能调整 |
+| `max_rpm`      | 60     | 60-120 | 每 Key 每分钟请求数        |
+| `_cache_ttl`   | 30     | 30-60  | 缓存过期时间（秒）         |
 
 ---
 
@@ -748,8 +726,8 @@ npm run dev
 ### 10.1 已实现
 
 - [x] Key CRUD
-- [x] AES-256 加密存储
-- [x] 轮询调度
+- [x] 环境变量 Key 注入（`AI_{PROVIDER_ID}_API_KEY`）
+- [x] 按 Provider 分组轮询
 - [x] 并发控制
 - [x] 限流检测
 - [x] 自动切换
@@ -769,20 +747,19 @@ npm run dev
 - [ ] 使用日志审计
 - [ ] 单元测试
 - [ ] HTTPS 传输加密
-- [ ] PostgreSQL 数据库迁移
 
 ### 10.3 成熟度评估
 
-| 维度 | 评分 | 说明 |
-|------|------|------|
-| 核心功能 | 8/10 | CRUD、加密、轮询、限流、切换完整 |
-| 安全性 | 7/10 | 加密存储+脱敏，需固定化密钥管理 |
-| 可靠性 | 5/10 | 无测试、无日志审计、无告警 |
-| 运维 | 3/10 | 无监控、无统计、SQLite 限制 |
-| 生产就绪 | 4/10 | 需 HTTPS + PostgreSQL + 日志 + 监控 |
+| 维度     | 评分 | 说明                                     |
+| -------- | ---- | ---------------------------------------- |
+| 核心功能 | 8/10 | CRUD、环境变量注入、轮询、限流、切换完整 |
+| 安全性   | 7/10 | Key 来自环境变量，无需数据库加密         |
+| 可靠性   | 5/10 | 无测试、无日志审计、无告警               |
+| 运维     | 5/10 | 环境变量管理，PostgreSQL 存储元数据      |
+| 生产就绪 | 5/10 | 需 HTTPS + 日志 + 监控                   |
 
 **适用场景：** 开发调试（2-5人）、内部演示
-**不适用：** 多租户、高并发、生产环境
+**不适用：** 多租户、高并发（需引入外部密钥管理服务）
 
 ---
 
@@ -790,14 +767,14 @@ npm run dev
 
 ### 11.1 常见问题
 
-| 问题 | 原因 | 解决方案 |
-|------|------|----------|
-| 401 Unauthorized | API Key 无效 | 检查 Key 是否正确，重新添加 |
-| 429 Too Many Requests | 达到限流 | 等待 1 分钟或增加 max_rpm |
-| 未配置任何可用的 API Key | Key 被禁用或不存在 | 在管理页面启用/添加 Key |
-| 获取模型列表失败 | Base URL 错误 | 检查 API Base URL 格式 |
-| RuntimeError: 未设置 INNOVOS_ENCRYPT_KEY | 未配置加密密钥 | `export INNOVOS_ENCRYPT_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")` |
-| Key 解密失败 | 环境变量密钥变更 | 重新添加所有 Key |
+| 问题                     | 原因                                       | 解决方案                    |
+| ------------------------ | ------------------------------------------ | --------------------------- |
+| 401 Unauthorized         | API Key 无效                               | 检查 Key 是否正确，重新添加 |
+| 429 Too Many Requests    | 达到限流                                   | 等待 1 分钟或增加 max_rpm   |
+| 未配置任何可用的 API Key | Key 被禁用或不存在                         | 在管理页面启用/添加 Key     |
+| 获取模型列表失败         | Base URL 错误                              | 检查 API Base URL 格式      |
+| AI 调用返回空            | 未设置 `AI_{PROVIDER_ID}_API_KEY` 环境变量 | 检查环境变量命名是否正确    |
+| Provider 未找到          | `providers_registry.py` 中无该 Provider    | 检查 Provider ID 拼写       |
 
 ### 11.2 调试命令
 
@@ -808,9 +785,10 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/keys
 # 测试 Key 连接
 curl -X POST -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/keys/1/test
 
-# 检查数据库（查看密文）
-sqlite3 backend/InnovOS_ACCOUNTS.db "SELECT id, key_name, substr(api_key, 1, 20) || '...' as key_prefix FROM api_keys;"
+# 检查环境变量是否设置
+echo ${AI_SILICON_API_KEY:+已设置}  # 输出"已设置"或空
+echo ${AI_DEEPSEEK_API_KEY:+已设置}
 
-# 验证加密密钥
-echo $INNOVOS_ENCRYPT_KEY
+# 列出所有 AI_ 开头的环境变量
+env | grep ^AI_
 ```

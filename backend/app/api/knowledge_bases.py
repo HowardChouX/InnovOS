@@ -215,36 +215,35 @@ async def import_directory(
     supported_extensions = {
         ".pdf",
         ".docx",
-        ".doc",
         ".txt",
         ".md",
         ".csv",
-        ".py",
-        ".js",
-        ".ts",
-        ".jsx",
-        ".tsx",
-        ".java",
-        ".go",
-        ".rs",
-        ".rb",
-        ".php",
-        ".c",
-        ".cpp",
-        ".h",
-        ".hpp",
-        ".sql",
-        ".yaml",
-        ".yml",
-        ".toml",
+        ".xlsx",
+        ".pptx",
         ".json",
         ".xml",
-        ".sh",
-        ".bash",
-        ".zsh",
-        ".env",
-        ".ini",
-        ".cfg",
+        ".html",
+        ".htm",
+        ".epub",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".bmp",
+        ".webp",
+        ".svg",
+        ".mp4",
+        ".avi",
+        ".mov",
+        ".wmv",
+        ".flv",
+        ".mkv",
+        ".webm",
+        ".zip",
+        ".gz",
+        ".tar",
+        ".7z",
+        ".rar",
     }
     valid_files = []
     for f in files:
@@ -256,9 +255,11 @@ async def import_directory(
         ext = os.path.splitext(f.filename)[1].lower()
         if ext in supported_extensions:
             valid_files.append(f)
+        else:
+            raise HTTPException(status_code=400, detail=f"不支持的文件格式: {f.filename}（仅允许文档、图片、视频、压缩包等安全格式）")
 
     if not valid_files:
-        raise HTTPException(status_code=400, detail="没有支持的文件格式（.pdf .docx .txt .md .csv）")
+        raise HTTPException(status_code=400, detail="没有支持的文件格式（仅允许文档、图片、视频、压缩包等安全格式）")
 
     # 创建持久化目录：uploads/{user_id}/{base_id}/{item_id}/
     item_id = str(uuid.uuid4())
@@ -275,7 +276,7 @@ async def import_directory(
         total_size += len(content)
         if total_size > MAX_TOTAL_SIZE:
             raise HTTPException(status_code=400, detail="总文件大小超过限制 (500MB)")
-        # ── MIME type hint check ──
+        # ── MIME type hint check — reject on mismatch ──
         ext = os.path.splitext(file.filename or "")[1].lower()
         expected_mime = SUPPORTED_MIME_TYPES.get(ext)
         if (
@@ -284,9 +285,9 @@ async def import_directory(
             and file.content_type != expected_mime
             and file.content_type != "application/octet-stream"
         ):
-            # 仅对明显不匹配发警告（不阻止上传），application/octet-stream 是浏览器常见回退
-            logger.warning(
-                "MIME type mismatch for %s: expected %s, got %s", file.filename, expected_mime, file.content_type
+            raise HTTPException(
+                status_code=400,
+                detail=f"文件 {file.filename} 的 MIME 类型不匹配：期望 {expected_mime}，实际 {file.content_type}",
             )
 
         rel_path = file.filename or "unnamed"

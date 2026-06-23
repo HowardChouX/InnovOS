@@ -61,10 +61,6 @@ export const knowledgeApi = {
     return apiRequest('/api/knowledge-bases', { method: 'POST', body: JSON.stringify(data) });
   },
 
-  async getBase(id: string): Promise<{ data: KnowledgeBase }> {
-    return apiRequest(`/api/knowledge-bases/${id}`);
-  },
-
   async updateBase(id: string, data: UpdateKnowledgeBaseInput): Promise<{ data: KnowledgeBase }> {
     return apiRequest(`/api/knowledge-bases/${id}`, {
       method: 'PATCH',
@@ -102,16 +98,6 @@ export const knowledgeApi = {
 
   async getItem(itemId: string): Promise<{ data: KnowledgeItem }> {
     return apiRequest(`/api/knowledge/items/${itemId}`);
-  },
-
-  async updateItem(
-    itemId: string,
-    data: { status?: string; error?: string; data?: Record<string, unknown> },
-  ): Promise<{ data: KnowledgeItem }> {
-    return apiRequest(`/api/knowledge/items/${itemId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
   },
 
   async deleteItem(itemId: string): Promise<void> {
@@ -235,47 +221,5 @@ export const knowledgeApi = {
       method: 'POST',
       body: JSON.stringify(data),
     });
-  },
-
-  // ─── 多知识库搜索 ────────────────────────────────────
-  async multiBaseSearch(params: {
-    query: string;
-    baseIds: string[];
-    topK?: number;
-  }): Promise<{ data: Array<{ text: string; score: number; source: string; baseId: string }> }> {
-    return apiRequest('/api/knowledge-bases/search', {
-      method: 'POST',
-      body: JSON.stringify(params),
-    });
-  },
-};
-
-// 保留旧 API 兼容
-export const knowledgeApiLegacy = {
-  async listDocs(
-    params: { base_id?: string; q?: string; page?: number; page_size?: number } = {},
-  ): Promise<{ data: unknown[]; total: number }> {
-    const sp = new URLSearchParams();
-    if (params.base_id) sp.set('base_id', params.base_id);
-    if (params.q) sp.set('q', params.q);
-    if (params.page) sp.set('page', String(params.page));
-    if (params.page_size) sp.set('page_size', String(params.page_size));
-    const qs = sp.toString();
-    return apiRequest(`/api/knowledge/docs${qs ? `?${qs}` : ''}`);
-  },
-
-  async createDoc(data: {
-    title: string;
-    content: string;
-    base_id?: string;
-    category?: string;
-    tags?: string[];
-    source?: string;
-  }): Promise<{ data: unknown }> {
-    return apiRequest('/api/knowledge/docs', { method: 'POST', body: JSON.stringify(data) });
-  },
-
-  async deleteDoc(id: string): Promise<void> {
-    await apiRequest(`/api/knowledge/docs/${id}`, { method: 'DELETE' });
   },
 };

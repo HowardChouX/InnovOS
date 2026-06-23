@@ -49,9 +49,6 @@ export const providersApi = {
   listBuiltin: (): Promise<{ data: Provider[] }> =>
     apiRequest<{ data: Provider[] }>('/api/admin/providers/builtin'),
 
-  list: (): Promise<{ data: Provider[] }> =>
-    apiRequest<{ data: Provider[] }>('/api/admin/providers'),
-
   add: (data: {
     provider_id: string;
     name: string;
@@ -87,20 +84,8 @@ export const providersApi = {
   delete: (providerId: string) =>
     apiRequest(`/api/admin/providers/${providerId}`, { method: 'DELETE' }),
 
-  check: (
-    providerId: string,
-    model?: string,
-  ): Promise<{ data: { status: string; latency_ms?: number; message?: string; model?: string } }> =>
-    apiRequest(`/api/admin/providers/${providerId}/check`, {
-      method: 'POST',
-      body: JSON.stringify(model ? { model } : {}),
-    }),
-
   detectModels: (providerId: string): Promise<{ data: { models: ModelEntry[] } }> =>
     apiRequest(`/api/admin/providers/${providerId}/detect-models`, { method: 'POST' }),
-
-  listModels: (providerId: string): Promise<{ data: unknown[] }> =>
-    apiRequest(`/api/admin/providers/${providerId}/models`),
 
   updateModel: (
     providerId: string,
@@ -118,11 +103,6 @@ export const providersApi = {
     apiRequest(`/api/admin/providers/${providerId}/models/${encodeURIComponent(modelId)}`, {
       method: 'PUT',
       body: JSON.stringify(data),
-    }),
-
-  deleteModel: (providerId: string, modelId: string): Promise<void> =>
-    apiRequest(`/api/admin/providers/${providerId}/models/${encodeURIComponent(modelId)}`, {
-      method: 'DELETE',
     }),
 
   /** 批量健康检查 — 并行测试多个模型连接，返回每个模型的状态/延迟/错误 */

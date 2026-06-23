@@ -2,7 +2,7 @@ import platform
 import time as _time_module
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
 from app.api.deps import CurrentUser, SuperUserDep
 from app.core.config import settings

@@ -41,44 +41,91 @@ export default function NoteEditorDialog({ open, onClose }: Props) {
   if (!open) return null;
 
   return createPortal(
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(0,0,0,0.5)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
-    }} onClick={onClose}>
-      <div style={{
-        width: '100%', maxWidth: 960, height: '90vh',
-        background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      }} onClick={e => e.stopPropagation()}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        background: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 960,
+          height: '90vh',
+          background: 'var(--bg-card)',
+          borderRadius: 12,
+          border: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div style={{
-          padding: '12px 20px', borderBottom: '1px solid var(--border-light)',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        }}>
-          <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>添加笔记</span>
-          <button onClick={onClose} style={{
-            background: 'none', border: 'none',
-            color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 16, padding: 4,
-          }}><i className="fa-solid fa-xmark" /></button>
+        <div
+          style={{
+            padding: '12px 20px',
+            borderBottom: '1px solid var(--border-light)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
+            添加笔记
+          </span>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-tertiary)',
+              cursor: 'pointer',
+              fontSize: 16,
+              padding: 4,
+            }}
+          >
+            <i className="fa-solid fa-xmark" />
+          </button>
         </div>
 
         {/* Title */}
         <div style={{ flexShrink: 0, padding: '12px 16px 0' }}>
           <input
             value={title}
-            onChange={e => setTitle(e.target.value)}
+            onChange={(e) => setTitle(e.target.value)}
             placeholder="笔记标题（可选）"
             style={{
-              width: '100%', padding: '8px 12px', fontSize: 14, fontFamily: 'inherit',
-              background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)',
-              borderRadius: 6, color: 'var(--text-primary)', outline: 'none',
+              width: '100%',
+              padding: '8px 12px',
+              fontSize: 14,
+              fontFamily: 'inherit',
+              background: 'rgba(0,0,0,0.3)',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              color: 'var(--text-primary)',
+              outline: 'none',
             }}
           />
         </div>
 
         {/* RichEditor — flex:1 fills remaining space */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, padding: '8px 16px 12px' }}>
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0,
+            padding: '8px 16px 12px',
+          }}
+        >
           <RichEditor
             ref={editorRef}
             showToolbar
@@ -90,23 +137,52 @@ export default function NoteEditorDialog({ open, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div style={{
-          padding: '12px 20px', borderTop: '1px solid var(--border-light)',
-          display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0,
-        }}>
-          <button onClick={onClose} style={{
-            padding: '7px 20px', borderRadius: 6, fontSize: 13,
-            background: 'transparent', border: '1px solid var(--border)',
-            color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit',
-          }}>取 消</button>
-          <button onClick={handleSave} disabled={submitting || !editorRef.current} style={{
-            padding: '7px 20px', borderRadius: 6, fontSize: 13, fontWeight: 500,
-            background: 'var(--accent-purple)', border: 'none', color: '#fff',
-            cursor: 'pointer', fontFamily: 'inherit', opacity: submitting ? 0.7 : 1,
-          }}>{submitting ? '保存中...' : '保 存'}</button>
+        <div
+          style={{
+            padding: '12px 20px',
+            borderTop: '1px solid var(--border-light)',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 8,
+            flexShrink: 0,
+          }}
+        >
+          <button
+            onClick={onClose}
+            style={{
+              padding: '7px 20px',
+              borderRadius: 6,
+              fontSize: 13,
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            取 消
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={submitting}
+            style={{
+              padding: '7px 20px',
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: 500,
+              background: 'var(--accent-purple)',
+              border: 'none',
+              color: '#fff',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              opacity: submitting ? 0.7 : 1,
+            }}
+          >
+            {submitting ? '保存中...' : '保 存'}
+          </button>
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

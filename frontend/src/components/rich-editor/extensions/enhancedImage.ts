@@ -1,14 +1,14 @@
-import { mergeAttributes, Node } from '@tiptap/core'
-import Image from '@tiptap/extension-image'
-import { ReactNodeViewRenderer } from '@tiptap/react'
+import { mergeAttributes, Node } from '@tiptap/core';
+import Image, { type ImageOptions } from '@tiptap/extension-image';
+import { ReactNodeViewRenderer } from '@tiptap/react';
 
-import ImagePlaceholderNodeView from '../components/placeholder/ImagePlaceholderNodeView'
+import ImagePlaceholderNodeView from '../components/placeholder/ImagePlaceholderNodeView';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     imagePlaceholder: {
-      insertImagePlaceholder: () => ReturnType
-    }
+      insertImagePlaceholder: () => ReturnType;
+    };
   }
 }
 
@@ -16,12 +16,12 @@ declare module '@tiptap/core' {
 export const EnhancedImage = Image.extend({
   addOptions() {
     return {
-      ...this.parent?.(),
+      ...(this.parent?.() as ImageOptions),
       allowBase64: true,
       HTMLAttributes: {
-        class: 'rich-editor-image'
-      }
-    } as any
+        class: 'rich-editor-image',
+      },
+    } as ImageOptions;
   },
 
   addAttributes() {
@@ -32,26 +32,26 @@ export const EnhancedImage = Image.extend({
         parseHTML: (element) => element.getAttribute('src'),
         renderHTML: (attributes) => {
           if (!attributes.src) {
-            return {}
+            return {};
           }
           return {
-            src: attributes.src
-          }
-        }
+            src: attributes.src,
+          };
+        },
       },
       alt: {
-        default: null
+        default: null,
       },
       title: {
-        default: null
+        default: null,
       },
       width: {
-        default: null
+        default: null,
       },
       height: {
-        default: null
-      }
-    }
+        default: null,
+      },
+    };
   },
 
   addCommands() {
@@ -62,14 +62,14 @@ export const EnhancedImage = Image.extend({
         ({ commands }) => {
           return commands.insertContent({
             type: 'imagePlaceholder',
-            attrs: {}
-          })
-        }
-    }
+            attrs: {},
+          });
+        },
+    };
   },
 
   addExtensions() {
-    const base = (this.parent?.() as any[]) || []
+    const base = (this.parent?.() as Node[]) || [];
     return [
       ...base,
       Node.create({
@@ -81,29 +81,29 @@ export const EnhancedImage = Image.extend({
 
         addOptions() {
           return {
-            HTMLAttributes: {}
-          }
+            HTMLAttributes: {},
+          };
         },
 
         parseHTML() {
           return [
             {
-              tag: 'div[data-type="image-placeholder"]'
-            }
-          ]
+              tag: 'div[data-type="image-placeholder"]',
+            },
+          ];
         },
 
         renderHTML({ HTMLAttributes }) {
           return [
             'div',
             mergeAttributes(HTMLAttributes, {
-              'data-type': 'image-placeholder'
-            })
-          ]
+              'data-type': 'image-placeholder',
+            }),
+          ];
         },
 
         addNodeView() {
-          return ReactNodeViewRenderer(ImagePlaceholderNodeView)
+          return ReactNodeViewRenderer(ImagePlaceholderNodeView);
         },
 
         addCommands() {
@@ -113,12 +113,12 @@ export const EnhancedImage = Image.extend({
               ({ commands }) => {
                 return commands.insertContent({
                   type: this.name,
-                  attrs: {}
-                })
-              }
-          }
-        }
-      })
-    ]
-  }
-})
+                  attrs: {},
+                });
+              },
+          };
+        },
+      }),
+    ];
+  },
+});

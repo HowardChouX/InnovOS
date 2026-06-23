@@ -1,21 +1,21 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface LinkEditorProps {
   /** Whether the editor is visible */
-  visible: boolean
+  visible: boolean;
   /** Position for the popup */
-  position: { x: number; y: number } | null
+  position: { x: number; y: number } | null;
   /** Link attributes */
-  link: { href: string; text: string }
+  link: { href: string; text: string };
   /** Callback when the user saves the link */
-  onSave: (href: string, text: string) => void
+  onSave: (href: string, text: string) => void;
   /** Callback when the user removes the link */
-  onRemove: () => void
+  onRemove: () => void;
   /** Callback when the editor is closed without saving */
-  onCancel: () => void
+  onCancel: () => void;
   /** Whether to show remove button */
-  showRemove?: boolean
+  showRemove?: boolean;
 }
 
 /**
@@ -29,76 +29,84 @@ const LinkEditor: React.FC<LinkEditorProps> = ({
   onSave,
   onRemove,
   onCancel,
-  showRemove = true
+  showRemove = true,
 }) => {
-  const { t } = useTranslation()
-  const [href, setHref] = useState<string>(link.href || '')
-  const [text, setText] = useState<string>(link.text || '')
-  const containerRef = useRef<HTMLDivElement>(null)
-  const hrefInputRef = useRef<HTMLInputElement>(null)
+  const { t } = useTranslation();
+  const [href, setHref] = useState<string>(link.href || '');
+  const [text, setText] = useState<string>(link.text || '');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hrefInputRef = useRef<HTMLInputElement>(null);
 
-  // Reset values when link changes
-  useEffect(() => {
+  // Reset local form state when dialog opens or link props change
+  // This runs during render (not in an effect) to avoid cascading renders
+  const [prevLinkKey, setPrevLinkKey] = useState('');
+  const linkKey = visible ? `${link.href}||${link.text}` : '';
+  if (linkKey !== prevLinkKey) {
+    setPrevLinkKey(linkKey);
     if (visible) {
-      setHref(link.href || '')
-      setText(link.text || '')
+      setHref(link.href || '');
+      setText(link.text || '');
     }
-  }, [visible, link.href, link.text])
+  }
 
   // Auto-focus href input when dialog opens
   useEffect(() => {
     if (visible && hrefInputRef.current) {
       setTimeout(() => {
-        hrefInputRef.current?.focus()
-      }, 100)
+        hrefInputRef.current?.focus();
+      }, 100);
     }
-  }, [visible])
+  }, [visible]);
 
   // Handle clicks outside to close
   useEffect(() => {
-    if (!visible) return
+    if (!visible) return;
 
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
+      const target = event.target as HTMLElement;
 
-      if (containerRef.current?.contains(target) || target.closest('a[href]') || target.closest('[data-link-editor]')) {
-        return
+      if (
+        containerRef.current?.contains(target) ||
+        target.closest('a[href]') ||
+        target.closest('[data-link-editor]')
+      ) {
+        return;
       }
 
-      onCancel()
-    }
+      onCancel();
+    };
 
     setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside)
-    }, 100)
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [visible, onCancel])
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [visible, onCancel]);
 
   const handleSave = useCallback(() => {
-    const trimmedHref = href.trim()
-    const trimmedText = text.trim()
+    const trimmedHref = href.trim();
+    const trimmedText = text.trim();
     if (trimmedHref && trimmedText) {
-      onSave(trimmedHref, trimmedText)
+      onSave(trimmedHref, trimmedText);
     }
-  }, [href, text, onSave])
+  }, [href, text, onSave]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        handleSave()
+        e.preventDefault();
+        handleSave();
       } else if (e.key === 'Escape') {
-        e.preventDefault()
-        onCancel()
+        e.preventDefault();
+        onCancel();
       }
     },
-    [handleSave, onCancel]
-  )
+    [handleSave, onCancel],
+  );
 
-  if (!visible || !position) return null
+  if (!visible || !position) return null;
 
   const styles: React.CSSProperties = {
     position: 'fixed',
@@ -111,8 +119,8 @@ const LinkEditor: React.FC<LinkEditorProps> = ({
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     padding: 12,
     width: 320,
-    maxWidth: '90vw'
-  }
+    maxWidth: '90vw',
+  };
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -125,14 +133,14 @@ const LinkEditor: React.FC<LinkEditorProps> = ({
     outline: 'none',
     boxSizing: 'border-box',
     height: 32,
-  }
+  };
 
   const labelStyle: React.CSSProperties = {
     fontSize: 12,
     fontWeight: 600,
     display: 'block',
     marginBottom: 4,
-  }
+  };
 
   const btnStyle: React.CSSProperties = {
     padding: '6px 12px',
@@ -142,27 +150,25 @@ const LinkEditor: React.FC<LinkEditorProps> = ({
     cursor: 'pointer',
     background: 'transparent',
     color: 'var(--color-foreground, #333)',
-  }
+  };
 
   const primaryBtnStyle: React.CSSProperties = {
     ...btnStyle,
     background: 'var(--color-primary, #7c3aed)',
     color: '#fff',
     border: 'none',
-  }
+  };
 
   const dangerBtnStyle: React.CSSProperties = {
     ...btnStyle,
     color: 'var(--color-danger, #e53e3e)',
     borderColor: 'var(--color-danger, #e53e3e)',
-  }
+  };
 
   return (
     <div style={styles} ref={containerRef} data-link-editor onKeyDown={handleKeyDown}>
       <div style={{ marginBottom: 8 }}>
-        <label style={labelStyle}>
-          {t('richEditor.link.text')}
-        </label>
+        <label style={labelStyle}>{t('richEditor.link.text')}</label>
         <input
           ref={hrefInputRef}
           style={inputStyle}
@@ -173,9 +179,7 @@ const LinkEditor: React.FC<LinkEditorProps> = ({
       </div>
 
       <div style={{ marginBottom: 8 }}>
-        <label style={labelStyle}>
-          {t('richEditor.link.url')}
-        </label>
+        <label style={labelStyle}>{t('richEditor.link.url')}</label>
         <input
           style={inputStyle}
           value={href}
@@ -207,7 +211,7 @@ const LinkEditor: React.FC<LinkEditorProps> = ({
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default LinkEditor
+export default LinkEditor;

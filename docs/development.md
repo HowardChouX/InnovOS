@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from app.auth import get_current_user
 from app.models.user import UserResponse
-from app.tasks import TaskRepository
+from app.database import get_db
 
 # 类型注解强制要求
 def process_task(task_id: int, user: UserResponse) -> dict:
@@ -25,6 +25,7 @@ def process_task(task_id: int, user: UserResponse) -> dict:
 ```
 
 **规范要求：**
+
 - 遵循 PEP 8
 - 行最大长度 100 字符
 - 使用类型注解
@@ -52,7 +53,7 @@ export const TaskInputPanel: React.FC<TaskInputProps> = ({
   initialData,
 }) => {
   const [loading, setLoading] = useState(false);
-  
+
   return (
     <div className="glass-panel">
       {/* 组件内容 */}
@@ -62,6 +63,7 @@ export const TaskInputPanel: React.FC<TaskInputProps> = ({
 ```
 
 **规范要求：**
+
 - 使用 TypeScript strict 模式
 - 组件文件 ≤200 行
 - 强制类型定义，禁止 any
@@ -92,6 +94,7 @@ main          ─── 生产分支，只允许 PR 合并
 ```
 
 **类型 (type)：**
+
 - feat: 新功能
 - fix: Bug 修复
 - refactor: 重构
@@ -101,6 +104,7 @@ main          ─── 生产分支，只允许 PR 合并
 - chore: 构建/工具
 
 **示例：**
+
 ```
 feat(tasks): 添加任务分页查询接口
 
@@ -121,23 +125,25 @@ Closes #42
 ## 3. 代码审查要点
 
 ### 3.1 后端审查
-| 检查项 | 说明 |
-|--------|------|
-| 类型注解 | 函数参数和返回值是否完整 |
+
+| 检查项   | 说明                            |
+| -------- | ------------------------------- |
+| 类型注解 | 函数参数和返回值是否完整        |
 | 异常处理 | 是否 catch 并转义为用户友好错误 |
-| SQL 注入 | 是否使用参数化查询 |
-| 数据隔离 | 是否按 user_id 过滤 |
-| 事务管理 | 多表操作是否使用事务 |
-| 性能 | N+1 查询、缺少索引 |
+| SQL 注入 | 是否使用参数化查询              |
+| 数据隔离 | 是否按 user_id 过滤             |
+| 事务管理 | 多表操作是否使用事务            |
+| 性能     | N+1 查询、缺少索引              |
 
 ### 3.2 前端审查
-| 检查项 | 说明 |
-|--------|------|
-| Type 安全 | 是否有 any 类型 |
-| 状态管理 | loading/error 状态是否处理 |
-| 内存泄漏 | useEffect 是否清理订阅 |
-| 组件粒度 | 是否过重或过碎片 |
-| 错误处理 | API 错误是否展示给用户 |
+
+| 检查项    | 说明                       |
+| --------- | -------------------------- |
+| Type 安全 | 是否有 any 类型            |
+| 状态管理  | loading/error 状态是否处理 |
+| 内存泄漏  | useEffect 是否清理订阅     |
+| 组件粒度  | 是否过重或过碎片           |
+| 错误处理  | API 错误是否展示给用户     |
 
 ## 4. 组件规范
 
@@ -149,7 +155,7 @@ interface TaskState {
   tasks: Task[];
   loading: boolean;
   error: string | null;
-  
+
   // 操作
   fetchTasks: () => Promise<void>;
   createTask: (data: TaskCreate) => Promise<void>;
@@ -161,7 +167,7 @@ const useTaskStore = create<TaskState>((set, get) => ({
   tasks: [],
   loading: false,
   error: null,
-  
+
   fetchTasks: async () => {
     set({ loading: true, error: null });
     try {
@@ -180,7 +186,7 @@ const useTaskStore = create<TaskState>((set, get) => ({
 
 ```bash
 # .env.example
-DATABASE_URL=sqlite:///InnovOS_ACCOUNTS.db
+DATABASE_URL=postgresql://innovos:innovos_secret@localhost:5432/innovos
 REDIS_URL=redis://localhost:6379
 SECRET_KEY=your-secret-key-here
 JWT_EXPIRE_HOURS=24
@@ -191,22 +197,22 @@ LOG_LEVEL=INFO
 
 ### 6.2 环境划分
 
-| 环境 | 数据库 | 日志级别 | 调试模式 |
-|------|--------|----------|----------|
-| 开发 | SQLite | DEBUG | 开启 |
-| 测试 | SQLite 测试库 | INFO | 开启 |
-| 生产 | PostgreSQL | WARNING | 关闭 |
+| 环境 | 数据库                 | 日志级别 | 调试模式 |
+| ---- | ---------------------- | -------- | -------- |
+| 开发 | PostgreSQL（本地）     | DEBUG    | 开启     |
+| 测试 | PostgreSQL（测试库）   | INFO     | 开启     |
+| 生产 | PostgreSQL（独立实例） | WARNING  | 关闭     |
 
 ## 7. 测试规范
 
 ### 7.1 测试框架
 
-| 层级 | 框架 | 说明 |
-|------|------|------|
-| 后端单元测试 | pytest | 函数级别测试 |
-| 后端接口测试 | pytest + httpx | API 端点测试 |
-| 前端单元测试 | Vitest | 组件/Hook 测试 |
-| 前端集成测试 | Vitest + React Testing Library | 页面级别测试 |
+| 层级         | 框架                           | 说明           |
+| ------------ | ------------------------------ | -------------- |
+| 后端单元测试 | pytest                         | 函数级别测试   |
+| 后端接口测试 | pytest + httpx                 | API 端点测试   |
+| 前端单元测试 | Vitest                         | 组件/Hook 测试 |
+| 前端集成测试 | Vitest + React Testing Library | 页面级别测试   |
 
 ### 7.2 测试文件结构
 
@@ -247,12 +253,12 @@ describe('KeyManagementPage', () => {
 
 ### 7.4 测试覆盖率要求
 
-| 模块 | 最低覆盖率 | 说明 |
-|------|-----------|------|
-| 认证 | 90% | 安全相关，高覆盖 |
-| Key 管理 | 85% | 核心功能 |
-| AI 调用 | 80% | 依赖外部服务，mock 测试 |
-| UI 组件 | 70% | 重点测试交互逻辑 |
+| 模块     | 最低覆盖率 | 说明                    |
+| -------- | ---------- | ----------------------- |
+| 认证     | 90%        | 安全相关，高覆盖        |
+| Key 管理 | 85%        | 核心功能                |
+| AI 调用  | 80%        | 依赖外部服务，mock 测试 |
+| UI 组件  | 70%        | 重点测试交互逻辑        |
 
 ### 7.5 运行测试
 

@@ -4,13 +4,13 @@ AI 驱动的创新分析平台，帮助技术团队从问题出发，通过多 A
 
 ## 技术栈
 
-| 层      | 技术                                           |
-| ------- | ---------------------------------------------- |
-| 后端    | Python 3.11+, FastAPI, PostgreSQL (pgvector)   |
-| 前端    | React 19, TypeScript, Vite 8, Tailwind CSS v4  |
-| AI 引擎 | OpenAI SDK, 2600+ 模型注册表, 多 Provider 轮询 |
-| 存储    | PostgreSQL (主数据), MinIO/S3 (文件存储)       |
-| 部署    | Docker Compose, Nginx (反向代理 + HTTPS)       |
+| 层      | 技术                                                            |
+| ------- | --------------------------------------------------------------- |
+| 后端    | Python 3.11+, FastAPI, PostgreSQL (pgvector)                    |
+| 前端    | React 19, TypeScript, Vite 8, Tailwind CSS v4                   |
+| AI 引擎 | OpenAI SDK, 2600+ 模型注册表, 多 Provider 轮询                  |
+| 存储    | PostgreSQL (主数据), 本地文件系统 (文件存储, MinIO/S3 预留配置) |
+| 部署    | Docker Compose, Nginx (反向代理 + HTTPS)                        |
 
 ## 快速开始（Docker）
 
@@ -131,7 +131,7 @@ docker compose up -d --build
 
 ### 关键安全配置
 
-- JWT Token 通过 httpOnly Cookie 传输（防 XSS）
+- JWT Token 通过 httpOnly Cookie 传输（防 XSS），同时支持 `Authorization: Bearer` 请求头
 - API Key 仅从环境变量读取（不存数据库）
 - 操作审计日志（增删改操作写入 `audit_log` 表）
 - 文件上传大小限制（50MB/文件，500MB/批次）
@@ -142,10 +142,10 @@ docker compose up -d --build
 ## 测试
 
 ```bash
-# 后端 236 项测试
+# 后端测试
 cd backend && uv run pytest tests/ -v
 
-# 前端 34 项测试
+# 前端测试
 cd frontend && npm test
 
 # 全量
@@ -160,4 +160,4 @@ make test
 
 ## 许可证
 
-MIT
+私有项目 — 济南一竖光年人工智能科技有限公司

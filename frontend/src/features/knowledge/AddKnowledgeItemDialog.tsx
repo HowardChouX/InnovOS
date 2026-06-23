@@ -40,8 +40,6 @@ export function AddKnowledgeItemDialog({ open, onClose }: Props) {
   const dirRef = useRef<HTMLInputElement>(null);
   const { uploadFile, addItem, importDirectory } = useKnowledgeStore();
 
-  if (!open) return null;
-
   const isSupported = (name: string) => {
     const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
     return SUPPORTED_EXTS.includes(ext);
@@ -51,28 +49,30 @@ export function AddKnowledgeItemDialog({ open, onClose }: Props) {
     e.preventDefault();
     setDragOver(false);
     const dropped = Array.from(e.dataTransfer.files);
-    const supported = dropped.filter(f => isSupported(f.name));
+    const supported = dropped.filter((f) => isSupported(f.name));
     const unsupportedCount = dropped.length - supported.length;
     if (unsupportedCount > 0) {
       setBannerWarning({ type: 'unsupported', count: unsupportedCount });
     } else {
       setBannerWarning(null);
     }
-    setFiles(prev => [...prev, ...supported]);
+    setFiles((prev) => [...prev, ...supported]);
   }, []);
+
+  if (!open) return null;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files;
     if (list) {
       const arr = Array.from(list);
-      const supported = arr.filter(f => isSupported(f.name));
+      const supported = arr.filter((f) => isSupported(f.name));
       const unsupportedCount = arr.length - supported.length;
       if (unsupportedCount > 0) {
         setBannerWarning({ type: 'unsupported', count: unsupportedCount });
       } else {
         setBannerWarning(null);
       }
-      setFiles(prev => [...prev, ...supported]);
+      setFiles((prev) => [...prev, ...supported]);
     }
     e.target.value = '';
   };
@@ -81,8 +81,8 @@ export function AddKnowledgeItemDialog({ open, onClose }: Props) {
     const list = e.target.files;
     if (list) {
       const arr = Array.from(list);
-      const supported = arr.filter(f => isSupported(f.name));
-      const unsupported = arr.filter(f => !isSupported(f.name));
+      const supported = arr.filter((f) => isSupported(f.name));
+      const unsupported = arr.filter((f) => !isSupported(f.name));
       const limited = supported.slice(0, MAX_DIRECTORY_FILES);
       const skipped = supported.length - limited.length;
 
@@ -107,7 +107,7 @@ export function AddKnowledgeItemDialog({ open, onClose }: Props) {
     e.target.value = '';
   };
 
-  const removeFile = (i: number) => setFiles(prev => prev.filter((_, j) => j !== i));
+  const removeFile = (i: number) => setFiles((prev) => prev.filter((_, j) => j !== i));
   const clearAll = () => {
     setFiles([]);
     setUrl('');
@@ -141,26 +141,29 @@ export function AddKnowledgeItemDialog({ open, onClose }: Props) {
         clearAll();
         onClose();
       }
-    } catch (e: any) {
-      setError(e?.message || '导入失败，请重试');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '导入失败，请重试');
     } finally {
       setUploading(false);
     }
   };
 
-  const canSubmit = (
+  const canSubmit =
     (activeTab === 'file' && files.length > 0) ||
     (activeTab === 'url' && url.trim().length > 0) ||
-    (activeTab === 'directory' && files.length > 0)
-  );
+    (activeTab === 'directory' && files.length > 0);
 
-  const supportedCount = files.filter(f => isSupported(f.name)).length;
+  const supportedCount = files.filter((f) => isSupported(f.name)).length;
 
   // ─── Styles ─────────────────────────────────────────
   const overlayStyle: React.CSSProperties = {
-    position: 'fixed', inset: 0, zIndex: 9999,
+    position: 'fixed',
+    inset: 0,
+    zIndex: 9999,
     background: 'rgba(0,0,0,0.5)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   };
 
   const dialogStyle: React.CSSProperties = {
@@ -221,7 +224,9 @@ export function AddKnowledgeItemDialog({ open, onClose }: Props) {
     padding: '36px 24px',
     textAlign: 'center',
     cursor: 'pointer',
-    background: isDragOver ? 'color-mix(in srgb, var(--accent-green) 4%, transparent)' : 'transparent',
+    background: isDragOver
+      ? 'color-mix(in srgb, var(--accent-green) 4%, transparent)'
+      : 'transparent',
     transition: 'all 0.15s',
     marginBottom: files.length > 0 ? 12 : 0,
   });
@@ -324,33 +329,70 @@ export function AddKnowledgeItemDialog({ open, onClose }: Props) {
     const { type, count, total, supported } = infoDialog;
     return createPortal(
       <div
-        style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        onClick={() => { setInfoDialog(null); setFiles(supported); }}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 10000,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        onClick={() => {
+          setInfoDialog(null);
+          setFiles(supported);
+        }}
       >
         <div
-          style={{ background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)', padding: 24, maxWidth: 420, width: '90vw' }}
-          onClick={e => e.stopPropagation()}
+          style={{
+            background: 'var(--bg-card)',
+            borderRadius: 12,
+            border: '1px solid var(--border)',
+            padding: 24,
+            maxWidth: 420,
+            width: '90vw',
+          }}
+          onClick={(e) => e.stopPropagation()}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <i
               className={`fa-solid ${type === 'unsupported' ? 'fa-triangle-exclamation' : 'fa-circle-info'}`}
-              style={{ color: type === 'unsupported' ? 'var(--accent-yellow)' : 'var(--accent-blue)', fontSize: 18 }}
+              style={{
+                color: type === 'unsupported' ? 'var(--accent-yellow)' : 'var(--accent-blue)',
+                fontSize: 18,
+              }}
             />
             <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}>
               {type === 'unsupported' ? '不支持的格式' : '导入提示'}
             </span>
           </div>
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 16 }}>
+          <p
+            style={{
+              fontSize: 13,
+              color: 'var(--text-secondary)',
+              lineHeight: 1.5,
+              marginBottom: 16,
+            }}
+          >
             {type === 'unsupported'
               ? `检测到 ${count} 个不支持的文件格式，已自动过滤。仅支持 ${SUPPORTED_EXTS.join(', ')} 格式。`
               : `文件夹共包含 ${total} 个文件，已自动限制导入前 ${MAX_DIRECTORY_FILES} 个。`}
           </p>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
-              onClick={() => { setInfoDialog(null); setFiles(supported); }}
+              onClick={() => {
+                setInfoDialog(null);
+                setFiles(supported);
+              }}
               style={{
-                padding: '7px 20px', borderRadius: 6, fontSize: 13,
-                background: 'var(--accent)', border: 'none', color: '#fff', cursor: 'pointer', fontFamily: 'inherit',
+                padding: '7px 20px',
+                borderRadius: 6,
+                fontSize: 13,
+                background: 'var(--accent)',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
               }}
             >
               知道了
@@ -358,33 +400,47 @@ export function AddKnowledgeItemDialog({ open, onClose }: Props) {
           </div>
         </div>
       </div>,
-      document.body
+      document.body,
     );
   };
 
   // ─── Render ─────────────────────────────────────────
   return createPortal(
     <div style={overlayStyle} onClick={onClose}>
-      <div style={dialogStyle} onClick={e => e.stopPropagation()}>
+      <div style={dialogStyle} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div style={headerStyle}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>添加知识</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
+            添加知识
+          </span>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-tertiary)',
+              cursor: 'pointer',
+              fontSize: 18,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
         </div>
 
         {/* Tabs */}
         <div style={tabsContainerStyle}>
-          {SOURCE_TABS.map(tab => (
+          {SOURCE_TABS.map((tab) => (
             <button
               key={tab.key}
               onClick={() => handleTabClick(tab.key)}
               style={getTabStyle(activeTab === tab.key)}
-              onMouseEnter={e => {
+              onMouseEnter={(e) => {
                 if (activeTab !== tab.key) {
                   (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)';
                 }
               }}
-              onMouseLeave={e => {
+              onMouseLeave={(e) => {
                 if (activeTab !== tab.key) {
                   (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
                 }
@@ -418,30 +474,84 @@ export function AddKnowledgeItemDialog({ open, onClose }: Props) {
               )}
 
               <div
-                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
                 onClick={() => fileRef.current?.click()}
                 style={dropzoneStyle(dragOver)}
-                onMouseEnter={e => Object.assign(e.currentTarget.style, dropzoneHoverStyle)}
-                onMouseLeave={e => Object.assign(e.currentTarget.style, dropzoneStyle(false))}
+                onMouseEnter={(e) => Object.assign(e.currentTarget.style, dropzoneHoverStyle)}
+                onMouseLeave={(e) => Object.assign(e.currentTarget.style, dropzoneStyle(false))}
               >
-                <i className="fa-solid fa-cloud-arrow-up" style={{ fontSize: 28, color: 'var(--text-tertiary)', marginBottom: 10, display: 'block' }} />
-                <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 6, fontWeight: 500 }}>拖拽或点击上传文件</div>
-                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>支持 .txt .md .pdf .docx .csv</div>
-                <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={handleFileSelect} />
+                <i
+                  className="fa-solid fa-cloud-arrow-up"
+                  style={{
+                    fontSize: 28,
+                    color: 'var(--text-tertiary)',
+                    marginBottom: 10,
+                    display: 'block',
+                  }}
+                />
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: 'var(--text-primary)',
+                    marginBottom: 6,
+                    fontWeight: 500,
+                  }}
+                >
+                  拖拽或点击上传文件
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                  支持 .txt .md .pdf .docx .csv
+                </div>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={handleFileSelect}
+                />
               </div>
 
               {files.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
                   {files.map((f, i) => (
                     <div key={i} style={fileRowStyle(true)}>
-                      <i className="fa-regular fa-file" style={{ color: 'var(--accent-blue)', fontSize: 13 }} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                      <span style={{ color: 'var(--text-tertiary)', fontSize: 11, whiteSpace: 'nowrap' }}>{(f.size / 1024).toFixed(1)} KB</span>
+                      <i
+                        className="fa-regular fa-file"
+                        style={{ color: 'var(--accent-blue)', fontSize: 13 }}
+                      />
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {f.name}
+                      </span>
+                      <span
+                        style={{
+                          color: 'var(--text-tertiary)',
+                          fontSize: 11,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {(f.size / 1024).toFixed(1)} KB
+                      </span>
                       <button
                         onClick={() => removeFile(i)}
-                        style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-tertiary)',
+                          cursor: 'pointer',
+                          fontSize: 12,
+                          padding: '2px 4px',
+                        }}
                       >
                         <i className="fa-solid fa-xmark" />
                       </button>
@@ -455,10 +565,12 @@ export function AddKnowledgeItemDialog({ open, onClose }: Props) {
           {/* ── URL Tab ── */}
           {activeTab === 'url' && (
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>输入网页 URL，系统将自动抓取内容</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                输入网页 URL，系统将自动抓取内容
+              </div>
               <input
                 value={url}
-                onChange={e => setUrl(e.target.value)}
+                onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://example.com/document"
                 style={inputStyle}
               />
@@ -474,45 +586,126 @@ export function AddKnowledgeItemDialog({ open, onClose }: Props) {
                   ...dropzoneStyle(false),
                   marginBottom: files.length > 0 ? 12 : 0,
                 }}
-                onMouseEnter={e => Object.assign(e.currentTarget.style, dropzoneHoverStyle)}
-                onMouseLeave={e => Object.assign(e.currentTarget.style, dropzoneStyle(false))}
+                onMouseEnter={(e) => Object.assign(e.currentTarget.style, dropzoneHoverStyle)}
+                onMouseLeave={(e) => Object.assign(e.currentTarget.style, dropzoneStyle(false))}
               >
-                <i className="fa-solid fa-folder-open" style={{ fontSize: 28, color: 'var(--text-tertiary)', marginBottom: 10, display: 'block' }} />
-                <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 6, fontWeight: 500 }}>点击选择文件夹</div>
-                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>将上传文件夹内所有支持的文件</div>
-                <input ref={dirRef} type="file" {...{ webkitdirectory: '' } as React.InputHTMLAttributes<HTMLInputElement>} multiple style={{ display: 'none' }} onChange={handleDirSelect} />
+                <i
+                  className="fa-solid fa-folder-open"
+                  style={{
+                    fontSize: 28,
+                    color: 'var(--text-tertiary)',
+                    marginBottom: 10,
+                    display: 'block',
+                  }}
+                />
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: 'var(--text-primary)',
+                    marginBottom: 6,
+                    fontWeight: 500,
+                  }}
+                >
+                  点击选择文件夹
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                  将上传文件夹内所有支持的文件
+                </div>
+                <input
+                  ref={dirRef}
+                  type="file"
+                  {...({ webkitdirectory: '' } as React.InputHTMLAttributes<HTMLInputElement>)}
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={handleDirSelect}
+                />
               </div>
 
               {files.length > 0 && (
                 <div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--text-secondary)',
+                      marginBottom: 8,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
                     <span>
-                      已选择 <strong style={{ color: 'var(--text-primary)' }}>{supportedCount}</strong> 个支持格式的文件
+                      已选择{' '}
+                      <strong style={{ color: 'var(--text-primary)' }}>{supportedCount}</strong>{' '}
+                      个支持格式的文件
                       {files.length > supportedCount && (
-                        <span style={{ color: 'var(--text-tertiary)', marginLeft: 4 }}>(共 {files.length} 个，已过滤不支持的格式)</span>
+                        <span style={{ color: 'var(--text-tertiary)', marginLeft: 4 }}>
+                          (共 {files.length} 个，已过滤不支持的格式)
+                        </span>
                       )}
                     </span>
                     <button
                       onClick={clearAll}
-                      style={{ background: 'none', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: 11 }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--accent-red)',
+                        cursor: 'pointer',
+                        fontSize: 11,
+                      }}
                     >
                       清空
                     </button>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflow: 'auto' }}>
-                    {files.filter(f => isSupported(f.name)).map((f, i) => (
-                      <div key={i} style={fileRowStyle(true)}>
-                        <i className="fa-regular fa-file" style={{ color: 'var(--accent-green)', fontSize: 13 }} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.webkitRelativePath || f.name}</span>
-                        <span style={{ color: 'var(--text-tertiary)', fontSize: 11, whiteSpace: 'nowrap' }}>{(f.size / 1024).toFixed(1)} KB</span>
-                        <button
-                          onClick={() => removeFile(files.indexOf(f))}
-                          style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}
-                        >
-                          <i className="fa-solid fa-xmark" />
-                        </button>
-                      </div>
-                    ))}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      maxHeight: 220,
+                      overflow: 'auto',
+                    }}
+                  >
+                    {files
+                      .filter((f) => isSupported(f.name))
+                      .map((f, i) => (
+                        <div key={i} style={fileRowStyle(true)}>
+                          <i
+                            className="fa-regular fa-file"
+                            style={{ color: 'var(--accent-green)', fontSize: 13 }}
+                          />
+                          <span
+                            style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {f.webkitRelativePath || f.name}
+                          </span>
+                          <span
+                            style={{
+                              color: 'var(--text-tertiary)',
+                              fontSize: 11,
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {(f.size / 1024).toFixed(1)} KB
+                          </span>
+                          <button
+                            onClick={() => removeFile(files.indexOf(f))}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--text-tertiary)',
+                              cursor: 'pointer',
+                              fontSize: 12,
+                              padding: '2px 4px',
+                            }}
+                          >
+                            <i className="fa-solid fa-xmark" />
+                          </button>
+                        </div>
+                      ))}
                   </div>
                 </div>
               )}
@@ -527,17 +720,29 @@ export function AddKnowledgeItemDialog({ open, onClose }: Props) {
             {activeTab === 'directory' && files.length > 0 && `已选择 ${supportedCount} 个文件`}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={onClose} style={cancelBtnStyle}>取消</button>
-            <button onClick={handleSubmit} disabled={!canSubmit || uploading} style={submitBtnStyle(canSubmit && !uploading)}>
+            <button onClick={onClose} style={cancelBtnStyle}>
+              取消
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!canSubmit || uploading}
+              style={submitBtnStyle(canSubmit && !uploading)}
+            >
               {uploading ? '添加中...' : '添加'}
             </button>
           </div>
         </div>
       </div>
 
-      <NoteEditorDialog open={noteEditorOpen} onClose={() => { setNoteEditorOpen(false); onClose(); }} />
+      <NoteEditorDialog
+        open={noteEditorOpen}
+        onClose={() => {
+          setNoteEditorOpen(false);
+          onClose();
+        }}
+      />
       {renderInfoDialog()}
     </div>,
-    document.body
+    document.body,
   );
 }

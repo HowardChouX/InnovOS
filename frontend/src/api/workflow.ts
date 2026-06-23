@@ -34,26 +34,6 @@ export const workflowApi = {
     return res.data;
   },
 
-  runDemandPortrait: (taskId: string) =>
-    apiRequest<{ data: unknown }>(`/api/workflow-steps/demand/${taskId}/analyze`, {
-      method: 'POST',
-    }).then((r) => r.data),
-
-  getDemandResults: (taskId: string) =>
-    apiRequest<{ data: unknown }>(`/api/workflow-steps/demand/${taskId}/results`).then(
-      (r) => r.data,
-    ),
-
-  runProblemModeling: (taskId: string) =>
-    apiRequest<{ data: unknown }>(`/api/workflow-steps/modeling/${taskId}/analyze`, {
-      method: 'POST',
-    }).then((r) => r.data),
-
-  getModelingResults: (taskId: string) =>
-    apiRequest<{ data: unknown }>(`/api/workflow-steps/modeling/${taskId}/results`).then(
-      (r) => r.data,
-    ),
-
   proceed: (taskId: string, ratings?: { demandId: string; score: number }[]) =>
     apiRequest<{ data: unknown }>(`/api/analysis/${taskId}/proceed`, {
       method: 'POST',

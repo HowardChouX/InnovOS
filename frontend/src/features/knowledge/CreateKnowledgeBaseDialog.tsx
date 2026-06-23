@@ -17,23 +17,29 @@ export default function CreateKnowledgeBaseDialog({ open, onClose }: Props) {
 
   useEffect(() => {
     if (open) {
-      setName('');
-      setGroupId(createBaseGroupId);
-      setError('');
+      const id = requestAnimationFrame(() => {
+        setName('');
+        setGroupId(createBaseGroupId);
+        setError('');
+      });
+      return () => cancelAnimationFrame(id);
     }
   }, [open, createBaseGroupId]);
 
   if (!open) return null;
 
   const handleSubmit = async () => {
-    if (!name.trim()) { setError('请输入知识库名称'); return; }
+    if (!name.trim()) {
+      setError('请输入知识库名称');
+      return;
+    }
     setError('');
     setSubmitting(true);
     try {
       await createBase(name.trim(), groupId, {});
       onClose();
-    } catch (e: any) {
-      setError(e?.message || '创建失败');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '创建失败');
     } finally {
       setSubmitting(false);
     }
@@ -46,7 +52,7 @@ export default function CreateKnowledgeBaseDialog({ open, onClose }: Props) {
     >
       <div
         className="flex w-[520px] max-h-[85vh] flex-col overflow-hidden rounded-xl border border-border bg-card"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border-light px-5 py-3.5">
@@ -64,8 +70,10 @@ export default function CreateKnowledgeBaseDialog({ open, onClose }: Props) {
             <input
               autoFocus
               value={name}
-              onChange={e => setName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !submitting) handleSubmit(); }}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !submitting) handleSubmit();
+              }}
               placeholder="知识库名称"
               className="w-full rounded-md border border-border bg-background-muted px-3 py-2 text-sm text-foreground outline-none placeholder:text-foreground-muted/50 focus:ring-1 focus:ring-ring"
             />
@@ -77,22 +85,20 @@ export default function CreateKnowledgeBaseDialog({ open, onClose }: Props) {
               <label className="mb-1.5 block text-xs font-medium text-foreground">分组</label>
               <select
                 value={groupId ?? ''}
-                onChange={e => setGroupId(e.target.value || undefined)}
+                onChange={(e) => setGroupId(e.target.value || undefined)}
                 className="w-full rounded-md border border-border bg-background-muted px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">未分组</option>
-                {groups.map(g => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
                 ))}
               </select>
             </div>
           )}
 
-          {error && (
-            <div className="rounded-md badge-danger px-3 py-2 text-xs">
-              {error}
-            </div>
-          )}
+          {error && <div className="rounded-md badge-danger px-3 py-2 text-xs">{error}</div>}
         </div>
 
         {/* Footer */}
@@ -115,6 +121,6 @@ export default function CreateKnowledgeBaseDialog({ open, onClose }: Props) {
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

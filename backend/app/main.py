@@ -16,12 +16,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 # Importing any app submodule triggers app/__init__.py bootstrap (load_dotenv + setup_logging)
-from app.api import analysis, auth, evaluation, feedback, modeling, notifications, patents, solutions, tasks, users as users_api, workflow
+from app.api import analysis, auth, evaluation, feedback, modeling, notifications, patents, solutions, tasks, workflow
 from app.api import conversion as conversion_api
 from app.api import kb_tools as kb_tools_api
 from app.api import knowledge as knowledge_api
 from app.api import knowledge_bases as knowledge_bases_api
 from app.api import models as models_api
+from app.api import users as users_api
 from app.api.admin import router as admin_router
 from app.api.sidebar import router as sidebar_router
 from app.api.workflow_steps import router as workflow_steps_router
@@ -48,14 +49,15 @@ app_.add_middleware(RequestLoggingMiddleware)
 app_.add_middleware(SecurityHeadersMiddleware)
 app_.add_middleware(RequestIDMiddleware)  # 最先执行（生成 request_id）
 
-# CORS — 开发环境允许前端调试地址
+# CORS — 开发环境允许前端调试地址，生产环境无回退
+_dev_origins: list[str] = ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"]
+if settings.ENVIRONMENT == "production":
+    cors_origins = settings.all_cors_origins or []
+else:
+    cors_origins = settings.all_cors_origins or _dev_origins
 app_.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS or [
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Request-ID"],

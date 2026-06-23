@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useEffect, useState, useCallback, createContext, useContext, useMemo } from 'react';
 import { useKnowledgeStore } from '../../store/useKnowledgeStore';
 import type { KnowledgeBase } from '../../types/knowledge';
@@ -30,31 +31,45 @@ export const useKnowledgePage = () => {
 // ─── Main Page ──────────────────────────────────────────────
 export default function KnowledgePage() {
   const {
-    fetchBases, fetchGroups, selectedBaseId,
-    isRecallTestOpen, closeRecallTest,
-    isCreateBaseOpen, closeCreateBase,
-    isCreateGroupOpen, closeCreateGroup,
+    fetchBases,
+    fetchGroups,
+    selectedBaseId,
+    isRecallTestOpen,
+    closeRecallTest,
+    isCreateBaseOpen,
+    closeCreateBase,
+    isCreateGroupOpen,
+    closeCreateGroup,
     createGroup,
-    editingName, closeRename,
-    isRestoringBase, restoreBase,
+    editingName,
+    closeRename,
+    isRestoringBase,
+    restoreBase,
   } = useKnowledgeStore();
 
   // Dialog state for rename base and restore
-  const [renameBaseDialog, setRenameBaseDialog] = useState<{ id: string; name: string } | null>(null);
+  const [renameBaseDialog, setRenameBaseDialog] = useState<{ id: string; name: string } | null>(
+    null,
+  );
   const [restoreDialogBase, setRestoreDialogBase] = useState<KnowledgeBase | null>(null);
-  const [renameGroupDialog, setRenameGroupDialog] = useState<{ id: string; name: string } | null>(null);
+  const [renameGroupDialog, setRenameGroupDialog] = useState<{ id: string; name: string } | null>(
+    null,
+  );
 
   useEffect(() => {
     fetchBases();
     fetchGroups();
-  }, []);
+  }, [fetchBases, fetchGroups]);
 
-  const handleRenameBaseSubmit = useCallback(async (name: string) => {
-    if (!renameBaseDialog) return;
-    const { renameBase } = useKnowledgeStore.getState();
-    await renameBase(renameBaseDialog.id, name);
-    setRenameBaseDialog(null);
-  }, [renameBaseDialog]);
+  const handleRenameBaseSubmit = useCallback(
+    async (name: string) => {
+      if (!renameBaseDialog) return;
+      const { renameBase } = useKnowledgeStore.getState();
+      await renameBase(renameBaseDialog.id, name);
+      setRenameBaseDialog(null);
+    },
+    [renameBaseDialog],
+  );
 
   const handleRestoreBaseRestored = useCallback((base: KnowledgeBase) => {
     setRestoreDialogBase(null);
@@ -63,18 +78,19 @@ export default function KnowledgePage() {
     fetchBases().then(() => selectBase(base.id));
   }, []);
 
-  const ctxValue = useMemo<KnowledgePageContextValue>(() => ({
-    openRenameBaseDialog: (base) => setRenameBaseDialog(base),
-    openRestoreBaseDialog: (base) => setRestoreDialogBase(base),
-  }), []);
+  const ctxValue = useMemo<KnowledgePageContextValue>(
+    () => ({
+      openRenameBaseDialog: (base) => setRenameBaseDialog(base),
+      openRestoreBaseDialog: (base) => setRestoreDialogBase(base),
+    }),
+    [],
+  );
 
   return (
     <KnowledgePageContext value={ctxValue}>
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
-          <KnowledgeNavigator
-            onOpenRenameGroup={(group) => setRenameGroupDialog(group)}
-          />
+          <KnowledgeNavigator onOpenRenameGroup={(group) => setRenameGroupDialog(group)} />
           {selectedBaseId ? <KnowledgeDetail /> : <KnowledgeEmptyState />}
         </div>
 
@@ -94,7 +110,9 @@ export default function KnowledgePage() {
           open={!!renameBaseDialog}
           initialName={renameBaseDialog?.name ?? ''}
           onSubmit={handleRenameBaseSubmit}
-          onOpenChange={(open) => { if (!open) setRenameBaseDialog(null); }}
+          onOpenChange={(open) => {
+            if (!open) setRenameBaseDialog(null);
+          }}
         />
 
         <RenameKnowledgeGroupDialog
@@ -108,7 +126,9 @@ export default function KnowledgePage() {
           base={restoreDialogBase}
           isRestoring={isRestoringBase}
           onRestore={restoreBase}
-          onOpenChange={(open) => { if (!open) setRestoreDialogBase(null); }}
+          onOpenChange={(open) => {
+            if (!open) setRestoreDialogBase(null);
+          }}
           onRestored={handleRestoreBaseRestored}
         />
 
@@ -122,7 +142,9 @@ export default function KnowledgePage() {
               await renameBase(editingName.id, name);
               closeRename();
             }}
-            onOpenChange={(open) => { if (!open) closeRename(); }}
+            onOpenChange={(open) => {
+              if (!open) closeRename();
+            }}
           />
         )}
       </div>

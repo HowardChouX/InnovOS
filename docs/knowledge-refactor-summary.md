@@ -1,3 +1,5 @@
+> ⚠️ **历史文档**：本文档记录知识库重构过程。部分文件路径已变更：`app/models/knowledge.py` 不存在（Pydantic 模型在 `app/models/` 独立文件），`knowledge_service_v3.py` 不存在（功能拆分为 `knowledge_base_service.py` + `knowledge_item_service.py`），`knowledge_orchestration.py` 不存在（实际为 `knowledge_orchestration_service.py`）。当前知识库使用 PostgreSQL + pgvector 向量存储，详见 `backend/app/tables/pg_schema.py`。
+
 # 知识库重构总结
 
 ## 重构目标
@@ -9,6 +11,7 @@
 ### 1. 数据模型 (`app/models/knowledge.py`)
 
 **新增内容：**
+
 - 使用 Pydantic 定义完整类型系统
 - 知识项类型枚举：`file`, `url`, `note`, `directory`
 - 知识项状态机：`idle`, `preparing`, `processing`, `reading`, `embedding`, `completed`, `failed`, `deleting`
@@ -18,12 +21,14 @@
 - 数据验证规则
 
 **参考 cherry-studio：**
+
 - `src/shared/data/types/knowledge.ts` - 类型定义
 - `src/main/data/db/schemas/knowledge.ts` - 数据库 schema
 
 ### 2. 服务层 (`app/services/knowledge_service_v3.py`)
 
 **新增内容：**
+
 - `KnowledgeBaseService` - 知识库数据持久化
 - `KnowledgeItemService` - 知识项数据持久化
 - 完整的 CRUD 操作
@@ -31,12 +36,14 @@
 - 关联查询（item count）
 
 **参考 cherry-studio：**
+
 - `src/main/data/services/KnowledgeBaseService.ts`
 - `src/main/data/services/KnowledgeItemService.ts`
 
 ### 3. 编排层 (`app/services/knowledge_orchestration.py`)
 
 **新增内容：**
+
 - `KnowledgeOrchestrationService` - 知识库工作流协调
 - `KnowledgeLockManager` - 同库变更序列化
 - 知识项生命周期管理
@@ -44,28 +51,33 @@
 - 搜索协调
 
 **参考 cherry-studio：**
+
 - `src/main/services/knowledge/KnowledgeOrchestrationService.ts`
 - `src/main/services/knowledge/KnowledgeLockManager.ts`
 
 ### 4. API 层 (`app/api/knowledge_bases_v2.py`)
 
 **新增内容：**
+
 - RESTful 端点
 - 请求/响应验证
 - 错误处理
 - 分页支持
 
 **参考 cherry-studio：**
+
 - `src/main/data/api/handlers/knowledges.ts`
 
 ## 架构对比
 
 ### 原架构
+
 ```
 API → Service → Database (原生 SQL)
 ```
 
 ### 新架构
+
 ```
 API → OrchestrationService → KnowledgeBaseService/KnowledgeItemService → Database
                     ↓
@@ -96,12 +108,12 @@ API → OrchestrationService → KnowledgeBaseService/KnowledgeItemService → D
 
 ## 文件变更列表
 
-| 文件 | 变更类型 | 说明 |
-|------|----------|------|
-| `app/models/knowledge.py` | 新增 | 数据模型定义 |
-| `app/services/knowledge_service_v3.py` | 新增 | 服务层实现 |
-| `app/services/knowledge_orchestration.py` | 新增 | 编排层实现 |
-| `app/api/knowledge_bases_v2.py` | 新增 | API 层实现 |
+| 文件                                      | 变更类型 | 说明         |
+| ----------------------------------------- | -------- | ------------ |
+| `app/models/knowledge.py`                 | 新增     | 数据模型定义 |
+| `app/services/knowledge_service_v3.py`    | 新增     | 服务层实现   |
+| `app/services/knowledge_orchestration.py` | 新增     | 编排层实现   |
+| `app/api/knowledge_bases_v2.py`           | 新增     | API 层实现   |
 
 ## 参考资源
 

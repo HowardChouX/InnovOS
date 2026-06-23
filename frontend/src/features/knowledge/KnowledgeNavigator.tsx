@@ -19,9 +19,17 @@ interface KnowledgeNavigatorProps {
 
 export function KnowledgeNavigator({ onOpenRenameGroup }: KnowledgeNavigatorProps) {
   const {
-    bases, groups, loading, selectedBaseId, selectBase,
-    deleteBase, openCreateBase, deleteGroup,
-    openCreateGroup, openRename, updateBase,
+    bases,
+    groups,
+    loading,
+    selectedBaseId,
+    selectBase,
+    deleteBase,
+    openCreateBase,
+    deleteGroup,
+    openCreateGroup,
+    openRename,
+    updateBase,
   } = useKnowledgeStore();
 
   const [width, setWidth] = useState(NAV_WIDTH);
@@ -32,7 +40,7 @@ export function KnowledgeNavigator({ onOpenRenameGroup }: KnowledgeNavigatorProp
 
   const sections = useMemo(
     () => buildKnowledgeBaseGroupSections(bases, groups, searchValue),
-    [bases, groups, searchValue]
+    [bases, groups, searchValue],
   );
 
   // Close context menu on outside click
@@ -48,23 +56,27 @@ export function KnowledgeNavigator({ onOpenRenameGroup }: KnowledgeNavigatorProp
   }, [contextMenu]);
 
   // Resize handler
-  const startResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startW = width;
-    const onMove = (me: MouseEvent) => setWidth(Math.min(NAV_MAX, Math.max(NAV_MIN, startW + me.clientX - startX)));
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      document.body.style.cursor = '';
-    };
-    document.body.style.cursor = 'col-resize';
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }, [width]);
+  const startResize = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startW = width;
+      const onMove = (me: MouseEvent) =>
+        setWidth(Math.min(NAV_MAX, Math.max(NAV_MIN, startW + me.clientX - startX)));
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.cursor = '';
+      };
+      document.body.style.cursor = 'col-resize';
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    },
+    [width],
+  );
 
   const toggleGroup = useCallback((groupId: string) => {
-    setExpandedGroups(prev => {
+    setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(groupId)) next.delete(groupId);
       else next.add(groupId);
@@ -79,26 +91,31 @@ export function KnowledgeNavigator({ onOpenRenameGroup }: KnowledgeNavigatorProp
 
   const closeMenu = useCallback(() => setContextMenu(null), []);
 
-  const handleMoveBase = useCallback(async (baseId: string, groupId: string | null) => {
-    await updateBase(baseId, { groupId });
-    closeMenu();
-  }, [updateBase, closeMenu]);
-
-  // Ensure "ungrouped" is always expanded
-  useEffect(() => {
-    setExpandedGroups(prev => {
-      const next = new Set(prev);
-      next.add('ungrouped');
-      return next;
-    });
-  }, []);
+  const handleMoveBase = useCallback(
+    async (baseId: string, groupId: string | null) => {
+      await updateBase(baseId, { groupId });
+      closeMenu();
+    },
+    [updateBase, closeMenu],
+  );
 
   const handleCreateMenuToggle = useCallback(() => {
-    setContextMenu(ctx => ctx?.type === 'createMenu' ? null : { x: 0, y: 0, type: 'createMenu', name: '' });
+    setContextMenu((ctx) =>
+      ctx?.type === 'createMenu' ? null : { x: 0, y: 0, type: 'createMenu', name: '' },
+    );
   }, []);
 
   return (
-    <div style={{ width, flexShrink: 0, position: 'relative', display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div
+      style={{
+        width,
+        flexShrink: 0,
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+      }}
+    >
       <aside className="flex h-full min-h-0 flex-col border-r border-border-muted">
         {/* Header with search and create menu */}
         <div className="flex shrink-0 items-center gap-2 p-3">
@@ -130,7 +147,9 @@ export function KnowledgeNavigator({ onOpenRenameGroup }: KnowledgeNavigatorProp
           {sections.map((section) => {
             const key = section.groupId ?? 'ungrouped';
             const isExpanded = expandedGroups.has(key);
-            const group = section.groupId ? groups.find(g => g.id === section.groupId) : undefined;
+            const group = section.groupId
+              ? groups.find((g) => g.id === section.groupId)
+              : undefined;
 
             return (
               <div key={key} className="mb-2">
@@ -173,12 +192,27 @@ export function KnowledgeNavigator({ onOpenRenameGroup }: KnowledgeNavigatorProp
           groups={groups}
           menuRef={menuRef}
           onClose={closeMenu}
-          onRenameBase={(id, name) => { closeMenu(); openRename(id, name, 'base'); }}
+          onRenameBase={(id, name) => {
+            closeMenu();
+            openRename(id, name, 'base');
+          }}
           onMoveBase={handleMoveBase}
-          onDeleteBase={async (id) => { await deleteBase(id); closeMenu(); }}
-          onRenameGroup={(id, name) => { closeMenu(); onOpenRenameGroup?.({ id, name }); }}
-          onCreateBaseInGroup={(groupId) => { closeMenu(); openCreateBase(groupId); }}
-          onDeleteGroup={async (id) => { await deleteGroup(id); closeMenu(); }}
+          onDeleteBase={async (id) => {
+            await deleteBase(id);
+            closeMenu();
+          }}
+          onRenameGroup={(id, name) => {
+            closeMenu();
+            onOpenRenameGroup?.({ id, name });
+          }}
+          onCreateBaseInGroup={(groupId) => {
+            closeMenu();
+            openCreateBase(groupId);
+          }}
+          onDeleteGroup={async (id) => {
+            await deleteGroup(id);
+            closeMenu();
+          }}
         />
       )}
     </div>

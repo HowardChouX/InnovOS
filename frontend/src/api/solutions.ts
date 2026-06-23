@@ -7,11 +7,6 @@ export const solutionsApi = {
     return res.data;
   },
 
-  async getDetail(taskId: string, solutionId: string): Promise<Solution> {
-    const res = await apiRequest<{ data: Solution }>(`/api/solutions/${taskId}/${solutionId}`);
-    return res.data;
-  },
-
   async updateRating(taskId: string, solutionId: string, rating: number): Promise<Solution> {
     const res = await apiRequest<{ data: Solution }>(`/api/solutions/${taskId}/${solutionId}`, {
       method: 'PUT',

@@ -18,23 +18,16 @@ InnovOS
     └── 管理员  （+ 专利数据库管理 / 数据监控 / Key管理 / 用户管理）
 ```
 
-**技术栈**：React 19 + TypeScript + Vite 8 + Zustand 5 + TailwindCSS 4 + Lucide React（前端）| FastAPI + PostgreSQL (pgvector)（后端）
+**技术栈**：React 19 + TypeScript + Vite 8 + Zustand 5 + TailwindCSS 4（前端）| FastAPI + PostgreSQL (pgvector)（后端）
 
 ---
 
-## 一、使用指南 ❌ 待实现
+## 一、使用指南 ✅ 已实现
 
-### 1.1 需求
+### 1.1 现状
 
 侧边栏顶部或 Header 中的「使用指南」链接 → 打开使用文档页面。
-
-### 1.2 实现计划
-
-| 项       | 文件                                           | 说明                                                              |
-| -------- | ---------------------------------------------- | ----------------------------------------------------------------- |
-| 新增页面 | `frontend/src/features/guide/GuidePage.tsx`    | 静态帮助文档页，介绍 6-Agent 流程、知识库用法、专利检索、方案评估 |
-| 修改路由 | `frontend/src/routes/index.tsx`                | 添加 `{ path: 'guide', element: <GuidePage /> }`                  |
-| 修改入口 | `frontend/src/components/layout/AppLayout.tsx` | Header「使用指南」span 绑定 `navigate('/guide')`                  |
+**✅ 已实现** - `frontend/src/features/guide/GuidePage.tsx` 已存在
 
 ---
 
@@ -62,7 +55,7 @@ InnovOS
 
 | 项           | 文件                                           | 变更                                                                       |
 | ------------ | ---------------------------------------------- | -------------------------------------------------------------------------- |
-| 表增加字段   | `backend/app/tables/notifications.py`          | `ALTER TABLE notifications ADD COLUMN is_recalled INTEGER DEFAULT 0`       |
+| 表增加字段   | `backend/app/tables/pg_schema.py`              | `ALTER TABLE notifications ADD COLUMN is_recalled INTEGER DEFAULT 0`       |
 | 新增端点     | `backend/app/api/notifications.py`             | `DELETE /api/notifications/{id}/recall`（Admin，软删除设 `is_recalled=1`） |
 | 修改列表查询 | `backend/app/api/notifications.py`             | `list_notifications` 排除 `is_recalled=1` 的记录                           |
 | 新增已发列表 | `backend/app/api/notifications.py`             | `GET /api/notifications/sent`（Admin，含撤销选项）                         |
@@ -237,7 +230,7 @@ InnovOS
 | 上传端点   | `backend/app/api/knowledge.py`                            | `POST /api/knowledge/upload`（接收 UploadFile → 解析 → 分块 → 入库）                                                |
 | 分块查询   | `backend/app/api/knowledge.py`                            | `GET /api/knowledge/docs/{id}/chunks`                                                                               |
 | AI 搜索    | `backend/app/api/knowledge.py`                            | `POST /api/knowledge/ai-search`（AI 提取 9 维度信息）                                                               |
-| 上传组件   | `frontend/src/components/ui/FileUpload.tsx`               | **新增**：拖拽上传区域 + 进度条 + 文件类型过滤                                                                      |
+| 上传组件   | `frontend/src/components/ui/FileUpload.tsx`               | **已有**：拖拽上传区域 + 进度条 + 文件类型过滤                                                                      |
 | 上传 API   | `frontend/src/api/knowledge.ts`                           | 新增 `uploadFile(file, metadata)` 使用 FormData + fetch                                                             |
 | 页面更新   | `frontend/src/features/knowledge/KnowledgeBasePage.tsx`   | 增加「导入文件」按钮 + 文件类型图标 + 分块数显示                                                                    |
 | 详情页     | `frontend/src/features/knowledge/KnowledgeDetailPage.tsx` | **待新建**：展示文档详情 + 分块内容列表                                                                             |
@@ -365,10 +358,10 @@ backend/app/
 ├── main.py              # FastAPI 入口 + startup/shutdown + 18 Router 挂载
 ├── auth.py              # JWT 认证（24h 过期，bcrypt，min 8 字符）
 ├── middleware.py         # SecurityHeaders + RequestID + GlobalException + RequestLogging
-├── rate_limit.py        # 内存滑动窗口限流（60/min API，10/min 登录）
+├── rate_limit.py        # 内存滑动窗口限流（120/min API，10/min 登录）
 ├── logging_config.py    # JSON 结构化日志（ENV=production）
 ├── database.py          # PostgreSQL 连接池（psycopg2，max 50）+ db_session()
-├── seed.py              # idempotent seed_if_empty()，环境变量管理员凭据
+├── seed_data.py         # idempotent seed_admin_user()，环境变量管理员凭据
 ├── utils.py             # 工具函数
 ├── api/                 # 路由层（20+ Router）
 │   ├── auth.py          # /api/auth（登录/注册/me）
@@ -389,16 +382,16 @@ backend/app/
 │   ├── sidebar.py       # /api/sidebar
 │   ├── models.py        # /api/models（模型注册表查询）
 │   └── admin/           # 管理员子路由
-│       ├── __init__.py  # 聚合 router (prefix=/api/admin)
-│       ├── keys.py      # Key 管理 CRUD + 测试连接
-│       ├── users.py     # 用户管理 CRUD
-│       ├── monitor.py   # 数据监控统计
-│       ├── patent_db.py # 专利数据库管理
-│       └── settings.py  # 系统设置
+│       ├── __init__.py     # 聚合 router (prefix=/api/admin)
+│       ├── knowledge.py    # 知识库管理
+│       ├── monitor.py      # 数据监控统计
+│       ├── patent_db.py    # 专利数据库管理
+│       ├── providers.py    # 供应商/Key 管理
+│       ├── settings.py     # 系统设置
+│       └── users.py        # 用户管理 CRUD
 ├── algorithm/           # AI 算法层
 │   ├── ai_client.py     # AI 通信客户端（OpenAI SDK v2）
 │   ├── key_manager.py   # Key 轮询管理（Provider 架构，参考 CherryStudio）
-│   ├── crypto.py        # AES-256 Fernet + PBKDF2 600K 迭代
 │   ├── model_registry.py # 2600+ 模型注册表（延迟加载）
 │   ├── model_runtime.py # 模型运行时（ensure_v1_url 等）
 │   ├── model_service.py # 模型配置服务
@@ -416,9 +409,6 @@ backend/app/
 │   ├── analyzers/       # 专项分析器
 │   │   ├── demand_portrait.py
 │   │   ├── problem_modeling.py
-│   │   ├── root_cause_analyzer.py
-│   │   ├── function_analyzer.py
-│   │   ├── trimming_analyzer.py
 │   │   ├── evolution_analyzer.py
 │   │   ├── sufield_analyzer.py
 │   │   ├── ifr_generator.py
@@ -428,10 +418,6 @@ backend/app/
 │   │       ├── nine_screens.py    # 九屏幕分析
 │   │       ├── stc_operator.py    # STC 算子
 │   │       └── resource_analyzer.py # 七维度资源分析
-│   ├── prompts/         # AI 提示词模板
-│   │   ├── demand_portrait/
-│   │   ├── problem_modeling/
-│   │   └── solution/
 │   └── knowledge/       # 知识库引擎
 │       ├── chunker.py
 │       ├── embedder.py
@@ -520,27 +506,27 @@ frontend/src/
 
 ---
 
-## 十一、数据库 Schema（22+ 张表）
+## 十一、数据库 Schema（22 张表）
 
 数据库定义在 `backend/app/tables/pg_schema.py`（PostgreSQL only，pgvector 支持），包含以下核心表：
 
-| 表名                                                                                                                          | 说明                    |
-| ----------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| `users`                                                                                                                       | 用户（角色 admin/user） |
-| `tasks`                                                                                                                       | 分析任务                |
-| `analyses`                                                                                                                    | 分析结果                |
-| `solutions`                                                                                                                   | 解决方案                |
-| `workflows`                                                                                                                   | 工作流步骤              |
-| `patents` + `patent_vectors`                                                                                                  | 专利数据 + 向量索引     |
-| `evaluations`                                                                                                                 | AI 评估结果             |
-| `feedbacks`                                                                                                                   | 用户反馈                |
-| `audit_logs`                                                                                                                  | 审计日志                |
-| `api_keys`                                                                                                                    | API Key 管理            |
-| `notifications`                                                                                                               | 通知                    |
-| `system_settings`                                                                                                             | 系统设置                |
-| `models` + `model_providers`                                                                                                  | 模型注册表              |
-| `knowledge_bases` + `knowledge_items` + `knowledge_groups` + `knowledge_docs` + `knowledge_items_pgvector` + `knowledge_jobs` | 知识库体系              |
-| `problem_modelings`                                                                                                           | 问题建模结果            |
+| 表名                                                                                                                   | 说明                                  |
+| ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `users`                                                                                                                | 用户（角色 admin/user）               |
+| `tasks`                                                                                                                | 分析任务                              |
+| `analyses`                                                                                                             | 分析结果                              |
+| `solutions`                                                                                                            | 解决方案                              |
+| `workflows`                                                                                                            | 工作流                                |
+| `patents` + `patent_vectors`                                                                                           | 专利数据 + 向量索引                   |
+| `evaluations`                                                                                                          | AI 评估结果（TRIZ 评估模式）          |
+| `feedbacks`                                                                                                            | 用户反馈                              |
+| `audit_log`                                                                                                            | 审计日志                              |
+| `api_keys`                                                                                                             | API Key（从环境变量读取，表保留兼容） |
+| `notifications`                                                                                                        | 通知                                  |
+| `system_settings`                                                                                                      | 系统设置                              |
+| `models` + `model_providers`                                                                                           | 模型注册表                            |
+| `knowledge_bases` + `knowledge_items` + `knowledge_groups` + `knowledge_docs` + `knowledge_vectors` + `knowledge_jobs` | 知识库体系                            |
+| `problem_modelings`                                                                                                    | 问题建模结果                          |
 
 ---
 
@@ -588,7 +574,7 @@ frontend/src/
 
 - [x] 后端：创建 `algorithm/base.py` 分析器基类
 - [x] 后端：从 `zr_ipm.py` 拆分 `algorithm/analyzers/` 专项分析器（9 个分析器 + thinking_tools）
-- [x] 后端：抽取 `algorithm/prompts/` 提示词模板
+- [ ] 后端：抽取提示词模板（待创建 algorithm/prompts/ 目录）
 - [x] 后端：创建 `services/` 业务逻辑层（9 个服务模块）
 - [x] 后端：创建 `algorithm/file_parser.py` + `algorithm/knowledge/chunker.py`
 - [ ] 前端：创建 `pages/` 目录，从 `features/` 迁移页面组件（保持 `features/` 架构）
@@ -636,7 +622,7 @@ frontend/src/
 
 ### Phase 7：使用指南 + 收尾
 
-- [ ] 前端：`GuidePage.tsx` ❌
+- [x] 前端：`GuidePage.tsx` ✅
 - [ ] 更新 CLAUDE.md + docs/
 - [ ] 清理废弃代码
 
@@ -650,7 +636,7 @@ make dev       # 启动开发环境（PostgreSQL → 后端 :8000 → 前端 :51
 make stop      # 停止开发环境
 make build     # 前端生产构建
 make test      # 运行测试（uv run pytest + npm test）
-make lint      # 代码检查（Ruff + mypy + ESLint + prettier）
+make lint      # 代码检查（Ruff + mypy + ESLint）
 make format    # 自动格式化
 make security  # 安全扫描（Bandit + safety）
 make db-backup # 数据库备份（pg_dump）
@@ -660,10 +646,10 @@ make db-backup # 数据库备份（pg_dump）
 
 - **提交格式**：`<type>(<scope>): <description>` — feat / fix / refactor / docs / test
 - **分支策略**：main ← develop ← feature/xxx
-- **前端**：函数组件 + hooks，页面放 `features/<domain>/`，子组件放 `components/<domain>/`，样式 TailwindCSS v4，图标 Lucide React
-- **后端**：一领域一 Router，复杂逻辑放 `services/`，分析器继承 `AIAnalyzer`，提示词放 `algorithm/prompts/`
+- **前端**：函数组件 + hooks，页面放 `features/<domain>/`，子组件放 `components/<domain>/`，样式 TailwindCSS v4，图标 FontAwesome 6（导航）+ Lucide React（其他）
+- **后端**：一领域一 Router，复杂逻辑放 `services/`，分析器继承 `AIAnalyzer`，提示词在 analyzer 子模块中
 - **DB**：PostgreSQL only，pgvector 向量搜索，`db_session()` 上下文管理器
-- **Key 管理**：Provider 架构（参考 CherryStudio），AES-256 Fernet 加密 + PBKDF2 600K 迭代，轮询 + 限流
+- **Key 管理**：Provider 架构（参考 CherryStudio），环境变量注入（`AI_{PROVIDER_ID}_API_KEY`），轮询 + 限流
 - **配置**：`.env`（`DATABASE_URL`、`INNOVOS_JWT_SECRET`、`INNOVOS_ADMIN_USER`、`INNOVOS_ADMIN_PASSWORD`）
 
 ---
