@@ -8,18 +8,23 @@ interface ModelingStore {
   modeling: ProblemModeling | null;
   loading: boolean;
   error: string | null;
-  
+
   // 各步骤数据
-  stepData: Partial<Record<ModelingStep, {
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    data: any;
-    timestamp: number;
-  }>>;
-  
+  stepData: Partial<
+    Record<
+      ModelingStep,
+      {
+        status: 'pending' | 'running' | 'completed' | 'failed';
+        data: unknown;
+        timestamp: number;
+      }
+    >
+  >;
+
   fetchModeling: (taskId: string) => Promise<void>;
   refreshModeling: (taskId: string) => Promise<void>;
   setModeling: (modeling: ProblemModeling | null) => void;
-  updateStepData: (step: ModelingStep, data: any) => void;
+  updateStepData: (step: ModelingStep, data: unknown) => void;
   clearModeling: () => void;
 }
 
@@ -28,38 +33,40 @@ export const useModelingStore = create<ModelingStore>((set) => ({
   loading: false,
   error: null,
   stepData: {},
-  
+
   fetchModeling: async (taskId: string) => {
     set({ loading: true, error: null });
     try {
       const modeling = await modelingApi.getByTaskId(taskId);
       set({ modeling, loading: false });
-    } catch (err: any) {
+    } catch (err: unknown) {
       // 404 表示尚未生成，不是错误
-      if (err?.response?.status === 404) {
+      const apiErr = err as { response?: { status: number }; message?: string } | null;
+      if (apiErr?.response?.status === 404) {
         set({ modeling: null, loading: false });
       } else {
-        set({ error: err?.message || '获取问题建模失败', loading: false });
+        set({ error: apiErr?.message || '获取问题建模失败', loading: false });
       }
     }
   },
-  
+
   refreshModeling: async (taskId: string) => {
     try {
       const modeling = await modelingApi.getByTaskId(taskId);
       set({ modeling });
-    } catch (err: any) {
-      if (err?.response?.status !== 404) {
-        set({ error: err?.message || '刷新问题建模失败' });
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { status: number }; message?: string } | null;
+      if (apiErr?.response?.status !== 404) {
+        set({ error: apiErr?.message || '刷新问题建模失败' });
       }
     }
   },
-  
+
   setModeling: (modeling: ProblemModeling | null) => {
     set({ modeling });
   },
-  
-  updateStepData: (step: ModelingStep, data: any) => {
+
+  updateStepData: (step, data: unknown) => {
     set((state) => ({
       stepData: {
         ...state.stepData,
@@ -71,7 +78,7 @@ export const useModelingStore = create<ModelingStore>((set) => ({
       },
     }));
   },
-  
+
   clearModeling: () => {
     set({ modeling: null, stepData: {}, error: null });
   },

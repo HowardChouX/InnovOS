@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface CreateKnowledgeGroupDialogProps {
@@ -14,17 +14,24 @@ const CreateKnowledgeGroupDialog = ({
   onSubmit,
   onOpenChange,
 }: CreateKnowledgeGroupDialogProps) => {
+  if (!open) return null;
+
+  return (
+    <CreateKnowledgeGroupForm
+      isSubmitting={isSubmitting}
+      onSubmit={onSubmit}
+      onOpenChange={onOpenChange}
+    />
+  );
+};
+
+function CreateKnowledgeGroupForm({
+  isSubmitting,
+  onSubmit,
+  onOpenChange,
+}: Omit<CreateKnowledgeGroupDialogProps, 'open'>) {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (open) {
-      setName('');
-      setError('');
-    }
-  }, [open]);
-
-  if (!open) return null;
 
   const handleSubmit = async () => {
     const trimmed = name.trim();
@@ -35,8 +42,8 @@ const CreateKnowledgeGroupDialog = ({
     try {
       await onSubmit(trimmed);
       onOpenChange(false);
-    } catch (e: any) {
-      setError(e?.message || '创建分组失败');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '创建分组失败');
     }
   };
 
@@ -47,7 +54,7 @@ const CreateKnowledgeGroupDialog = ({
     >
       <div
         className="flex w-[400px] flex-col overflow-hidden rounded-xl border border-border bg-card"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border-light px-4 py-3.5">
@@ -65,14 +72,17 @@ const CreateKnowledgeGroupDialog = ({
           <input
             autoFocus
             value={name}
-            onChange={e => { setName(e.target.value); setError(''); }}
-            onKeyDown={e => { if (e.key === 'Enter' && !isSubmitting) handleSubmit(); }}
+            onChange={(e) => {
+              setName(e.target.value);
+              setError('');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !isSubmitting) handleSubmit();
+            }}
             placeholder="分组名称"
             className="w-full rounded-md border border-border bg-background-muted px-3 py-2 text-sm text-foreground outline-none placeholder:text-foreground-muted/50 focus:ring-1 focus:ring-ring"
           />
-          {error && (
-            <div className="mt-2 text-xs text-accent-danger">{error}</div>
-          )}
+          {error && <div className="mt-2 text-xs text-accent-danger">{error}</div>}
         </div>
 
         {/* Footer */}
@@ -93,8 +103,8 @@ const CreateKnowledgeGroupDialog = ({
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
-};
+}
 
 export default CreateKnowledgeGroupDialog;

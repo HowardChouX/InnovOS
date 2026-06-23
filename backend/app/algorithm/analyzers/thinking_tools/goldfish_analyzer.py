@@ -1,6 +1,7 @@
 """
 金鱼法分析器 — 幻想方案分解（从 RootSeek 迁移）
 """
+
 import logging
 from typing import Any
 

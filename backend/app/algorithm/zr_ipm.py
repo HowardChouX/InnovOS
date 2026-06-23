@@ -10,6 +10,7 @@ ZR-IPM (智融创新问题映射) 算法引擎
 
 import json
 import logging
+
 from .ai_client import chat_completion
 from .model_resolver import model_resolver
 
@@ -64,7 +65,6 @@ EVALUATE_SYSTEM = "你是一个创新评估专家。返回JSON: scores(innovatio
 
 
 class ZRIPMEngine:
-
     @staticmethod
     def _get_model_id() -> str:
         """从全局设置中获取分配的对话模型 ID"""
@@ -88,11 +88,16 @@ class ZRIPMEngine:
                 result = {}
         return self._build_conflict_graph(result)
 
-    async def generate_solutions(self, task_description: str, patents: list[dict] | None = None,
-                                  innovations: list[dict] | None = None, direction_patents: dict | None = None,
-                                  patent_ratings: dict | None = None) -> list[dict]:
+    async def generate_solutions(
+        self,
+        task_description: str,
+        patents: list[dict] | None = None,
+        innovations: list[dict] | None = None,
+        direction_patents: dict | None = None,
+        patent_ratings: dict | None = None,
+    ) -> list[dict]:
         """生成解决方案，按创新方向生成，每个方向至少一个方案
-        
+
         Args:
             patent_ratings: 专利索引->评分的映射，用于算法加权
         """
@@ -103,7 +108,7 @@ class ZRIPMEngine:
             for i, inn in enumerate(innovations):
                 desc = inn.get("description", "")
                 if desc:
-                    dir_lines.append(f"  方向{i+1}: {desc}")
+                    dir_lines.append(f"  方向{i + 1}: {desc}")
             if dir_lines:
                 context_parts.append("\n创新方向：\n" + "\n".join(dir_lines))
 
@@ -123,34 +128,40 @@ class ZRIPMEngine:
                 user_rating = patent_ratings.get(i, 0) if patent_ratings else 0
                 # 综合得分 = 相关度 * 0.4 + 用户评分 * 0.6（用户评分权重更高）
                 combined_score = rel * 0.4 + (user_rating / 5.0) * 0.6
-                scored_patents.append({
-                    "title": title,
-                    "relevance": rel,
-                    "user_rating": user_rating,
-                    "combined_score": combined_score,
-                    "abstract": p.get("abstract", "")[:200] if p.get("abstract") else "",
-                })
-            
+                scored_patents.append(
+                    {
+                        "title": title,
+                        "relevance": rel,
+                        "user_rating": user_rating,
+                        "combined_score": combined_score,
+                        "abstract": p.get("abstract", "")[:200] if p.get("abstract") else "",
+                    }
+                )
+
             # 按综合得分降序排序
             scored_patents.sort(key=lambda x: x["combined_score"], reverse=True)
-            
+
             # 高评分专利（用户评分>=4）放在最前面，用特殊标记
             high_rated = [p for p in scored_patents if p["user_rating"] >= 4]
             normal_rated = [p for p in scored_patents if p["user_rating"] < 4]
-            
+
             patent_lines = []
             if high_rated:
                 patent_lines.append("【重点参考专利（用户高评分）】")
                 for i, p in enumerate(high_rated, 1):
-                    patent_lines.append(f"  ★ 专利{i}: {p['title']} (用户评分: {p['user_rating']}/5, 相关度: {p['relevance']:.0%})")
+                    patent_lines.append(
+                        f"  ★ 专利{i}: {p['title']} (用户评分: {p['user_rating']}/5, 相关度: {p['relevance']:.0%})"
+                    )
                     if p["abstract"]:
                         patent_lines.append(f"     摘要: {p['abstract']}")
-            
+
             if normal_rated:
                 patent_lines.append("【一般参考专利】")
                 for i, p in enumerate(normal_rated, len(high_rated) + 1):
-                    patent_lines.append(f"  专利{i}: {p['title']} (用户评分: {p['user_rating']}/5, 相关度: {p['relevance']:.0%})")
-            
+                    patent_lines.append(
+                        f"  专利{i}: {p['title']} (用户评分: {p['user_rating']}/5, 相关度: {p['relevance']:.0%})"
+                    )
+
             if patent_lines:
                 context_parts.append("\n参考专利（按用户评分加权排序）：\n" + "\n".join(patent_lines))
 
@@ -177,8 +188,9 @@ class ZRIPMEngine:
             model_id=self._get_model_id(),
         )
 
-    async def generate_report(self, task_description: str, innovations: list,
-                               patents: list, solutions: list, evaluations: list) -> dict:
+    async def generate_report(
+        self, task_description: str, innovations: list, patents: list, solutions: list, evaluations: list
+    ) -> dict:
         """生成完整分析报告"""
         context_parts = [f"用户问题：{task_description}"]
 
@@ -191,13 +203,14 @@ class ZRIPMEngine:
             context_parts.append("\n检索到的专利：\n" + "\n".join(p_lines))
 
         if solutions:
-            s_lines = [f"  - {sol.get('title', '')}: {sol.get('description', '')[:100]}"
-                       for sol in solutions[:10]]
+            s_lines = [f"  - {sol.get('title', '')}: {sol.get('description', '')[:100]}" for sol in solutions[:10]]
             context_parts.append("\n生成的方案：\n" + "\n".join(s_lines))
 
         if evaluations:
-            e_lines = [f"  - {e.get('solution_title', '')}: 总分{e.get('evaluation', {}).get('overall', 0)}"
-                       for e in evaluations[:10]]
+            e_lines = [
+                f"  - {e.get('solution_title', '')}: 总分{e.get('evaluation', {}).get('overall', 0)}"
+                for e in evaluations[:10]
+            ]
             context_parts.append("\n方案评估：\n" + "\n".join(e_lines))
 
         user_prompt = "\n".join(context_parts)
@@ -212,10 +225,18 @@ class ZRIPMEngine:
             try:
                 result = json.loads(result)
             except (json.JSONDecodeError, TypeError):
-                result = {"title": "创新分析报告", "summary": result, "sections": [], "recommendations": [], "topSolutions": []}
-        return result if isinstance(result, dict) else {
-            "title": "创新分析报告", "summary": "", "sections": [], "recommendations": [], "topSolutions": []
-        }
+                result = {
+                    "title": "创新分析报告",
+                    "summary": result,
+                    "sections": [],
+                    "recommendations": [],
+                    "topSolutions": [],
+                }
+        return (
+            result
+            if isinstance(result, dict)
+            else {"title": "创新分析报告", "summary": "", "sections": [], "recommendations": [], "topSolutions": []}
+        )
 
     @staticmethod
     def _build_conflict_graph(ai_result: dict) -> dict:
@@ -226,15 +247,17 @@ class ZRIPMEngine:
         colors = ["#60a5fa", "#4ade80", "#a78bfa", "#fbbf24"]
         positions = ["top", "right", "bottom", "left"]
         for i, s in enumerate(ai_result.get("satellites", [])):
-            satellites.append({
-                "id": f"s{i+1}",
-                "label": s.get("label", ""),
-                "sublabel": s.get("sublabel", ""),
-                "description": s.get("description", ""),
-                "type": "satellite",
-                "color": colors[i % len(colors)],
-                "position": positions[i % len(positions)],
-            })
+            satellites.append(
+                {
+                    "id": f"s{i + 1}",
+                    "label": s.get("label", ""),
+                    "sublabel": s.get("sublabel", ""),
+                    "description": s.get("description", ""),
+                    "type": "satellite",
+                    "color": colors[i % len(colors)],
+                    "position": positions[i % len(positions)],
+                }
+            )
 
         return {
             "centerNode": {

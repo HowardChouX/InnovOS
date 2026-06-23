@@ -1,8 +1,10 @@
 import json
+
 from fastapi import APIRouter, Depends, HTTPException
+
+from app.algorithm.zr_ipm import ZRIPMEngine
 from app.auth import get_current_user
 from app.database import get_db
-from app.algorithm.zr_ipm import ZRIPMEngine
 
 router = APIRouter(prefix="/api/modeling", tags=["modeling"])
 
@@ -58,37 +60,37 @@ async def generate_modeling(task_id: int, user: dict = Depends(get_current_user)
         problem_elements = {
             "coreGoal": analysis_result.get("centerNode", {}).get("description", ""),
             "techObject": task["description"][:50],
-            "constraints": [
-                "成本约束",
-                "性能约束",
-                "安全约束"
-            ],
+            "constraints": ["成本约束", "性能约束", "安全约束"],
             "potentialConflicts": analysis_result.get("satelliteNodes", []),
         }
 
         conflicts = []
         satellites = analysis_result.get("satelliteNodes", [])
         if len(satellites) >= 2:
-            conflicts.append({
-                "type": "技术矛盾",
-                "description": f"{satellites[0].get('label', '')} 与 {satellites[1].get('label', '')} 之间的冲突",
-                "parameters": [
-                    {"name": satellites[0].get('label', ''), "direction": "提高"},
-                    {"name": satellites[1].get('label', ''), "direction": "降低"}
-                ],
-                "severity": "高"
-            })
+            conflicts.append(
+                {
+                    "type": "技术矛盾",
+                    "description": f"{satellites[0].get('label', '')} 与 {satellites[1].get('label', '')} 之间的冲突",
+                    "parameters": [
+                        {"name": satellites[0].get("label", ""), "direction": "提高"},
+                        {"name": satellites[1].get("label", ""), "direction": "降低"},
+                    ],
+                    "severity": "高",
+                }
+            )
 
         if len(satellites) >= 3:
-            conflicts.append({
-                "type": "物理矛盾",
-                "description": f"{satellites[2].get('label', '')} 需要同时满足相反要求",
-                "parameters": [
-                    {"name": satellites[2].get('label', ''), "requirement": "大"},
-                    {"name": satellites[2].get('label', ''), "requirement": "小"}
-                ],
-                "severity": "中"
-            })
+            conflicts.append(
+                {
+                    "type": "物理矛盾",
+                    "description": f"{satellites[2].get('label', '')} 需要同时满足相反要求",
+                    "parameters": [
+                        {"name": satellites[2].get("label", ""), "requirement": "大"},
+                        {"name": satellites[2].get("label", ""), "requirement": "小"},
+                    ],
+                    "severity": "中",
+                }
+            )
 
         recommended_principles = analysis_result.get("principles", [])
 
@@ -96,18 +98,14 @@ async def generate_modeling(task_id: int, user: dict = Depends(get_current_user)
             {
                 "direction": "结构优化",
                 "description": f"优化{satellites[0].get('label', '系统')}的结构设计",
-                "confidence": 85
+                "confidence": 85,
             },
             {
                 "direction": "材料创新",
                 "description": f"采用新材料改善{satellites[1].get('label', '性能')}",
-                "confidence": 78
+                "confidence": 78,
             },
-            {
-                "direction": "工艺改进",
-                "description": "改进制造工艺以消除冲突",
-                "confidence": 72
-            }
+            {"direction": "工艺改进", "description": "改进制造工艺以消除冲突", "confidence": 72},
         ]
 
         model_structure = {
@@ -119,7 +117,7 @@ async def generate_modeling(task_id: int, user: dict = Depends(get_current_user)
         }
 
         db.execute(
-            """INSERT INTO problem_modelings 
+            """INSERT INTO problem_modelings
                (task_id, problem_elements, conflicts, recommended_principles, innovation_directions, model_structure)
                VALUES (?, ?, ?, ?, ?, ?)""",
             (
@@ -129,7 +127,7 @@ async def generate_modeling(task_id: int, user: dict = Depends(get_current_user)
                 json.dumps(recommended_principles, ensure_ascii=False),
                 json.dumps(innovation_directions, ensure_ascii=False),
                 json.dumps(model_structure, ensure_ascii=False),
-            )
+            ),
         )
         db.commit()
 
@@ -140,4 +138,4 @@ async def generate_modeling(task_id: int, user: dict = Depends(get_current_user)
 
     except Exception as e:
         db.close()
-        raise HTTPException(status_code=500, detail=f"问题建模生成失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"问题建模生成失败: {str(e)}") from e

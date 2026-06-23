@@ -7,8 +7,8 @@
 3. 句子过长则按字符分割
 4. 相邻块之间保持 overlap 个字符的重叠
 """
+
 from __future__ import annotations
-import re
 
 
 def chunk_document(
@@ -27,11 +27,7 @@ def chunk_document(
     raw_chunks = _recursive_split(content, separators, 0)
     merged = _merge_chunks(raw_chunks, chunk_size)
     overlapped = _add_overlap(merged, chunk_overlap)
-    return [
-        {"text": t.strip(), "index": i}
-        for i, t in enumerate(overlapped)
-        if t.strip()
-    ]
+    return [{"text": t.strip(), "index": i} for i, t in enumerate(overlapped) if t.strip()]
 
 
 def _recursive_split(text: str, separators: list[str], depth: int) -> list[str]:

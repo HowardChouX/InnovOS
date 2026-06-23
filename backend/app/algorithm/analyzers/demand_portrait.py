@@ -1,17 +1,18 @@
 """
 需求画像编排器 — 并行运行多种分析工具，汇总需求列表
 """
+
 import asyncio
 import json
 import logging
 from typing import Any
 
-from app.algorithm.base import AIBase
-from app.algorithm.analyzers.resource_analyzer import ResourceAnalyzer
 from app.algorithm.analyzers.ifr_generator import IFRGenerator
-from app.algorithm.analyzers.thinking_tools.nine_screens import NineScreensAnalyzer
+from app.algorithm.analyzers.resource_analyzer import ResourceAnalyzer
 from app.algorithm.analyzers.thinking_tools.goldfish_analyzer import GoldfishAnalyzer
+from app.algorithm.analyzers.thinking_tools.nine_screens import NineScreensAnalyzer
 from app.algorithm.analyzers.thinking_tools.stc_operator import STCAnalyzer
+from app.algorithm.base import AIBase
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +75,7 @@ class DemandPortraitAnalyzer:
             "demands": demands,
         }
 
-    async def _aggregate_demands(
-        self, problem, resource, ifr, nine_screens, goldfish, stc
-    ) -> list[dict]:
+    async def _aggregate_demands(self, problem, resource, ifr, nine_screens, goldfish, stc) -> list[dict]:
         context_parts = [f"系统描述：{problem}"]
 
         if resource:
@@ -94,8 +93,10 @@ class DemandPortraitAnalyzer:
         if stc:
             context_parts.append(f"【STC算子完整结果】\n{json.dumps(stc, ensure_ascii=False, indent=2)}")
 
-        user_prompt = "\n\n".join(context_parts) + "\n\n请基于以上所有分析结果，从用户视角列出用户的原始需求。需求是用户想要什么效果（如'手机不发烫'），而不是技术上怎么做（如'加散热片'）。至少列出 6 条不同维度的需求。"
-
+        user_prompt = (
+            "\n\n".join(context_parts)
+            + "\n\n请基于以上所有分析结果，从用户视角列出用户的原始需求。需求是用户想要什么效果（如'手机不发烫'），而不是技术上怎么做（如'加散热片'）。至少列出 6 条不同维度的需求。"
+        )
 
         result = await self.ai.call_ai_async(
             DEMAND_SYSTEM_PROMPT,

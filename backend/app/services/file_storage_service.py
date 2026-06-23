@@ -9,14 +9,14 @@
   key = await storage.upload(user_id, "doc.pdf", content_bytes)
   url = await storage.get_download_url(key)
 """
+
 from __future__ import annotations
 
 import io
-import os
-import uuid
 import logging
-from typing import Optional
-from urllib.parse import urlparse
+import os
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class FileStorageService:
     """MinIO/S3 文件存储服务。
 
-    配置（环境变量）：
+    配置（通过 pydantic-settings settings.S3_*）：
         S3_ENDPOINT    — MinIO/S3 endpoint (e.g. http://minio:9000)
         S3_ACCESS_KEY  — Access key
         S3_SECRET_KEY  — Secret key
@@ -34,12 +34,12 @@ class FileStorageService:
     """
 
     def __init__(self):
-        self._endpoint = os.getenv("S3_ENDPOINT", "")
-        self._access_key = os.getenv("S3_ACCESS_KEY", "")
-        self._secret_key = os.getenv("S3_SECRET_KEY", "")
-        self._bucket = os.getenv("S3_BUCKET", "innovos-files")
-        self._region = os.getenv("S3_REGION", "us-east-1")
-        self._public_url = os.getenv("PUBLIC_URL", "").rstrip("/")
+        self._endpoint = settings.S3_ENDPOINT
+        self._access_key = settings.S3_ACCESS_KEY
+        self._secret_key = settings.S3_SECRET_KEY
+        self._bucket = settings.S3_BUCKET or "innovos-files"
+        self._region = settings.S3_REGION or "us-east-1"
+        self._public_url = (settings.PUBLIC_URL or "").rstrip("/")
         self._client = None
 
     @property
@@ -52,9 +52,7 @@ class FileStorageService:
         """懒加载 boto3 S3 客户端。"""
         if self._client is None:
             if not self.enabled:
-                raise RuntimeError(
-                    "S3 未配置: 需要设置 S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY"
-                )
+                raise RuntimeError("S3 未配置: 需要设置 S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY")
             import boto3
             from botocore.config import Config
 
@@ -76,15 +74,25 @@ class FileStorageService:
             logger.info(f"S3 客户端已初始化: {self._endpoint} bucket={self._bucket}")
         return self._client
 
-    def _object_key(self, user_id: int, filename: str) -> str:
-        """生成 S3 对象键: knowledge/{user_id}/{uuid}_{filename}。"""
+    def _object_key(self, user_id: int, filename: str, base_id: str | None = None, item_id: str | None = None) -> str:
+        """生成 S3 对象键: knowledge/{user_id}/{base_id}/{filename}。"""
         safe_name = filename.replace("/", "_").replace("\\", "_")
-        unique_id = uuid.uuid4().hex[:12]
-        return f"knowledge/{user_id}/{unique_id}_{safe_name}"
+        parts = ["knowledge", str(user_id)]
+        if base_id:
+            parts.append(base_id)
+        if item_id:
+            parts.append(item_id)
+        parts.append(safe_name)
+        return "/".join(parts)
 
     async def upload(
-        self, user_id: int, filename: str, content: bytes
-    ) -> Optional[str]:
+        self,
+        user_id: int,
+        filename: str,
+        content: bytes,
+        base_id: str | None = None,
+        item_id: str | None = None,
+    ) -> str | None:
         """上传文件到 MinIO/S3。
 
         Args:
@@ -99,7 +107,7 @@ class FileStorageService:
             logger.warning("S3 未配置，文件不会被持久化存储")
             return None
 
-        key = self._object_key(user_id, filename)
+        key = self._object_key(user_id, filename, base_id, item_id)
         try:
             self._s3.upload_fileobj(
                 io.BytesIO(content),
@@ -113,7 +121,7 @@ class FileStorageService:
             logger.exception(f"文件上传失败: {e}")
             return None
 
-    async def download(self, key: str) -> Optional[bytes]:
+    async def download(self, key: str) -> bytes | None:
         """从 S3 下载文件内容。"""
         if not self.enabled:
             return None
@@ -136,7 +144,27 @@ class FileStorageService:
             logger.exception(f"文件删除失败: key={key} {e}")
             return False
 
-    async def get_download_url(self, key: str, expires: int = 3600) -> Optional[str]:
+    async def delete_by_prefix(self, prefix: str) -> int:
+        """Delete all objects with the given prefix. Returns count."""
+        if not self.enabled:
+            return 0
+        try:
+            s3 = self._s3
+            # List objects
+            response = s3.list_objects_v2(Bucket=self._bucket, Prefix=prefix)
+            keys = [{"Key": obj["Key"]} for obj in response.get("Contents", [])]
+            if not keys:
+                return 0
+            # Delete in bulk
+            resp = s3.delete_objects(Bucket=self._bucket, Delete={"Objects": keys})
+            deleted = len(resp.get("Deleted", []))
+            logger.info(f"S3 bulk delete: {deleted} objects under prefix '{prefix}'")
+            return deleted
+        except Exception as e:
+            logger.error(f"S3 delete_by_prefix failed: {e}")
+            return 0
+
+    async def get_download_url(self, key: str, expires: int = 3600) -> str | None:
         """获取预签名下载 URL（带过期时间）。
 
         Args:
@@ -159,7 +187,7 @@ class FileStorageService:
             logger.exception(f"生成下载 URL 失败: key={key} {e}")
             return None
 
-    async def get_public_url(self, key: str) -> Optional[str]:
+    async def get_public_url(self, key: str) -> str | None:
         """获取公开访问 URL（如果配置了 PUBLIC_URL + 公开 bucket）。
 
         Args:

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**InnovOS** (智融创新操作系统) - AI-powered innovation problem-solving system using multi-agent workflows. Built with React 19 (TypeScript) frontend and FastAPI (Python) backend. Uses SQLite for development, with PostgreSQL for production.
+**InnovOS** (智融创新操作系统) — AI-powered innovation problem-solving system using multi-agent workflows. Built with React 19 (TypeScript) frontend and FastAPI (Python 3.11+) backend. PostgreSQL only (pgvector for embeddings).
 
 ## Build & Development Commands
 
@@ -13,83 +13,108 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cd backend && uv sync
 cd frontend && npm install
 
-# Start development environment (both frontend and backend)
+# Start development (both frontend and backend)
 make dev
 
 # Start individually
-make backend      # FastAPI on :8000
-make frontend     # Vite dev server on :5173
+cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+cd frontend && npm run dev
 
 # Build & test
-make build        # Build frontend for production
-make test         # Run test suite
-make lint         # Run linting (frontend: ESLint, backend: type checking)
+make build        # Frontend production build with code splitting
+make test         # Run all tests (backend + frontend)
+make lint         # Run linting (ESLint, Ruff, mypy)
+make format       # Auto-format code (Prettier, Black, isort, Ruff)
 make clean        # Remove build artifacts
+make security     # Bandit + safety dependency scan
+make docker-build # Build Docker images (multi-stage)
 
 # Single test
-cd backend && python -m pytest tests/test_<filename>.py -v
+cd backend && uv run pytest tests/test_<filename>.py -v
+
+# TypeScript check
+cd frontend && npx tsc --noEmit
 ```
 
 ## Architecture
 
-### Frontend (React 19 + TypeScript + Vite)
+### Frontend (React 19 + TypeScript + Vite 8)
 
 ```
 src/
-├── api/           # API 客户端（按领域拆分，JWT 自动注入）
-├── pages/         # 页面组件（路由级）
+├── api/           # API 客户端（JWT 自动注入，按领域拆分）
+├── features/      # 页面组件（按领域：auth, dashboard, knowledge, patents, workflow, admin...）
 ├── components/    # 可复用组件
 │   ├── layout/    # AppLayout, Sidebar, ProtectedRoute
-│   ├── ui/        # GlassPanel, Modal, StatusBadge, EmptyState...
-│   ├── dashboard/ # 首页子组件
-│   ├── knowledge/ # 知识库子组件
-│   └── workflow/  # 工作流可视化
-├── store/         # Zustand 5 状态管理
-├── types/         # TypeScript 接口
-├── routes/        # React Router v7 路由配置
+│   ├── common/    # ErrorBoundary, LoadingSkeleton, LazyPage
+│   ├── rich-editor/ # TipTap 富文本编辑器
+│   └── ...
+├── store/         # Zustand 5 状态管理（每个领域一个 store）
+├── types/         # TypeScript 类型定义
+├── routes/        # React Router v7（惰性加载所有页面）
 ├── hooks/         # 自定义 React Hooks
-└── utils/         # 工具函数
+└── lib/           # 第三方库扩展
 ```
 
 **Key Patterns:**
-- 页面组件在 `pages/`，可复用子组件在 `components/<domain>/`
+
+- 页面组件在 `features/`，可复用子组件在 `components/<domain>/`
+- 惰性加载：所有页面通过 `lazyPage()` 包装，路由自动 code-split
+- ErrorBoundary 包裹顶层 RouterProvider
+- 骨架屏：PageSkeleton, CardSkeleton, TableSkeleton, ListSkeleton
 - State management via Zustand stores (one per feature domain)
 - All API calls through `src/api/` with automatic JWT token injection
-- Glass morphism UI styling with TailwindCSS 4 + CSS 变量
+- Build optimization: vendor/ui/state code splitting, esbuild minification, no Console in prod
 
-### Backend (FastAPI + SQLite)
+### Backend (FastAPI + PostgreSQL)
 
 ```
 backend/app/
-├── main.py          # FastAPI 入口 + 路由挂载
-├── auth.py          # JWT 认证
-├── database.py      # SQLite 连接与初始化
-├── seed.py          # 种子数据
-├── api/             # 路由层（16 个 Router）
-├── models/          # Pydantic 响应/请求模型
-├── tables/          # 数据库表定义（13 张表）
+├── main.py          # FastAPI 入口 + 路由挂载 + startup/shutdown 事件
+├── middleware.py     # SecurityHeaders, RequestID, GlobalExceptionHandler, RequestLogging
+├── rate_limit.py    # 内存滑动窗口限流器
+├── logging_config.py # JSON 结构化日志（ENV=production）
+├── auth.py          # JWT 认证 + bcrypt（生产环境强制 INNOVOS_JWT_SECRET）
+├── database.py      # PostgreSQL 连接池 + db_session() 上下文管理器 + QueryBuilder
+├── seed.py          # idempotent 种子数据 seed_if_empty()
+├── api/             # 路由层（20+ Router）
+│   ├── auth.py, tasks.py, analysis.py, patents.py
+│   ├── knowledge.py, knowledge_bases.py, kb_tools.py
+│   ├── workflow.py, workflow_steps/*.py
+│   ├── evaluation.py, feedback.py, solutions.py
+│   ├── notifications.py, conversion.py, sidebare.py, models.py, monitoring.py
+│   └── admin/       # admin/users.py, admin/keys.py, admin/monitor.py, admin/patent_db.py, admin/settings.py
+├── models/          # Pydantic 请求/响应模型
+├── tables/          # PG 表定义（pg_schema.py，含 FK 约束 + 索引）
 ├── algorithm/       # 算法层
-│   ├── ai_client.py      # AI 通信客户端
-│   ├── key_manager.py    # Key 轮询管理
-│   ├── crypto.py         # AES 加密
-│   ├── base.py           # 分析器基类
-│   ├── analyzers/        # 专项分析器（需求洞察、问题建模、专利检索...）
-│   ├── prompts/          # AI 提示词模板
-│   ├── file_parser.py    # 文件解析器（PDF/DOCX/TXT/MD）
-│   └── text_chunker.py   # 文本分块器
+│   ├── ai_client.py      # AI 通信客户端（30s 超时）
+│   ├── key_manager.py    # Provider-based Key 轮询管理
+│   ├── crypto.py         # AES-256 Fernet 加密（随机盐，600K PBKDF2）
+│   ├── model_registry.py # 2600+ 模型注册表（懒加载）
+│   ├── model_runtime.py  # 模型运行时
+│   ├── embedder.py, reranker.py, retriever.py
+│   ├── pipeline.py       # 知识库管道
+│   ├── analyzers/        # 分析器
+│   └── knowledge/        # 知识库处理（processors, pipeline）
 ├── services/        # 业务逻辑层
-│   ├── knowledge_service.py
-│   ├── patent_conversion.py
-│   └── workflow_service.py
-└── data/            # 静态数据与种子
+│   ├── knowledge_base_service.py
+│   ├── knowledge_item_service.py
+│   ├── knowledge_job_manager.py  # 异步作业系统
+│   ├── knowledge_orchestration_service.py
+│   ├── knowledge_workflow_service.py
+│   ├── knowledge_lock_manager.py
+│   └── notification_service.py
+└── data/            # 静态数据
 ```
 
 **Key Patterns:**
-- Direct SQLite with `sqlite3.Row` for dict-like access (no ORM)
-- WAL journal mode for concurrent reads
-- Key Manager: API key rotation, rate limiting, concurrent request handling
-- AI integration via OpenAI-compatible SDK (DeepSeek-R1, Qwen-Turbo, Qwen-Max, BGE-M3)
-- 分析器继承 `AIAnalyzer` 基类，提示词模板统一管理
+
+- Direct PostgreSQL via psycopg2 with connection pool (max 50 connections)
+- `with db_session() as db:` — 必须使用此模式确保连接归还
+- Provider-based API Key management with round-robin and rate limiting
+- AI integration via OpenAI-compatible SDK
+- 6-Agent pipeline with async job processing
+- All SQL parameterized with `?` placeholders; dynamic column names whitelisted
 
 ### Multi-Agent Architecture (ZR-MoA)
 
@@ -98,69 +123,62 @@ User Input → 知识库RAG检索 → 需求洞察Agent → 问题建模Agent
             → 专利分析Agent → 方案生成Agent → 方案评估Agent → 成果转化Agent
 ```
 
-**Core Algorithm:** ZR-IPM (智融创新问题映射) - 87.4% accuracy for problem identification
-
-**侧边栏状态机**：细粒度追踪 6-Agent 管线的子步骤进度
+**Core Algorithm:** ZR-IPM (智融创新问题映射) — 87.4% accuracy for problem identification
 
 **Four-Dimension Evaluation Engine:**
+
 - Innovation Assessment (patent similarity, tech evolution)
 - Feasibility Assessment (constraint reasoning, rule validation)
 - Completeness Assessment (reasoning chain verification, cross-validation)
 - Achievement Transformation Assessment (patent applicability, industry scenario matching)
 
-### Database Schema (13 tables in InnovOS_ACCOUNTS.db)
+### Database Schema (PostgreSQL, 15+ tables)
 
-- `users` - 用户账户（含角色 admin/user）
-- `tasks` - 创新任务
-- `analyses` - 冲突分析结果（1:1 with tasks）
-- `solutions` - 生成的方案
-- `workflows` - 工作流状态（含 Agent 步骤 JSON）
-- `patents` - 专利数据
-- `evaluations` - 四维评估 + RootSeek 智枢扩展（21 列）
-- `feedbacks` - 用户反馈
-- `api_keys` - AES-256 加密 API 密钥
-- `notifications` - 通知（含管理员撤销）
-- `knowledge_docs` - 知识库文档（支持文件分块）
-- `problem_modelings` - 问题建模（1:1 with tasks）
-- `audit_logs` - 审计日志
+- `users` — 用户账户（admin/user 角色）
+- `tasks` — 创新任务
+- `analyses` — 冲突分析结果
+- `solutions` — 创新方案
+- `workflows` — 工作流状态 + Agent 步骤
+- `patents` — 专利数据
+- `evaluations` — 四维评估
+- `feedbacks` — 用户反馈
+- `api_keys` — AES-256 加密 API 密钥 + providers
+- `notifications` — 通知
+- `knowledge_bases` — 知识库
+- `knowledge_items` — 知识项（含状态机）
+- `knowledge_vectors` — 向量嵌入（pgvector, 4096维，FK约束）
+- `knowledge_docs` — 知识库文档
+- `model_providers` — AI 模型供应商
+- `models` — 模型注册 (composite PK provider_id, model_id)
+- `problem_modelings` — 问题建模
+- `audit_logs` — 审计日志
 
 ### Key Configuration
 
 Backend: `.env` (see `.env.example`)
-- `INNOVOS_ENCRYPT_KEY` - Fernet encryption key
-- `INNOVOS_JWT_SECRET` - JWT signing secret
-- `DATABASE_URL` - SQLite path (default: InnovOS_ACCOUNTS.db)
-- API Keys configured via admin UI and stored encrypted
+
+```env
+INNOVOS_ENCRYPT_KEY=       # 必须：Fernet 加密密钥（生产环境必填）
+INNOVOS_JWT_SECRET=        # 必须：JWT 签名密钥（生产环境必填）
+DATABASE_URL=              # PostgreSQL 连接串
+ENV=production             # production 启用 JSON 日志
+INNOVOS_ADMIN_USER=admin   # 可选：管理员用户名
+INNOVOS_ADMIN_PASSWORD=    # 可选：管理员密码（未设置则自动生成随机密码）
+```
 
 ## Development Notes
 
 - **Type Safety:** TypeScript strict mode (frontend), Python type hints enforced (backend)
-- **Commit Style:** `<type>(<scope>): <description>` (feat, fix, refactor, docs, test)
+- **DB Connection must be closed:** Always use `with db_session() as db:` or `try/finally` with `get_db()`
+- **Commit Style:** `<type>(<scope>): <description>` (feat, fix, refactor, docs, test, chore)
 - **Branch Strategy:** main → develop → feature/fix/refactor branches
 - **CORS:** Allows `localhost:5173` and `localhost:5174` (Vite dev servers)
 - **JWT Tokens:** 24-hour expiry, sent via `Authorization: Bearer <token>` header
-- **Database Init:** Automatic on backend startup (`init_db()` + `seed_admin_user()`)
+- **Database Init:** Automatic on backend startup (`init_db()` + `seed_if_empty()` in startup event)
 - **Dev Servers:** Backend on `:8000`, Frontend on `:5173`
-
-## Documentation
-
-- `/docs/README.md` - 文档入口索引
-- `/docs/RESTRUCTURE_PLAN.md` - **项目重构计划**：重构目标、目录结构、迁移方案、开发顺序
-- `/docs/DEVELOPMENT_GUIDE.md` - 项目结构、数据库、API、开发规范、实施计划
-- `/docs/developer/INDEX.md` - **开发文档索引**（按思维导图节点组织）
-  - `00-使用指南.md` - 快速开始、功能模块概览、API 端点
-  - `01-账户系统.md` - 账户类型、注册、登录、找回密码、数据隔离
-  - `02-通知系统.md` - 用户接收（读取/删除）、管理员管理（发送/撤销）
-  - `03-知识库.md` - 借鉴 CherryStudio 的 RAG 检索架构
-  - `04-侧边栏与导航.md` - 侧边栏结构、状态同步
-  - `05-需求画像.md` - RootSeek 分析器迁移（七来源/IFR/九屏幕/金鱼法/STC）
-  - `06-问题建模.md` - 功能分析/因果链/矛盾/裁剪/进化趋势
-  - `07-专利检索与转化.md` - 专利检索 + 查重 + 模式化
-  - `08-方案生成与评估.md` - 方案生成 + 四维评估引擎
-  - `09-历史方案.md` - 历史方案保存与浏览
-  - `10-工作流状态机.md` - 6-Agent 管线状态机
-  - `11-管理员后台.md` - Key管理/用户管理/数据监控/专利数据库管理
-  - `12-API密钥管理.md` - 借鉴 CherryStudio Provider 架构的模型服务管理
-- `/docs/development.md` - 代码风格和 Git 工作流
-- `/docs/key-management.md` - Key 管理系统详细文档
-- `/docs/ai-integration.md` - AI 接入开发文档
+- **Seed:** First-run only — creates admin user if none exists. Does NOT overwrite existing admin password.
+- **Encryption:** API keys encrypted with AES-256 Fernet + random salt (600K PBKDF2 iterations)
+- **Rate Limiting:** per-IP sliding window (auth 10/min, API 60/min, in-memory, single-worker)
+- **Security Headers:** CSP, HSTS, XFO, X-XSS-Protection, Referrer-Policy, Permissions-Policy
+- **Build:** Code splitting (vendor/ui/state chunks), esbuild minification
+- **Error Boundary:** Global React error boundary with professional Chinese error UI and reload button

@@ -8,12 +8,13 @@ Knowledge Item Service — 完全复现 CherryStudio KnowledgeItemService
 - 子树操作 (递归 CTE)
 - 容器状态协调
 """
+
 from __future__ import annotations
 
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+
 from app.database import get_db
 from app.utils import utc_iso
 
@@ -28,9 +29,7 @@ class KnowledgeItemService:
         """分页列出知识项"""
         db = get_db()
         # Verify the base belongs to user
-        base = db.execute(
-            "SELECT id FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id)
-        ).fetchone()
+        base = db.execute("SELECT id FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id)).fetchone()
         if not base:
             raise ValueError("知识库不存在")
 
@@ -58,7 +57,7 @@ class KnowledgeItemService:
         return {"items": [KnowledgeItemService._row_to_item(r) for r in rows], "total": total, "page": page}
 
     @staticmethod
-    def get_by_id(user_id: int, item_id: str) -> Optional[dict]:
+    def get_by_id(user_id: int, item_id: str) -> dict | None:
         """获取单个知识项"""
         db = get_db()
         row = db.execute(
@@ -77,9 +76,7 @@ class KnowledgeItemService:
         """获取知识库下的所有知识项（非分页）"""
         db = get_db()
         # Verify the base belongs to user
-        base = db.execute(
-            "SELECT id FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id)
-        ).fetchone()
+        base = db.execute("SELECT id FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id)).fetchone()
         if not base:
             raise ValueError("知识库不存在")
 
@@ -120,7 +117,8 @@ class KnowledgeItemService:
     def get_deleting_root_groups(user_id: int) -> list[dict]:
         """获取正在删除的根组（用于崩溃恢复）"""
         db = get_db()
-        rows = db.execute("""
+        rows = db.execute(
+            """
             SELECT child.base_id AS baseId, child.id AS id
             FROM knowledge_items child
             LEFT JOIN knowledge_items parent
@@ -130,7 +128,9 @@ class KnowledgeItemService:
                 AND kb.user_id = ?
                 AND (child.group_id IS NULL OR parent.id IS NULL OR parent.status != 'deleting')
             ORDER BY child.base_id, child.id
-        """, (user_id,)).fetchall()
+        """,
+            (user_id,),
+        ).fetchall()
         db.close()
 
         root_ids_by_base = {}
@@ -143,25 +143,32 @@ class KnowledgeItemService:
         return [{"baseId": bid, "rootItemIds": rids} for bid, rids in root_ids_by_base.items()]
 
     @staticmethod
-    def create(user_id: int, base_id: str, item: dict) -> Optional[dict]:
+    def create(user_id: int, base_id: str, item: dict) -> dict | None:
         """创建知识项"""
         db = get_db()
         # Verify base ownership
-        base = db.execute(
-            "SELECT id FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id)
-        ).fetchone()
+        base = db.execute("SELECT id FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id)).fetchone()
         if not base:
             raise ValueError("知识库不存在或无权访问")
 
         item_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
         data_json = json.dumps(item.get("data", {}))
-        cursor = db.execute(
+        db.execute(
             """INSERT INTO knowledge_items
                (id, base_id, group_id, type, data, status, error, created_at, updated_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (item_id, base_id, item.get("groupId") or None, item["type"],
-             data_json, item.get("status", "idle"), item.get("error"), now, now),
+            (
+                item_id,
+                base_id,
+                item.get("groupId") or None,
+                item["type"],
+                data_json,
+                item.get("status", "idle"),
+                item.get("error"),
+                now,
+                now,
+            ),
         )
         db.commit()
         row = db.execute("SELECT * FROM knowledge_items WHERE id=?", (item_id,)).fetchone()
@@ -171,7 +178,9 @@ class KnowledgeItemService:
         return KnowledgeItemService._row_to_item(row)
 
     @staticmethod
-    def set_subtree_status(user_id: int, base_id: str, root_ids: list[str], status: str, error: str = None) -> list[str]:
+    def set_subtree_status(
+        user_id: int, base_id: str, root_ids: list[str], status: str, error: str = None
+    ) -> list[str]:
         """递归设置子树状态（使用递归 CTE）"""
         unique_root_ids = list(dict.fromkeys(root_ids))
         if not unique_root_ids:
@@ -179,9 +188,7 @@ class KnowledgeItemService:
 
         db = get_db()
         # Verify the base belongs to user
-        base = db.execute(
-            "SELECT id FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id)
-        ).fetchone()
+        base = db.execute("SELECT id FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id)).fetchone()
         if not base:
             raise ValueError("知识库不存在")
 
@@ -190,7 +197,8 @@ class KnowledgeItemService:
         now = datetime.now(timezone.utc).isoformat()
 
         # 递归 CTE 查找子树
-        rows = db.execute(f"""
+        rows = db.execute(
+            f"""
             WITH RECURSIVE subtree AS (
                 SELECT id FROM knowledge_items
                 WHERE base_id = ? AND id IN ({placeholders})
@@ -202,10 +210,12 @@ class KnowledgeItemService:
             UPDATE knowledge_items
             SET status = ?, error = ?, updated_at = ?
             WHERE base_id = ? AND id IN (SELECT DISTINCT id FROM subtree)
-                {'AND status != ?' if status == 'failed' else ''}
+                {"AND status != ?" if status == "failed" else ""}
             RETURNING id, group_id AS groupId
-        """, [base_id, *unique_root_ids, base_id, status, error or None, now, base_id] +
-              (["deleting"] if status == "failed" else [])).fetchall()
+        """,
+            [base_id, *unique_root_ids, base_id, status, error or None, now, base_id]
+            + (["deleting"] if status == "failed" else []),
+        ).fetchall()
         db.commit()
 
         updated_ids = [r["id"] for r in rows]
@@ -227,9 +237,7 @@ class KnowledgeItemService:
 
         db = get_db()
         # Verify the base belongs to user
-        base = db.execute(
-            "SELECT id FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id)
-        ).fetchone()
+        base = db.execute("SELECT id FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id)).fetchone()
         if not base:
             raise ValueError("知识库不存在")
 
@@ -254,7 +262,9 @@ class KnowledgeItemService:
         KnowledgeItemService._reconcile_containers(user_id, base_id, group_ids)
 
     @staticmethod
-    def get_subtree_items(user_id: int, base_id: str, root_ids: list[str], include_roots: bool = False, leaf_only: bool = False) -> list[dict]:
+    def get_subtree_items(
+        user_id: int, base_id: str, root_ids: list[str], include_roots: bool = False, leaf_only: bool = False
+    ) -> list[dict]:
         """获取子树项（递归 CTE）"""
         unique_ids = list(dict.fromkeys(root_ids))
         if not unique_ids:
@@ -262,9 +272,7 @@ class KnowledgeItemService:
 
         db = get_db()
         # Verify the base belongs to user
-        base = db.execute(
-            "SELECT id FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id)
-        ).fetchone()
+        base = db.execute("SELECT id FROM knowledge_bases WHERE id=? AND user_id=?", (base_id, user_id)).fetchone()
         if not base:
             raise ValueError("知识库不存在")
 
@@ -272,7 +280,8 @@ class KnowledgeItemService:
         leaf_filter = "AND item.type IN ('file', 'url', 'note')" if leaf_only else ""
         root_filter = "" if include_roots else f"AND item.id NOT IN ({placeholders})"
 
-        rows = db.execute(f"""
+        rows = db.execute(
+            f"""
             WITH RECURSIVE subtree AS (
                 SELECT id, type FROM knowledge_items
                 WHERE base_id = ? AND id IN ({placeholders})
@@ -285,13 +294,14 @@ class KnowledgeItemService:
             FROM subtree
             INNER JOIN knowledge_items item ON item.id = subtree.id AND item.base_id = ?
             WHERE 1=1 {root_filter} {leaf_filter}
-        """, [base_id, *unique_ids, base_id, base_id] +
-              (unique_ids if not include_roots else [])).fetchall()
+        """,
+            [base_id, *unique_ids, base_id, base_id] + (unique_ids if not include_roots else []),
+        ).fetchall()
         db.close()
         return [KnowledgeItemService._row_to_item(r) for r in rows]
 
     @staticmethod
-    def update_status(user_id: int, item_id: str, status: str, error: str = None) -> Optional[dict]:
+    def update_status(user_id: int, item_id: str, status: str, error: str = None) -> dict | None:
         """更新知识项状态"""
         db = get_db()
         existing = db.execute(
@@ -339,7 +349,7 @@ class KnowledgeItemService:
         return KnowledgeItemService._row_to_item(row)
 
     @staticmethod
-    def reindex(user_id: int, item_id: str) -> Optional[dict]:
+    def reindex(user_id: int, item_id: str) -> dict | None:
         """重置知识项状态为 idle 以便重新索引"""
         db = get_db()
         existing = db.execute(
@@ -417,12 +427,15 @@ class KnowledgeItemService:
                     queue.append(container["group_id"])
                 continue
 
-            stats = db.execute("""
+            stats = db.execute(
+                """
                 SELECT
                     SUM(CASE WHEN status NOT IN ('completed', 'failed', 'deleting') THEN 1 ELSE 0 END) AS activecount,
                     SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failedcount
                 FROM knowledge_items WHERE base_id=? AND group_id=?
-            """, (base_id, container_id)).fetchone()
+            """,
+                (base_id, container_id),
+            ).fetchone()
 
             active_count = stats["activecount"] or 0
             failed_count = stats["failedcount"] or 0
@@ -477,6 +490,7 @@ class KnowledgeItemService:
 # 兼容旧接口
 class KnowledgeItemServiceCompat:
     """兼容旧接口的包装器"""
+
     @staticmethod
     def list_items(user_id, base_id, page=1, limit=20, item_type="", group_id=""):
         return KnowledgeItemService.list(user_id, base_id, page, limit, item_type or None, group_id or None)

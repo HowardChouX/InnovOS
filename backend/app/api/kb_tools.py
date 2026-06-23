@@ -2,10 +2,10 @@
 AI Agent KB Tools API — 参考 CherryStudio KnowledgeSearchTool / KnowledgeListTool
 提供 kb__search 和 kb__list 端点供 AI agent 使用
 """
+
 import asyncio
 import json
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -26,7 +26,8 @@ NOTE_SNIPPET_MAX_CHARS = 80
 
 # ── 来源提取 ──────────────────────────────────────────────────────
 
-def derive_sample_source(item: dict) -> Optional[str]:
+
+def derive_sample_source(item: dict) -> str | None:
     """从知识项数据中提取样本来源（文件名/URL/路径/笔记首行）"""
     data = item.get("data", {}) or {}
     item_type = item.get("type", "")
@@ -55,7 +56,7 @@ def derive_sample_source(item: dict) -> Optional[str]:
             trimmed = line.strip()
             if trimmed:
                 if len(trimmed) > NOTE_SNIPPET_MAX_CHARS:
-                    return trimmed[:NOTE_SNIPPET_MAX_CHARS - 1] + "…"
+                    return trimmed[: NOTE_SNIPPET_MAX_CHARS - 1] + "…"
                 return trimmed
         return None
 
@@ -77,10 +78,11 @@ def matches_query(item: dict, lowered: str) -> bool:
 
 # ── kb__list ──────────────────────────────────────────────────────
 
+
 @router.get("/list")
 async def list_kb_tools(
-    query: Optional[str] = Query(None, min_length=1, max_length=200, description="大小写不敏感的名称/来源子串过滤"),
-    groupId: Optional[str] = Query(None, min_length=1, description="按知识库分组筛选"),
+    query: str | None = Query(None, min_length=1, max_length=200, description="大小写不敏感的名称/来源子串过滤"),
+    groupId: str | None = Query(None, min_length=1, description="按知识库分组筛选"),
     user: dict = Depends(get_current_user),
 ):
     """列出可用知识库及样本来源（kb__list 等价）
@@ -113,15 +115,17 @@ async def list_kb_tools(
             if source:
                 sample_sources.append(source)
 
-        output_items.append({
-            "id": base["id"],
-            "name": base.get("name", ""),
-            "groupId": base.get("groupId"),
-            "status": base.get("status", "completed"),
-            "documentCount": base.get("documentCount", 0) or 0,
-            "itemCount": len(root_items),
-            "sampleSources": sample_sources,
-        })
+        output_items.append(
+            {
+                "id": base["id"],
+                "name": base.get("name", ""),
+                "groupId": base.get("groupId"),
+                "status": base.get("status", "completed"),
+                "documentCount": base.get("documentCount", 0) or 0,
+                "itemCount": len(root_items),
+                "sampleSources": sample_sources,
+            }
+        )
 
     # 按 query 子串过滤
     if query:
@@ -132,6 +136,7 @@ async def list_kb_tools(
 
 
 # ── kb__search ────────────────────────────────────────────────────
+
 
 class KbSearchInput(BaseModel):
     query: str = Field(..., min_length=2, max_length=200, description="搜索关键词（2–200 字符）")
@@ -235,11 +240,13 @@ async def search_kb_tools(
         item_id = result.get("item_id", "")
         source = item_sources.get(item_id, item_id)
 
-        output.append({
-            "id": idx + 1,
-            "content": content,
-            "score": score,
-            "source": source,
-        })
+        output.append(
+            {
+                "id": idx + 1,
+                "content": content,
+                "score": score,
+                "source": source,
+            }
+        )
 
     return {"data": output, "message": "success", "code": 200}

@@ -1,11 +1,11 @@
-import RecallResultCard from './RecallResultCard'
-import { useRecallTest } from './RecallTestProvider'
-import { formatRecallPercent, formatRecallScore } from './utils'
+import RecallResultCard from './RecallResultCard';
+import { useRecallTest } from './useRecallTest';
+import { formatRecallPercent, formatRecallScore } from './utils';
 
 const RecallResultSummary = () => {
   const {
-    state: { results, duration, topScore, scoreKind }
-  } = useRecallTest()
+    state: { results, duration, topScore, scoreKind },
+  } = useRecallTest();
 
   return (
     <div className="flex items-center justify-between gap-4 border-b border-border-muted px-4 py-3 text-xs leading-4 text-foreground-muted">
@@ -25,13 +25,13 @@ const RecallResultSummary = () => {
         </span>
       </div>
     </div>
-  )
-}
+  );
+};
 
 const RecallResults = () => {
   const {
-    state: { results }
-  } = useRecallTest()
+    state: { results },
+  } = useRecallTest();
 
   return (
     <div className="h-full min-h-0 overflow-y-auto px-6 py-5">
@@ -44,8 +44,8 @@ const RecallResults = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
 const RecallEmptyState = () => {
   return (
@@ -56,8 +56,8 @@ const RecallEmptyState = () => {
         <div className="mt-1 text-xs">支持向量检索、关键词检索和混合检索</div>
       </div>
     </div>
-  )
-}
+  );
+};
 
 const RecallSearchingState = () => {
   return (
@@ -65,25 +65,25 @@ const RecallSearchingState = () => {
       <i className="fa-solid fa-circle-notch fa-spin text-xl text-primary" />
       <p className="mt-2 text-sm leading-5">搜索中...</p>
     </div>
-  )
-}
+  );
+};
 
 export default function RecallTestBody() {
   const {
-    state: { isSearching, hasSearched }
-  } = useRecallTest()
+    state: { isSearching, hasSearched },
+  } = useRecallTest();
 
   if (isSearching) {
     return (
       <div className="h-full min-h-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <RecallSearchingState />
       </div>
-    )
+    );
   }
 
   if (hasSearched) {
-    return <RecallResults />
+    return <RecallResults />;
   }
 
-  return <RecallEmptyState />
+  return <RecallEmptyState />;
 }

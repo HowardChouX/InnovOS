@@ -1,16 +1,15 @@
-import json
 import asyncio
+import json
 import logging
-import sys
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+
+from app.algorithm.analyzers.demand_portrait import DemandPortraitAnalyzer
+from app.algorithm.base import AIBase
+from app.algorithm.zr_ipm import ZRIPMEngine
 from app.auth import get_current_user
 from app.database import get_db
-from app.algorithm.zr_ipm import ZRIPMEngine
-from app.algorithm.base import AIBase
-from app.algorithm.analyzers.demand_portrait import DemandPortraitAnalyzer
-from app.algorithm.patent_search_engine import PatentSearchEngine
 
 logger = logging.getLogger(__name__)
 
@@ -23,26 +22,58 @@ _background_tasks = set()
 _running_workflows: set[int] = set()
 
 WORKFLOW_AGENTS = [
-    {"agent_id": "agent1", "agent_type": "problem_analysis", "agent_label": "需求洞察Agent", "description": "理解用户需求，提取关键要素"},
-    {"agent_id": "agent2", "agent_type": "patent_search", "agent_label": "问题建模Agent", "description": "构建问题模型，识别核心冲突"},
-    {"agent_id": "agent5", "agent_type": "patent_search", "agent_label": "专利分析Agent", "description": "检索相关专利，分析技术方案"},
-    {"agent_id": "agent3", "agent_type": "solution_gen", "agent_label": "方案生成Agent", "description": "生成创新方案，整合多源知识"},
-    {"agent_id": "agent4", "agent_type": "evaluation", "agent_label": "方案评估Agent", "description": "评估方案可行性与创新性"},
-    {"agent_id": "agent6", "agent_type": "evaluation", "agent_label": "成果转化Agent", "description": "输出结构化成果，支持转化"},
+    {
+        "agent_id": "agent1",
+        "agent_type": "problem_analysis",
+        "agent_label": "需求洞察Agent",
+        "description": "理解用户需求，提取关键要素",
+    },
+    {
+        "agent_id": "agent2",
+        "agent_type": "patent_search",
+        "agent_label": "问题建模Agent",
+        "description": "构建问题模型，识别核心冲突",
+    },
+    {
+        "agent_id": "agent5",
+        "agent_type": "patent_search",
+        "agent_label": "专利分析Agent",
+        "description": "检索相关专利，分析技术方案",
+    },
+    {
+        "agent_id": "agent3",
+        "agent_type": "solution_gen",
+        "agent_label": "方案生成Agent",
+        "description": "生成创新方案，整合多源知识",
+    },
+    {
+        "agent_id": "agent4",
+        "agent_type": "evaluation",
+        "agent_label": "方案评估Agent",
+        "description": "评估方案可行性与创新性",
+    },
+    {
+        "agent_id": "agent6",
+        "agent_type": "evaluation",
+        "agent_label": "成果转化Agent",
+        "description": "输出结构化成果，支持转化",
+    },
 ]
 
 
 def create_workflow(db, task_id: int):
     steps = []
     for agent in WORKFLOW_AGENTS:
-        steps.append({
-            **agent,
-            "status": "pending",
-            "started_at": None,
-            "completed_at": None,
-            "duration": None,
-            "output": None,
-        })
+        steps.append(
+            {
+                **agent,
+                "status": "pending",
+                "started_at": None,
+                "completed_at": None,
+                "duration": None,
+                "output": None,
+            }
+        )
 
     cursor = db.execute(
         "INSERT INTO workflows (task_id, status, steps) VALUES (?, ?, ?) RETURNING id",
@@ -52,8 +83,17 @@ def create_workflow(db, task_id: int):
     return cursor.fetchone()["id"]
 
 
-def update_workflow_step(db, task_id: int, agent_id: str, status: str, description: str | None = None, duration: str | None = None, output: str | None = None):
+def update_workflow_step(
+    db,
+    task_id: int,
+    agent_id: str,
+    status: str,
+    description: str | None = None,
+    duration: str | None = None,
+    output: str | None = None,
+):
     from datetime import datetime
+
     now = datetime.now().isoformat()
 
     row = db.execute("SELECT steps FROM workflows WHERE task_id=?", (task_id,)).fetchone()
@@ -107,12 +147,13 @@ def update_workflow_step(db, task_id: int, agent_id: str, status: str, descripti
     logger.debug(f"Committed workflow status={workflow_status} for task_id={task_id}")
 
 
-async def _update_problem_modeling(db, task_id: int, task_description: str, analysis_result: dict, 
-                                       step: str, extra_data: dict | None = None):
+async def _update_problem_modeling(
+    db, task_id: int, task_description: str, analysis_result: dict, step: str, extra_data: dict | None = None
+):
     """增量更新问题建模，与Agent步骤对齐"""
     try:
         existing = db.execute("SELECT * FROM problem_modelings WHERE task_id=?", (task_id,)).fetchone()
-        
+
         if step == "agent1":
             # Agent1: 需求洞察 - 初始化问题要素
             satellites = analysis_result.get("satelliteNodes", [])
@@ -125,15 +166,15 @@ async def _update_problem_modeling(db, task_id: int, task_description: str, anal
                     for i, s in enumerate(satellites[:3])
                 ],
             }
-            
+
             if existing:
                 db.execute(
                     "UPDATE problem_modelings SET problem_elements=? WHERE task_id=?",
-                    (json.dumps(problem_elements, ensure_ascii=False), task_id)
+                    (json.dumps(problem_elements, ensure_ascii=False), task_id),
                 )
             else:
                 db.execute(
-                    """INSERT INTO problem_modelings 
+                    """INSERT INTO problem_modelings
                        (task_id, problem_elements, conflicts, recommended_principles, innovation_directions, model_structure)
                        VALUES (?, ?, ?, ?, ?, ?)""",
                     (
@@ -143,36 +184,40 @@ async def _update_problem_modeling(db, task_id: int, task_description: str, anal
                         json.dumps([], ensure_ascii=False),
                         json.dumps([], ensure_ascii=False),
                         json.dumps({}, ensure_ascii=False),
-                    )
+                    ),
                 )
             db.commit()
-            
+
         elif step == "agent2":
             # Agent2: 问题建模 - 更新冲突和模型结构
             satellites = analysis_result.get("satelliteNodes", [])
-            
+
             conflicts = []
             if len(satellites) >= 2:
-                conflicts.append({
-                    "type": "技术矛盾",
-                    "description": f"{satellites[0].get('label', '')} 与 {satellites[1].get('label', '')} 之间的冲突",
-                    "parameters": [
-                        {"name": satellites[0].get('label', ''), "direction": "提高"},
-                        {"name": satellites[1].get('label', ''), "direction": "降低"}
-                    ],
-                    "severity": "高"
-                })
+                conflicts.append(
+                    {
+                        "type": "技术矛盾",
+                        "description": f"{satellites[0].get('label', '')} 与 {satellites[1].get('label', '')} 之间的冲突",
+                        "parameters": [
+                            {"name": satellites[0].get("label", ""), "direction": "提高"},
+                            {"name": satellites[1].get("label", ""), "direction": "降低"},
+                        ],
+                        "severity": "高",
+                    }
+                )
 
             if len(satellites) >= 3:
-                conflicts.append({
-                    "type": "物理矛盾",
-                    "description": f"{satellites[2].get('label', '')} 需要同时满足相反要求",
-                    "parameters": [
-                        {"name": satellites[2].get('label', ''), "requirement": "大"},
-                        {"name": satellites[2].get('label', ''), "requirement": "小"}
-                    ],
-                    "severity": "中"
-                })
+                conflicts.append(
+                    {
+                        "type": "物理矛盾",
+                        "description": f"{satellites[2].get('label', '')} 需要同时满足相反要求",
+                        "parameters": [
+                            {"name": satellites[2].get("label", ""), "requirement": "大"},
+                            {"name": satellites[2].get("label", ""), "requirement": "小"},
+                        ],
+                        "severity": "中",
+                    }
+                )
 
             model_structure = {
                 "problemType": "技术矛盾" if len(satellites) >= 2 else "单一问题",
@@ -181,103 +226,101 @@ async def _update_problem_modeling(db, task_id: int, task_description: str, anal
                 "rootCause": analysis_result.get("centerNode", {}).get("description", ""),
                 "solutionSpace": "多方案可行",
             }
-            
+
             db.execute(
                 """UPDATE problem_modelings SET conflicts=?, model_structure=? WHERE task_id=?""",
                 (
                     json.dumps(conflicts, ensure_ascii=False),
                     json.dumps(model_structure, ensure_ascii=False),
                     task_id,
-                )
+                ),
             )
             db.commit()
-            
+
         elif step == "agent3":
             # Agent3: 方案生成 - 更新创新方向
             satellites = analysis_result.get("satelliteNodes", [])
             solutions = extra_data.get("solutions", []) if extra_data else []
-            
+
             innovation_directions = []
             if solutions:
                 for i, sol in enumerate(solutions[:3]):
-                    innovation_directions.append({
-                        "direction": sol.get("title", f"方向{i+1}"),
-                        "description": sol.get("description", "")[:100],
-                        "confidence": sol.get("confidenceScore", 80)
-                    })
+                    innovation_directions.append(
+                        {
+                            "direction": sol.get("title", f"方向{i + 1}"),
+                            "description": sol.get("description", "")[:100],
+                            "confidence": sol.get("confidenceScore", 80),
+                        }
+                    )
             else:
                 innovation_directions = [
                     {
                         "direction": "结构优化",
                         "description": f"优化{satellites[0].get('label', '系统')}的结构设计",
-                        "confidence": 85
+                        "confidence": 85,
                     },
                     {
                         "direction": "材料创新",
                         "description": f"采用新材料改善{satellites[1].get('label', '性能')}",
-                        "confidence": 78
+                        "confidence": 78,
                     },
-                    {
-                        "direction": "工艺改进",
-                        "description": "改进制造工艺以消除冲突",
-                        "confidence": 72
-                    }
+                    {"direction": "工艺改进", "description": "改进制造工艺以消除冲突", "confidence": 72},
                 ]
-            
+
             db.execute(
                 "UPDATE problem_modelings SET innovation_directions=? WHERE task_id=?",
-                (json.dumps(innovation_directions, ensure_ascii=False), task_id)
+                (json.dumps(innovation_directions, ensure_ascii=False), task_id),
             )
             db.commit()
-            
+
         elif step == "agent4":
             # Agent4: 方案评估 - 更新模型复杂度
             evaluations = extra_data.get("evaluations", []) if extra_data else []
-            
+
             # 读取现有模型结构
             row = db.execute("SELECT model_structure FROM problem_modelings WHERE task_id=?", (task_id,)).fetchone()
             model_structure = json.loads(row["model_structure"]) if row and row["model_structure"] else {}
-            
+
             avg_score = 0
             if evaluations:
                 scores = []
                 for ev in evaluations:
                     eval_data = ev.get("evaluation", {})
                     if "scores" in eval_data:
-                        for dim, score_data in eval_data["scores"].items():
+                        for _dim, score_data in eval_data["scores"].items():
                             if isinstance(score_data, dict):
                                 scores.append(score_data.get("score", 0))
                             else:
                                 scores.append(score_data)
                 avg_score = sum(scores) / len(scores) if scores else 0
-            
+
             model_structure["solutionSpace"] = "多方案可行" if avg_score > 70 else "需优化"
             model_structure["avgScore"] = round(avg_score, 1)
-            
+
             db.execute(
                 "UPDATE problem_modelings SET model_structure=? WHERE task_id=?",
-                (json.dumps(model_structure, ensure_ascii=False), task_id)
+                (json.dumps(model_structure, ensure_ascii=False), task_id),
             )
             db.commit()
-            
+
         elif step == "agent5":
             # Agent5: 专利分析 - 更新推荐原理
             patent_info = extra_data.get("patents", []) if extra_data else []
             principles = analysis_result.get("principles", [])
-            
+
             # 合并专利相关原理
             recommended_principles = list(principles)
             for p in patent_info:
                 title = p.get("title", "")
                 if title and title not in recommended_principles:
                     recommended_principles.append(title)
-            
+
             db.execute(
                 "UPDATE problem_modelings SET recommended_principles=? WHERE task_id=?",
-                (json.dumps(recommended_principles[:5], ensure_ascii=False), task_id)
+                (json.dumps(recommended_principles[:5], ensure_ascii=False), task_id),
             )
             db.commit()
-            
+
     except Exception as e:
         logger.error(f"Problem modeling update error for {step}: {e}")
         pass
@@ -293,12 +336,14 @@ async def _search_knowledge_bases(user_id: int, base_ids: list[str], query: str,
             pipeline = KnowledgePipeline(user_id, base_id)
             results = await pipeline.search(query, top_k=top_k, use_rerank=True)
             for r in results:
-                all_results.append({
-                    "base_id": base_id,
-                    "item_id": r.get("item_id", ""),
-                    "content": r.get("text", ""),
-                    "score": r.get("score", 0),
-                })
+                all_results.append(
+                    {
+                        "base_id": base_id,
+                        "item_id": r.get("item_id", ""),
+                        "content": r.get("text", ""),
+                        "score": r.get("score", 0),
+                    }
+                )
         except Exception as e:
             logger.warning(f"KB search failed for base {base_id}: {e}")
 
@@ -323,6 +368,7 @@ def _create_ai_base() -> AIBase | None:
     """从全局设置创建 AIBase 实例给分析器用"""
     try:
         from app.algorithm.model_resolver import model_resolver
+
         s = model_resolver.get_assigned_settings()
         chat_model = s.get("chat_model") or ""
         if not chat_model or ":" not in chat_model:
@@ -340,7 +386,9 @@ def _create_ai_base() -> AIBase | None:
         return None
 
 
-async def run_demand_portrait(task_id: int, user_id: int, task_description: str, knowledge_base_ids: Optional[list[str]] = None):
+async def run_demand_portrait(
+    task_id: int, user_id: int, task_description: str, knowledge_base_ids: list[str] | None = None
+):
     """只运行需求洞察步骤，等待用户评分"""
     logger.debug(f"Demand portrait started for task_id={task_id}")
     db = get_db()
@@ -349,8 +397,7 @@ async def run_demand_portrait(task_id: int, user_id: int, task_description: str,
     kb_context = ""
     if knowledge_base_ids:
         logger.debug(f"Searching knowledge bases: {knowledge_base_ids}")
-        update_workflow_step(db, task_id, "agent1", "running",
-                           description="正在检索知识库...")
+        update_workflow_step(db, task_id, "agent1", "running", description="正在检索知识库...")
         kb_context = await _search_knowledge_bases(user_id, knowledge_base_ids, task_description)
 
     enriched = task_description
@@ -358,8 +405,7 @@ async def run_demand_portrait(task_id: int, user_id: int, task_description: str,
         enriched = f"{kb_context}\n\n【用户问题】\n{task_description}"
 
     try:
-        update_workflow_step(db, task_id, "agent1", "running",
-                           description="正在进行需求分析...")
+        update_workflow_step(db, task_id, "agent1", "running", description="正在进行需求分析...")
 
         ai_base = _create_ai_base()
         if not ai_base:
@@ -369,9 +415,14 @@ async def run_demand_portrait(task_id: int, user_id: int, task_description: str,
         result = await analyzer.analyze(enriched)
 
         demands = result.get("demands", [])
-        update_workflow_step(db, task_id, "agent1", "completed",
-                           description=f"识别 {len(demands)} 个需求",
-                           output=json.dumps(result, ensure_ascii=False))
+        update_workflow_step(
+            db,
+            task_id,
+            "agent1",
+            "completed",
+            description=f"识别 {len(demands)} 个需求",
+            output=json.dumps(result, ensure_ascii=False),
+        )
 
         # 设置 workflow 为等待评分状态
         db.execute(
@@ -385,8 +436,7 @@ async def run_demand_portrait(task_id: int, user_id: int, task_description: str,
 
     except Exception as e:
         logger.error(f"Demand portrait failed: {e}")
-        update_workflow_step(db, task_id, "agent1", "failed",
-                           description=f"执行失败: {str(e)}")
+        update_workflow_step(db, task_id, "agent1", "failed", description=f"执行失败: {str(e)}")
         return None
     finally:
         db.close()
@@ -395,6 +445,7 @@ async def run_demand_portrait(task_id: int, user_id: int, task_description: str,
 def _is_step_pending(db, task_id: int, agent_id: str) -> bool:
     """检查某个步骤是否为 pending 状态"""
     import json
+
     row = db.execute("SELECT steps FROM workflows WHERE task_id=?", (task_id,)).fetchone()
     if not row:
         return False
@@ -414,19 +465,30 @@ def _fallback_patent_search(db, task_description: str, patent_keywords: list) ->
         params.extend([like, like])
     sql = f"SELECT * FROM patents WHERE {' OR '.join(or_conditions)} ORDER BY relevance_score DESC LIMIT 10"
     rows = db.execute(sql, params).fetchall()
-    return [{
-        "id": r["id"], "title": r["title"], "abstract": r["abstract"],
-        "relevance": r["relevance_score"],
-        "applicants": json.loads(r["applicants"]),
-        "inventors": json.loads(r["inventors"]),
-        "patent_number": r["patent_number"],
-        "filing_date": r["filing_date"],
-        "publication_date": r["publication_date"],
-        "ipc_codes": json.loads(r["ipc_codes"]),
-    } for r in rows]
+    return [
+        {
+            "id": r["id"],
+            "title": r["title"],
+            "abstract": r["abstract"],
+            "relevance": r["relevance_score"],
+            "applicants": json.loads(r["applicants"]),
+            "inventors": json.loads(r["inventors"]),
+            "patent_number": r["patent_number"],
+            "filing_date": r["filing_date"],
+            "publication_date": r["publication_date"],
+            "ipc_codes": json.loads(r["ipc_codes"]),
+        }
+        for r in rows
+    ]
 
 
-async def run_analysis_background(task_id: int, user_id: int, task_description: str, knowledge_base_ids: Optional[list[str]] = None, start_from: str = "agent1"):
+async def run_analysis_background(
+    task_id: int,
+    user_id: int,
+    task_description: str,
+    knowledge_base_ids: list[str] | None = None,
+    start_from: str = "agent1",
+):
     """后台执行分析任务"""
     # 并发锁：防止同一个 task_id 的多个后台任务同时执行
     if task_id in _running_workflows:
@@ -460,8 +522,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
     enriched_description = task_description
     if start_from == "agent1" and knowledge_base_ids:
         logger.debug(f"Searching knowledge bases: {knowledge_base_ids}")
-        update_workflow_step(db, task_id, "agent1", "running",
-                           description="正在检索知识库...")
+        update_workflow_step(db, task_id, "agent1", "running", description="正在检索知识库...")
         kb_context = await _search_knowledge_bases(user_id, knowledge_base_ids, task_description)
         if kb_context:
             enriched_description = f"{kb_context}\n\n【用户问题】\n{task_description}"
@@ -471,16 +532,21 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
         if start_from == "agent1":
             logger.debug(f"Setting agent1 to running for task_id={task_id}")
             update_workflow_step(db, task_id, "agent1", "running")
-            logger.debug(f"Agent1 set to running successfully")
-            
+            logger.debug("Agent1 set to running successfully")
+
             analysis_result = await engine.analyze(enriched_description)
-            
+
             # 增量更新：问题要素
             await _update_problem_modeling(db, task_id, task_description, analysis_result, "agent1")
-            
-            update_workflow_step(db, task_id, "agent1", "completed",
-                               description="理解用户需求，提取关键要素",
-                               output=json.dumps(analysis_result, ensure_ascii=False))
+
+            update_workflow_step(
+                db,
+                task_id,
+                "agent1",
+                "completed",
+                description="理解用户需求，提取关键要素",
+                output=json.dumps(analysis_result, ensure_ascii=False),
+            )
         else:
             # 从 proceed 恢复时，从 workflow 读取之前 agent1 的输出
             row = db.execute("SELECT steps FROM workflows WHERE task_id=?", (task_id,)).fetchone()
@@ -497,8 +563,8 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
         if _is_step_pending(db, task_id, "agent2"):
             update_workflow_step(db, task_id, "agent2", "running")
             try:
-                from app.algorithm.base import AIBase
                 from app.algorithm.analyzers.problem_modeling import ProblemModelingAnalyzer
+
                 ai_base = _create_ai_base()
                 if ai_base:
                     pm_analyzer = ProblemModelingAnalyzer(ai_base)
@@ -509,24 +575,30 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
                         if demands:
                             demand_results = {
                                 "demands": [
-                                    {"description": d.get("description", ""),
-                                     "category": d.get("category", ""),
-                                     "rating": d.get("user_rating", None)}
+                                    {
+                                        "description": d.get("description", ""),
+                                        "category": d.get("category", ""),
+                                        "rating": d.get("user_rating", None),
+                                    }
                                     for d in demands
                                 ]
                             }
                     pm_result = await pm_analyzer.analyze(enriched_description, demand_results=demand_results)
                     innovations = pm_result.get("innovations", [])
 
-                    update_workflow_step(db, task_id, "agent2", "completed",
-                                       description=f"生成 {len(innovations)} 个创新方向",
-                                       output=json.dumps(pm_result, ensure_ascii=False))
+                    update_workflow_step(
+                        db,
+                        task_id,
+                        "agent2",
+                        "completed",
+                        description=f"生成 {len(innovations)} 个创新方向",
+                        output=json.dumps(pm_result, ensure_ascii=False),
+                    )
                 else:
                     raise RuntimeError("AI 模型未配置")
             except Exception as e:
                 logger.error(f"问题建模分析失败: {e}")
-                update_workflow_step(db, task_id, "agent2", "failed",
-                                   description=f"执行失败: {str(e)}")
+                update_workflow_step(db, task_id, "agent2", "failed", description=f"执行失败: {str(e)}")
                 return
 
             # 来自 proceed 流程，暂停等评分
@@ -541,7 +613,6 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
 
             patent_info = []
             direction_patents = {}
-            search_note = ""
             try:
                 all_directions = [task_description[:200]]  # fallback
                 row_steps = db.execute("SELECT steps FROM workflows WHERE task_id=?", (task_id,)).fetchone()
@@ -559,14 +630,14 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
                                     reverse=True,
                                 )
                                 all_directions = [
-                                    inn.get("description", "")
-                                    for inn in sorted_inns
-                                    if inn.get("description")
+                                    inn.get("description", "") for inn in sorted_inns if inn.get("description")
                                 ]
                         except (json.JSONDecodeError, TypeError):
                             pass
 
-                patent_searcher = PatentSearchEngine()
+                from app.algorithm.patent_search_engine import get_patent_search_engine
+
+                patent_searcher = get_patent_search_engine()
                 seen_ids = set()
                 patent_info = []
 
@@ -602,12 +673,20 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
             except Exception as e:
                 logger.warning(f"专利检索失败: {e}")
 
-            update_workflow_step(db, task_id, "agent5", "completed",
-                               description=f"检索到 {len(patent_info)} 条相关专利",
-                               output=json.dumps({
-                                   "patents": patent_info,
-                                   "directionPatents": direction_patents,
-                               }, ensure_ascii=False))
+            update_workflow_step(
+                db,
+                task_id,
+                "agent5",
+                "completed",
+                description=f"检索到 {len(patent_info)} 条相关专利",
+                output=json.dumps(
+                    {
+                        "patents": patent_info,
+                        "directionPatents": direction_patents,
+                    },
+                    ensure_ascii=False,
+                ),
+            )
 
             # 暂停等待用户评分，不允许直接继续
             db.execute("UPDATE workflows SET status=? WHERE task_id=?", ("awaiting_rating", task_id))
@@ -689,16 +768,22 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
                         sol.get("confidenceScore", 0),
                         json.dumps(sol.get("referencedPatents", [])),
                         0,
-                    )
+                    ),
                 )
 
             # 增量更新：创新方向
-            await _update_problem_modeling(db, task_id, enriched_description, analysis_result, "agent3",
-                                           extra_data={"solutions": solutions})
-            
-            update_workflow_step(db, task_id, "agent3", "completed",
-                               description=f"生成 {len(solutions)} 个创新方案",
-                               output=json.dumps(solutions, ensure_ascii=False))
+            await _update_problem_modeling(
+                db, task_id, enriched_description, analysis_result, "agent3", extra_data={"solutions": solutions}
+            )
+
+            update_workflow_step(
+                db,
+                task_id,
+                "agent3",
+                "completed",
+                description=f"生成 {len(solutions)} 个创新方案",
+                output=json.dumps(solutions, ensure_ascii=False),
+            )
 
             # 暂停等待用户确认方案
             if start_from != "agent1":
@@ -712,10 +797,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
             update_workflow_step(db, task_id, "agent4", "running")
 
             # 获取该任务的所有solution_id
-            solution_rows = db.execute(
-                "SELECT id, title FROM solutions WHERE task_id=?",
-                (task_id,)
-            ).fetchall()
+            solution_rows = db.execute("SELECT id, title FROM solutions WHERE task_id=?", (task_id,)).fetchall()
             solution_id_map = {row["title"]: row["id"] for row in solution_rows}
 
             # 读取方案数据（可能刚生成，也可能已存在）
@@ -727,10 +809,12 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
             evaluations = []
             for sol in solutions_data:
                 eval_result = await engine.evaluate(sol.get("description", "") or sol.get("title", ""))
-                evaluations.append({
-                    "solution_title": sol.get("title", ""),
-                    "evaluation": eval_result,
-                })
+                evaluations.append(
+                    {
+                        "solution_title": sol.get("title", ""),
+                        "evaluation": eval_result,
+                    }
+                )
 
                 # 获取对应的solution_id
                 sol_id = solution_id_map.get(sol.get("title", ""), 0)
@@ -745,16 +829,22 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
                         db.execute(
                             """INSERT INTO evaluations (solution_id, user_id, dimension, score, details, status)
                                VALUES (?, ?, ?, ?, ?, ?)""",
-                            (sol_id, user_id, dim, score_val, json.dumps(eval_result), "completed")
+                            (sol_id, user_id, dim, score_val, json.dumps(eval_result), "completed"),
                         )
 
             # 增量更新：评估分数
-            await _update_problem_modeling(db, task_id, task_description, analysis_result, "agent4",
-                                           extra_data={"evaluations": evaluations})
-            
-            update_workflow_step(db, task_id, "agent4", "completed",
-                               description=f"评估 {len(evaluations)} 个方案",
-                               output=json.dumps(evaluations, ensure_ascii=False))
+            await _update_problem_modeling(
+                db, task_id, task_description, analysis_result, "agent4", extra_data={"evaluations": evaluations}
+            )
+
+            update_workflow_step(
+                db,
+                task_id,
+                "agent4",
+                "completed",
+                description=f"评估 {len(evaluations)} 个方案",
+                output=json.dumps(evaluations, ensure_ascii=False),
+            )
 
             # 暂停等待用户确认评估结果
             if start_from != "agent1":
@@ -803,7 +893,8 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
                 eval_rows = db.execute(
                     """SELECT e.dimension, e.score, s.title as solution_title
                        FROM evaluations e JOIN solutions s ON e.solution_id = s.id
-                       WHERE s.task_id=?""", (task_id,)
+                       WHERE s.task_id=?""",
+                    (task_id,),
                 ).fetchall()
                 if eval_rows:
                     eval_map = {}
@@ -821,24 +912,40 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
                 # 生成报告
                 engine = ZRIPMEngine()
                 report = await engine.generate_report(
-                    task_description, innovations, patent_info,
-                    solutions_data, evaluations
+                    task_description, innovations, patent_info, solutions_data, evaluations
                 )
 
-                update_workflow_step(db, task_id, "agent6", "completed",
-                                   description=report.get("title", "分析报告"),
-                                   output=json.dumps(report, ensure_ascii=False))
+                update_workflow_step(
+                    db,
+                    task_id,
+                    "agent6",
+                    "completed",
+                    description=report.get("title", "分析报告"),
+                    output=json.dumps(report, ensure_ascii=False),
+                )
             except Exception as e:
                 logger.error(f"报告生成失败: {e}")
-                update_workflow_step(db, task_id, "agent6", "completed",
-                                   description="报告生成异常",
-                                   output=json.dumps({"title": "分析报告", "summary": f"报告生成失败: {e}",
-                                                      "sections": [], "recommendations": [], "topSolutions": []}))
+                update_workflow_step(
+                    db,
+                    task_id,
+                    "agent6",
+                    "completed",
+                    description="报告生成异常",
+                    output=json.dumps(
+                        {
+                            "title": "分析报告",
+                            "summary": f"报告生成失败: {e}",
+                            "sections": [],
+                            "recommendations": [],
+                            "topSolutions": [],
+                        }
+                    ),
+                )
 
         # 更新任务状态
         db.execute(
             "UPDATE tasks SET status='completed', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
-            (task_id,)
+            (task_id,),
         )
         db.commit()
 
@@ -846,7 +953,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
         logger.error(f"Background task failed for task_id={task_id}: {e}")
         db.execute(
             "UPDATE tasks SET status='failed', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
-            (task_id,)
+            (task_id,),
         )
         db.commit()
 
@@ -856,8 +963,7 @@ async def run_analysis_background(task_id: int, user_id: int, task_description: 
                 steps = json.loads(row["steps"])
                 for step in steps:
                     if step["status"] == "running":
-                        update_workflow_step(db, task_id, step["agent_id"], "failed",
-                                           description=f"执行失败: {str(e)}")
+                        update_workflow_step(db, task_id, step["agent_id"], "failed", description=f"执行失败: {str(e)}")
                         break
         except Exception:
             pass
@@ -889,31 +995,28 @@ def get_analysis(task_id: int, user: dict = Depends(get_current_user)):
             "edges": json.loads(row["edges"]),
             "principles": json.loads(row["principles"]),
         },
-        "message": "success", "code": 200,
+        "message": "success",
+        "code": 200,
     }
 
 
 class TriggerAnalysisInput(BaseModel):
-    knowledgeBaseIds: Optional[list[str]] = None
+    knowledgeBaseIds: list[str] | None = None
 
 
 @router.post("/{task_id}/trigger")
-async def trigger_analysis(task_id: int, body: Optional[TriggerAnalysisInput] = None, user: dict = Depends(get_current_user)):
+async def trigger_analysis(
+    task_id: int, body: TriggerAnalysisInput | None = None, user: dict = Depends(get_current_user)
+):
     db = get_db()
 
-    task = db.execute(
-        "SELECT * FROM tasks WHERE id=? AND user_id=?",
-        (task_id, user["id"])
-    ).fetchone()
+    task = db.execute("SELECT * FROM tasks WHERE id=? AND user_id=?", (task_id, user["id"])).fetchone()
 
     if not task:
         db.close()
         raise HTTPException(status_code=404, detail="任务不存在")
 
-    existing = db.execute(
-        "SELECT * FROM analyses WHERE task_id=?",
-        (task_id,)
-    ).fetchone()
+    existing = db.execute("SELECT * FROM analyses WHERE task_id=?", (task_id,)).fetchone()
 
     if existing:
         db.close()
@@ -931,8 +1034,7 @@ async def trigger_analysis(task_id: int, body: Optional[TriggerAnalysisInput] = 
         }
 
     db.execute(
-        "UPDATE tasks SET status='analyzing', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
-        (task_id,)
+        "UPDATE tasks SET status='analyzing', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?", (task_id,)
     )
     db.commit()
 
@@ -960,11 +1062,11 @@ async def trigger_analysis(task_id: int, body: Optional[TriggerAnalysisInput] = 
 
 
 class ProceedInput(BaseModel):
-    ratings: Optional[list[dict]] = None
+    ratings: list[dict] | None = None
 
 
 @router.post("/{task_id}/proceed")
-async def proceed_workflow(task_id: int, body: Optional[ProceedInput] = None, user: dict = Depends(get_current_user)):
+async def proceed_workflow(task_id: int, body: ProceedInput | None = None, user: dict = Depends(get_current_user)):
     """用户评分后，继续执行后续工作流步骤"""
     db = get_db()
 
@@ -984,7 +1086,6 @@ async def proceed_workflow(task_id: int, body: Optional[ProceedInput] = None, us
 
     # 在 db.close() 之前读取所有需要的数据
     wf_steps = wf["steps"]
-    wf_status = wf["status"]
     task_desc = task["description"]
     user_id = user["id"]
 
@@ -1034,9 +1135,7 @@ async def proceed_workflow(task_id: int, body: Optional[ProceedInput] = None, us
     db.close()
 
     # 启动后台任务执行下一步
-    remaining = asyncio.create_task(
-        run_analysis_background(task_id, user_id, task_desc, None, start_from=next_agent)
-    )
+    remaining = asyncio.create_task(run_analysis_background(task_id, user_id, task_desc, None, start_from=next_agent))
     _background_tasks.add(remaining)
     remaining.add_done_callback(_background_tasks.discard)
 
@@ -1045,5 +1144,3 @@ async def proceed_workflow(task_id: int, body: Optional[ProceedInput] = None, us
         "message": "继续执行后续步骤",
         "code": 200,
     }
-
-

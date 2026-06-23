@@ -7,6 +7,7 @@ const BASE = import.meta.env.VITE_API_URL ?? '';
 interface AuthUser {
   id: number;
   username: string;
+  email: string;
   role: string;
   created_at: string;
 }
@@ -19,6 +20,7 @@ interface AuthResponse {
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
   });
   const data = await res.json();
@@ -28,26 +30,25 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const authApi = {
   register(username: string, password: string) {
-    return request<AuthResponse>(
-      '/api/auth/register',
-      { method: 'POST', body: JSON.stringify({ username, password }) }
-    );
+    return request<AuthResponse>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
   },
 
   login(username: string, password: string) {
-    return request<AuthResponse>(
-      '/api/auth/login',
-      { method: 'POST', body: JSON.stringify({ username, password }) }
-    );
+    return request<AuthResponse>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
   },
 
-  me(token: string) {
-    return fetch(`${BASE}/api/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }).then(async (r) => {
-      if (!r.ok) throw new Error('登录已过期，请重新登录');
-      return r.json();
-    });
+  me() {
+    return request<AuthUser>('/api/auth/me');
+  },
+
+  logout() {
+    return request<{ message: string }>('/api/auth/logout', { method: 'POST' });
   },
 };
 

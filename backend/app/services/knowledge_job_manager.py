@@ -9,13 +9,13 @@ Knowledge Job Manager — 轻量级异步作业系统
 - 每库队列序列化
 - 崩溃恢复
 """
+
 import asyncio
 import json
 import logging
-import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable, Coroutine, Optional
+from typing import Any, Optional
 
 from app.database import get_db
 
@@ -52,12 +52,13 @@ DEFAULT_RETRY_POLICY: dict[str, Any] = {
 }
 
 DEFAULT_TIMEOUT_MS = 10 * 60 * 1000  # 10分钟
-INDEX_TIMEOUT_MS = 30 * 60 * 1000    # 30分钟
+INDEX_TIMEOUT_MS = 30 * 60 * 1000  # 30分钟
 
 
 @dataclass
 class JobRecord:
     """DB 中的作业记录"""
+
     id: str
     job_type: str
     queue: str
@@ -66,9 +67,9 @@ class JobRecord:
     attempt: int
     max_attempts: int
     timeout_ms: int
-    parent_job_id: Optional[str]
-    idempotency_key: Optional[str]
-    error: Optional[str]
+    parent_job_id: str | None
+    idempotency_key: str | None
+    error: str | None
     created_at: str
     updated_at: str
 
@@ -76,6 +77,7 @@ class JobRecord:
 @dataclass
 class JobHandle:
     """运行中的作业句柄 — 提供取消能力"""
+
     job_id: str
     job_type: str
     cancel_event: asyncio.Event = field(default_factory=asyncio.Event)
@@ -105,9 +107,9 @@ class KnowledgeJobManager:
         job_type: str,
         input_data: dict[str, Any],
         *,
-        queue: Optional[str] = None,
-        idempotency_key: Optional[str] = None,
-        parent_job_id: Optional[str] = None,
+        queue: str | None = None,
+        idempotency_key: str | None = None,
+        parent_job_id: str | None = None,
         delay_ms: int = 0,
     ) -> str:
         """入队作业"""
@@ -136,9 +138,18 @@ class KnowledgeJobManager:
                     timeout_ms, parent_job_id, idempotency_key, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    job_id, job_type, q, input_json, JOB_PENDING, 0,
-                    handler.max_attempts, handler.timeout_ms,
-                    parent_job_id, idempotency_key, now, now,
+                    job_id,
+                    job_type,
+                    q,
+                    input_json,
+                    JOB_PENDING,
+                    0,
+                    handler.max_attempts,
+                    handler.timeout_ms,
+                    parent_job_id,
+                    idempotency_key,
+                    now,
+                    now,
                 ),
             )
             db.commit()
@@ -157,7 +168,19 @@ class KnowledgeJobManager:
         """创建后台任务执行作业"""
         task = asyncio.create_task(self._execute_job(job_id))
         self._pending_tasks.add(task)
-        task.add_done_callback(self._pending_tasks.discard)
+
+        def _on_job_done(t: asyncio.Task) -> None:
+            self._pending_tasks.discard(t)
+            exc = t.exception()
+            if exc and not isinstance(exc, asyncio.CancelledError):
+                logger.error(f"Job {job_id} 未处理异常: {exc}", exc_info=exc)
+                # Mark job as failed in DB
+                try:
+                    self._update_status(job_id, JOB_FAILED, error=f"未处理异常: {exc}")
+                except Exception as e:
+                    logger.error(f"标记Job {job_id} 失败时出错: {e}")
+
+        task.add_done_callback(_on_job_done)
 
     async def _execute_job(self, job_id: str) -> None:
         """执行单个作业（含重试逻辑）"""
@@ -238,7 +261,9 @@ class KnowledgeJobManager:
         # 更新 DB 状态（如果未运行）
         self._update_status(job_id, JOB_CANCELLED, error=reason)
 
-    def cancel_jobs_for_base(self, base_id: str, current_job_id: Optional[str] = None, reason: str = "base-operation") -> None:
+    def cancel_jobs_for_base(
+        self, base_id: str, current_job_id: str | None = None, reason: str = "base-operation"
+    ) -> None:
         """取消指定知识库的所有活跃作业"""
         db = get_db()
         try:
@@ -284,7 +309,7 @@ class KnowledgeJobManager:
 
         for group in deleting_groups:
             for i in range(0, len(group["rootItemIds"]), 100):
-                chunk = group["rootItemIds"][i:i + 100]
+                chunk = group["rootItemIds"][i : i + 100]
                 try:
                     await self.enqueue(
                         JOB_TYPE_DELETE_SUBTREE,
@@ -318,12 +343,10 @@ class KnowledgeJobManager:
             self._base_locks[queue] = asyncio.Lock()
         return self._base_locks[queue]
 
-    def _load_job(self, job_id: str) -> Optional[JobRecord]:
+    def _load_job(self, job_id: str) -> JobRecord | None:
         db = get_db()
         try:
-            row = db.execute(
-                "SELECT * FROM knowledge_jobs WHERE id=?", (job_id,)
-            ).fetchone()
+            row = db.execute("SELECT * FROM knowledge_jobs WHERE id=?", (job_id,)).fetchone()
             if not row:
                 return None
             return JobRecord(**dict(row))
@@ -331,9 +354,11 @@ class KnowledgeJobManager:
             db.close()
 
     def _update_status(
-        self, job_id: str, status: str,
-        attempt: Optional[int] = None,
-        error: Optional[str] = None,
+        self,
+        job_id: str,
+        status: str,
+        attempt: int | None = None,
+        error: str | None = None,
     ) -> None:
         db = get_db()
         try:
@@ -376,7 +401,7 @@ class KnowledgeJobManager:
         if handler:
             await handler.on_settled(job_id, JOB_FAILED, error)
 
-    def _find_by_idempotency_key(self, key: str) -> Optional[dict[str, Any]]:
+    def _find_by_idempotency_key(self, key: str) -> dict[str, Any] | None:
         db = get_db()
         try:
             row = db.execute(
@@ -391,6 +416,7 @@ class KnowledgeJobManager:
 
 class JobSignal:
     """作业信号 — 类似 AbortSignal"""
+
     def __init__(self, cancel_event: asyncio.Event):
         self._cancel_event = cancel_event
 
@@ -405,6 +431,7 @@ class JobSignal:
 
 class JobHandler:
     """作业处理器基类"""
+
     def __init__(
         self,
         max_attempts: int = 3,
@@ -416,12 +443,13 @@ class JobHandler:
     async def execute(self, job_id: str, input_data: dict[str, Any], signal: JobSignal) -> None:
         raise NotImplementedError
 
-    async def on_settled(self, job_id: str, status: str, error: Optional[str]) -> None:
+    async def on_settled(self, job_id: str, status: str, error: str | None) -> None:
         """作业最终状态回调（成功或重试用尽）"""
         pass
 
 
 # ─── 工具函数 ──────────────────────────────────────────────
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -429,6 +457,7 @@ def _now_iso() -> str:
 
 def _generate_job_id(job_type: str) -> str:
     import uuid
+
     prefix = job_type.replace("knowledge.", "kj-")
     return f"{prefix}-{uuid.uuid4().hex[:12]}"
 

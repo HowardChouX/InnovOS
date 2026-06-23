@@ -1,9 +1,9 @@
 from fastapi import APIRouter
-from . import keys, users, monitor, providers, knowledge as admin_knowledge
-from . import settings, patent_db
+
+from . import knowledge as admin_knowledge
+from . import monitor, patent_db, providers, settings, users
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-router.include_router(keys.router)
 router.include_router(users.router)
 router.include_router(monitor.router)
 router.include_router(providers.router)

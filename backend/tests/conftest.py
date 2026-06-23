@@ -33,7 +33,8 @@ def auto_mock_db(monkeypatch):
     # 预导入可能引用 get_db 的模块，确保 monkeypatch 生效
     import app.api.models
     monkeypatch.setattr("app.api.models.get_db", mock_get_db)
-    monkeypatch.setattr("app.algorithm.crypto.decrypt_key", lambda x: f"decrypted_{x}" if x else "")
+    # Mock 环境变量读取 API Key（密钥不再来自 crypto 模块）
+    monkeypatch.setattr("app.algorithm.model_service._get_provider_api_key", lambda pid: f"env_key_{pid}" if pid else "")
     yield mock_conn
 
 

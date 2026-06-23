@@ -4,10 +4,11 @@
 使用 pgvector（PostgreSQL）持久化向量。
 兼容原有 VectorStore 接口，新增 replaceByExternalId 语义。
 """
+
 from __future__ import annotations
+
 import json
 import logging
-from typing import Optional
 
 from app.database import get_db
 
@@ -51,7 +52,7 @@ class VectorStore:
             )
 
             # 2. 插入新向量
-            for vec, meta in zip(vectors, metadata):
+            for vec, meta in zip(vectors, metadata, strict=False):
                 vec_json = json.dumps(vec)
                 db.execute(
                     """INSERT INTO knowledge_vectors
@@ -80,7 +81,7 @@ class VectorStore:
         base_id: str,
         query_vector: list[float],
         top_k: int = 5,
-        query_text: Optional[str] = None,
+        query_text: str | None = None,
         mode: str = "vector",
         alpha: float = 0.0,
     ) -> list[dict]:
@@ -108,7 +109,7 @@ class VectorStore:
         base_id: str,
         query_vector: list[float],
         top_k: int,
-        query_text: Optional[str] = None,
+        query_text: str | None = None,
         mode: str = "vector",
         alpha: float = 0.0,
     ) -> list[dict]:
@@ -143,13 +144,15 @@ class VectorStore:
                 cosine_score = r["cosine_score"]
                 text_score = (r["text_score"] or 0.0) / max_text_score if max_text_score > 0 else 0.0
                 blended = (1 - alpha) * cosine_score + alpha * text_score
-                results.append({
-                    "id": r["id"],
-                    "item_id": r["item_id"],
-                    "chunk_index": r["chunk_index"],
-                    "text": r["text"],
-                    "score": blended,
-                })
+                results.append(
+                    {
+                        "id": r["id"],
+                        "item_id": r["item_id"],
+                        "chunk_index": r["chunk_index"],
+                        "text": r["text"],
+                        "score": blended,
+                    }
+                )
 
             results.sort(key=lambda x: x["score"], reverse=True)
             return results[:top_k]
@@ -168,7 +171,7 @@ class VectorStore:
             db.close()
             return [dict(r) for r in rows]
 
-    def count(self, base_id: Optional[str] = None) -> int:
+    def count(self, base_id: str | None = None) -> int:
         db = get_db()
         try:
             if base_id:
@@ -185,7 +188,7 @@ class VectorStore:
         finally:
             db.close()
 
-    def clear(self, base_id: Optional[str] = None):
+    def clear(self, base_id: str | None = None):
         """清空向量。"""
         db = get_db()
         try:

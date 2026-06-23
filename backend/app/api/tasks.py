@@ -1,10 +1,21 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException, Query
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
+
+from app.audit import log_audit
 from app.auth import get_current_user
 from app.database import get_db
 from app.utils import utc_iso
-from pydantic import BaseModel
-from typing import Optional
+
+ALLOWED_TASK_FIELDS = {"title", "description", "tags", "status", "updated_at"}
+
+
+def _validate_columns(fields: list[str], allowed: set[str]) -> None:
+    for f in fields:
+        if f not in allowed:
+            raise ValueError(f"Invalid column: {f}")
+
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -16,10 +27,10 @@ class CreateTaskInput(BaseModel):
 
 
 class UpdateTaskInput(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    tags: Optional[list[str]] = None
-    status: Optional[str] = None
+    title: str | None = None
+    description: str | None = None
+    tags: list[str] | None = None
+    status: str | None = None
 
 
 STATUSES = {"pending", "analyzing", "completed", "failed"}
@@ -133,6 +144,7 @@ def update_task(task_id: int, body: UpdateTaskInput, user: dict = Depends(get_cu
     if updates:
         updates.append("updated_at = to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')")
         params.extend([task_id, user["id"]])
+        _validate_columns([u.split("=")[0].strip() for u in updates], ALLOWED_TASK_FIELDS)
         db.execute(
             f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND user_id = ?",
             params,
@@ -145,7 +157,17 @@ def update_task(task_id: int, body: UpdateTaskInput, user: dict = Depends(get_cu
 
 
 @router.delete("/{task_id}")
-def delete_task(task_id: int, user: dict = Depends(get_current_user)):
+def delete_task(task_id: int, request: Request, user: dict = Depends(get_current_user)):
+    # Audit log before operation
+    log_audit(
+        user["id"],
+        user.get("username", ""),
+        "task.delete",
+        "task",
+        str(task_id),
+        {},
+        request.client.host if request.client else "",
+    )
     db = get_db()
     row = db.execute(
         "SELECT * FROM tasks WHERE id = ? AND user_id = ?",

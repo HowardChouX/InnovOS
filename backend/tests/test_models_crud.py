@@ -162,7 +162,7 @@ class TestModelsCrudService:
         svc = ModelsCrudService()
         svc.create(provider_id="silicon", model_id="m1", name="Original")
         svc.batch_upsert("silicon", [
-            {"provider_id": "silicon", "model_id": "m1", "name": "Updated"}
+            {"model_id": "m1", "name": "Updated"}
         ])
         model = svc.get("silicon", "m1")
         assert model["name"] == "Updated"

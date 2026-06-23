@@ -1,8 +1,8 @@
-import '../types.js'
+import '../types.js';
 
-import { callOrReturn, getExtensionField, mergeAttributes, Node } from '@tiptap/core'
-import type { DOMOutputSpec, Node as ProseMirrorNode } from '@tiptap/pm/model'
-import { TextSelection } from '@tiptap/pm/state'
+import { callOrReturn, getExtensionField, mergeAttributes, Node } from '@tiptap/core';
+import type { DOMOutputSpec, Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { TextSelection } from '@tiptap/pm/state';
 import {
   addColumnAfter,
   addColumnBefore,
@@ -20,57 +20,68 @@ import {
   splitCell,
   tableEditing,
   toggleHeader,
-  toggleHeaderCell
-} from '@tiptap/pm/tables'
-import { type EditorView, type NodeView } from '@tiptap/pm/view'
+  toggleHeaderCell,
+} from '@tiptap/pm/tables';
+import { type EditorView, type NodeView } from '@tiptap/pm/view';
 
-import { TableView } from './TableView.js'
-import { createColGroup } from './utilities/createColGroup.js'
-import { createTable } from './utilities/createTable.js'
-import { deleteTableWhenAllCellsSelected } from './utilities/deleteTableWhenAllCellsSelected.js'
+import { TableView } from './TableView.js';
+import { createColGroup } from './utilities/createColGroup.js';
+import { createTable } from './utilities/createTable.js';
+import { deleteTableWhenAllCellsSelected } from './utilities/deleteTableWhenAllCellsSelected.js';
 
 export interface TableOptions {
-  HTMLAttributes: Record<string, any>
-  resizable: boolean
-  handleWidth: number
-  cellMinWidth: number
-  View: (new (node: ProseMirrorNode, cellMinWidth: number, view: EditorView) => NodeView) | null
-  lastColumnResizable: boolean
-  allowTableNodeSelection: boolean
-  onRowActionClick?: (args: { rowIndex: number; view: EditorView; position?: { x: number; y: number } }) => void
-  onColumnActionClick?: (args: { colIndex: number; view: EditorView; position?: { x: number; y: number } }) => void
+  HTMLAttributes: Record<string, unknown>;
+  resizable: boolean;
+  handleWidth: number;
+  cellMinWidth: number;
+  View: (new (node: ProseMirrorNode, cellMinWidth: number, view: EditorView) => NodeView) | null;
+  lastColumnResizable: boolean;
+  allowTableNodeSelection: boolean;
+  onRowActionClick?: (args: {
+    rowIndex: number;
+    view: EditorView;
+    position?: { x: number; y: number };
+  }) => void;
+  onColumnActionClick?: (args: {
+    colIndex: number;
+    view: EditorView;
+    position?: { x: number; y: number };
+  }) => void;
 }
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     table: {
-      insertTable: (options?: { rows?: number; cols?: number; withHeaderRow?: boolean }) => ReturnType
-      addColumnBefore: () => ReturnType
-      addColumnAfter: () => ReturnType
-      deleteColumn: () => ReturnType
-      addRowBefore: () => ReturnType
-      addRowAfter: () => ReturnType
-      deleteRow: () => ReturnType
-      deleteTable: () => ReturnType
-      mergeCells: () => ReturnType
-      splitCell: () => ReturnType
-      toggleHeaderColumn: () => ReturnType
-      toggleHeaderRow: () => ReturnType
-      toggleHeaderCell: () => ReturnType
-      mergeOrSplit: () => ReturnType
-      setCellAttribute: (name: string, value: any) => ReturnType
-      goToNextCell: () => ReturnType
-      goToPreviousCell: () => ReturnType
-      fixTables: () => ReturnType
-      setCellSelection: (position: { anchorCell: number; headCell?: number }) => ReturnType
-    }
+      insertTable: (options?: {
+        rows?: number;
+        cols?: number;
+        withHeaderRow?: boolean;
+      }) => ReturnType;
+      addColumnBefore: () => ReturnType;
+      addColumnAfter: () => ReturnType;
+      deleteColumn: () => ReturnType;
+      addRowBefore: () => ReturnType;
+      addRowAfter: () => ReturnType;
+      deleteRow: () => ReturnType;
+      deleteTable: () => ReturnType;
+      mergeCells: () => ReturnType;
+      splitCell: () => ReturnType;
+      toggleHeaderColumn: () => ReturnType;
+      toggleHeaderRow: () => ReturnType;
+      toggleHeaderCell: () => ReturnType;
+      mergeOrSplit: () => ReturnType;
+      setCellAttribute: (name: string, value: unknown) => ReturnType;
+      goToNextCell: () => ReturnType;
+      goToPreviousCell: () => ReturnType;
+      fixTables: () => ReturnType;
+      setCellSelection: (position: { anchorCell: number; headCell?: number }) => ReturnType;
+    };
   }
 }
 
 export const Table = Node.create<TableOptions>({
   name: 'table',
 
-  // @ts-ignore - TODO: fix
   addOptions() {
     return {
       HTMLAttributes: {},
@@ -80,8 +91,8 @@ export const Table = Node.create<TableOptions>({
       // TODO: fix
       View: TableView,
       lastColumnResizable: true,
-      allowTableNodeSelection: false
-    }
+      allowTableNodeSelection: false,
+    };
   },
 
   content: 'tableRow+',
@@ -90,22 +101,22 @@ export const Table = Node.create<TableOptions>({
   group: 'block',
 
   parseHTML() {
-    return [{ tag: 'table' }]
+    return [{ tag: 'table' }];
   },
 
   renderHTML({ node, HTMLAttributes }) {
-    const { colgroup, tableWidth, tableMinWidth } = createColGroup(node, this.options.cellMinWidth)
+    const { colgroup, tableWidth, tableMinWidth } = createColGroup(node, this.options.cellMinWidth);
 
     const table: DOMOutputSpec = [
       'table',
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-        style: tableWidth ? `width: ${tableWidth}` : `min-width: ${tableMinWidth}`
+        style: tableWidth ? `width: ${tableWidth}` : `min-width: ${tableMinWidth}`,
       }),
       colgroup,
-      ['tbody', 0]
-    ]
+      ['tbody', 0],
+    ];
 
-    return table
+    return table;
   },
 
   addCommands() {
@@ -113,160 +124,163 @@ export const Table = Node.create<TableOptions>({
       insertTable:
         ({ rows = 3, cols = 3, withHeaderRow = true } = {}) =>
         ({ tr, dispatch, editor }) => {
-          const tableCellExtension = this.editor.extensionManager.extensions.find((ext) => ext.name === 'tableCell')
+          const tableCellExtension = this.editor.extensionManager.extensions.find(
+            (ext) => ext.name === 'tableCell',
+          );
           const allowNestedNodes: boolean = tableCellExtension
-            ? Boolean((tableCellExtension.options as { allowNestedNodes?: boolean }).allowNestedNodes)
-            : false
+            ? Boolean(
+                (tableCellExtension.options as { allowNestedNodes?: boolean }).allowNestedNodes,
+              )
+            : false;
 
           if (!allowNestedNodes) {
-            const { $from } = tr.selection
+            const { $from } = tr.selection;
             if ($from.depth > 1) {
-              return false
+              return false;
             }
           }
 
-          const node = createTable(editor.schema, rows, cols, withHeaderRow)
+          const node = createTable(editor.schema, rows, cols, withHeaderRow);
 
           if (dispatch) {
-            const offset = tr.selection.from + 1
+            const offset = tr.selection.from + 1;
             tr.replaceSelectionWith(node)
               .scrollIntoView()
-              .setSelection(TextSelection.near(tr.doc.resolve(offset)))
+              .setSelection(TextSelection.near(tr.doc.resolve(offset)));
           }
 
-          return true
+          return true;
         },
       addColumnBefore:
         () =>
         ({ state, dispatch }) => {
-          return addColumnBefore(state, dispatch)
+          return addColumnBefore(state, dispatch);
         },
       addColumnAfter:
         () =>
         ({ state, dispatch }) => {
-          return addColumnAfter(state, dispatch)
+          return addColumnAfter(state, dispatch);
         },
       deleteColumn:
         () =>
         ({ state, dispatch }) => {
-          return deleteColumn(state, dispatch)
+          return deleteColumn(state, dispatch);
         },
       addRowBefore:
         () =>
         ({ state, dispatch }) => {
-          return addRowBefore(state, dispatch)
+          return addRowBefore(state, dispatch);
         },
       addRowAfter:
         () =>
         ({ state, dispatch }) => {
-          return addRowAfter(state, dispatch)
+          return addRowAfter(state, dispatch);
         },
       deleteRow:
         () =>
         ({ state, dispatch }) => {
-          return deleteRow(state, dispatch)
+          return deleteRow(state, dispatch);
         },
       deleteTable:
         () =>
         ({ state, dispatch }) => {
-          return deleteTable(state, dispatch)
+          return deleteTable(state, dispatch);
         },
       mergeCells:
         () =>
         ({ state, dispatch }) => {
-          return mergeCells(state, dispatch)
+          return mergeCells(state, dispatch);
         },
       splitCell:
         () =>
         ({ state, dispatch }) => {
-          return splitCell(state, dispatch)
+          return splitCell(state, dispatch);
         },
       toggleHeaderColumn:
         () =>
         ({ state, dispatch }) => {
-          return toggleHeader('column')(state, dispatch)
+          return toggleHeader('column')(state, dispatch);
         },
       toggleHeaderRow:
         () =>
         ({ state, dispatch }) => {
-          return toggleHeader('row')(state, dispatch)
+          return toggleHeader('row')(state, dispatch);
         },
       toggleHeaderCell:
         () =>
         ({ state, dispatch }) => {
-          return toggleHeaderCell(state, dispatch)
+          return toggleHeaderCell(state, dispatch);
         },
       mergeOrSplit:
         () =>
         ({ state, dispatch }) => {
-          if (mergeCells(state, dispatch)) return true
-          return splitCell(state, dispatch)
+          if (mergeCells(state, dispatch)) return true;
+          return splitCell(state, dispatch);
         },
       setCellAttribute:
         (name, value) =>
         ({ state, dispatch }) => {
-          return setCellAttr(name, value)(state, dispatch)
+          return setCellAttr(name, value)(state, dispatch);
         },
       goToNextCell:
         () =>
         ({ state, dispatch }) => {
-          return goToNextCell(1)(state, dispatch)
+          return goToNextCell(1)(state, dispatch);
         },
       goToPreviousCell:
         () =>
         ({ state, dispatch }) => {
-          return goToNextCell(-1)(state, dispatch)
+          return goToNextCell(-1)(state, dispatch);
         },
       fixTables:
         () =>
         ({ state, dispatch }) => {
-          if (dispatch) fixTables(state)
-          return true
+          if (dispatch) fixTables(state);
+          return true;
         },
       setCellSelection:
         (position) =>
         ({ tr, dispatch }) => {
           if (dispatch) {
-            const selection = CellSelection.create(tr.doc, position.anchorCell, position.headCell)
-            // @ts-ignore - TODO: fix
-            tr.setSelection(selection)
+            const selection = CellSelection.create(tr.doc, position.anchorCell, position.headCell);
+            tr.setSelection(selection);
           }
-          return true
-        }
-    }
+          return true;
+        },
+    };
   },
 
   addNodeView() {
     return (props) => {
-      const { node, view } = props
-      const ViewClass = this.options.View || TableView
+      const { node, view } = props;
+      const ViewClass = this.options.View || TableView;
       if (ViewClass === TableView) {
         return new TableView(node, this.options.cellMinWidth, view, {
           onRowActionClick: this.options.onRowActionClick,
-          onColumnActionClick: this.options.onColumnActionClick
-        })
+          onColumnActionClick: this.options.onColumnActionClick,
+        });
       }
-      return new ViewClass(node, this.options.cellMinWidth, view)
-    }
+      return new ViewClass(node, this.options.cellMinWidth, view);
+    };
   },
 
   addKeyboardShortcuts() {
     return {
       Tab: () => {
-        if (this.editor.commands.goToNextCell()) return true
-        if (!this.editor.can().addRowAfter()) return false
-        return this.editor.chain().addRowAfter().goToNextCell().run()
+        if (this.editor.commands.goToNextCell()) return true;
+        if (!this.editor.can().addRowAfter()) return false;
+        return this.editor.chain().addRowAfter().goToNextCell().run();
       },
       'Shift-Tab': () => this.editor.commands.goToPreviousCell(),
       Backspace: deleteTableWhenAllCellsSelected,
       'Mod-Backspace': deleteTableWhenAllCellsSelected,
       Delete: deleteTableWhenAllCellsSelected,
-      'Mod-Delete': deleteTableWhenAllCellsSelected
-    }
+      'Mod-Delete': deleteTableWhenAllCellsSelected,
+    };
   },
 
   addProseMirrorPlugins() {
-    const isResizable = this.options.resizable && this.editor.isEditable
+    const isResizable = this.options.resizable && this.editor.isEditable;
 
     return [
       ...(isResizable
@@ -276,25 +290,25 @@ export const Table = Node.create<TableOptions>({
               cellMinWidth: this.options.cellMinWidth,
               defaultCellMinWidth: this.options.cellMinWidth,
               View: this.options.View,
-              lastColumnResizable: this.options.lastColumnResizable
-            })
+              lastColumnResizable: this.options.lastColumnResizable,
+            }),
           ]
         : []),
       tableEditing({
-        allowTableNodeSelection: this.options.allowTableNodeSelection
-      })
-    ]
+        allowTableNodeSelection: this.options.allowTableNodeSelection,
+      }),
+    ];
   },
 
   extendNodeSchema(extension) {
     const context = {
       name: extension.name,
       options: extension.options,
-      storage: extension.storage
-    }
+      storage: extension.storage,
+    };
 
     return {
-      tableRole: callOrReturn(getExtensionField(extension, 'tableRole', context))
-    }
-  }
-})
+      tableRole: callOrReturn(getExtensionField(extension, 'tableRole', context)),
+    };
+  },
+});

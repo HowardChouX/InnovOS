@@ -4,21 +4,22 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
+from app.audit import log_audit
 from app.auth import get_current_user
 from app.database import get_db
-from app.services.knowledge_job_manager import (
-    JOB_TYPE_PREPARE_ROOT,
-    knowledge_queue_name,
-    knowledge_idempotency_key,
-)
-from app.services.knowledge_orchestration_service import knowledge_orchestration_service
+from app.services.file_storage_service import file_storage
 from app.services.knowledge_base_service import KnowledgeBaseService
 from app.services.knowledge_item_service import KnowledgeItemService
+from app.services.knowledge_job_manager import (
+    JOB_TYPE_PREPARE_ROOT,
+    knowledge_idempotency_key,
+    knowledge_queue_name,
+)
+from app.services.knowledge_orchestration_service import knowledge_orchestration_service
 
 logger = logging.getLogger(__name__)
 
@@ -27,24 +28,36 @@ UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file
 UPLOAD_DIR = os.path.abspath(UPLOAD_DIR)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# ── File upload limits ──────────────────────────────────────────
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB per file
+MAX_TOTAL_SIZE = 500 * 1024 * 1024  # 500MB per batch
+SUPPORTED_MIME_TYPES = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".doc": "application/msword",
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+    ".csv": "text/csv",
+}
+
 router = APIRouter(prefix="/api/knowledge-bases", tags=["knowledge-bases"])
 
 
 class CreateBaseInput(BaseModel):
     name: str
-    groupId: Optional[str] = None
-    dimensions: Optional[int] = None
-    embeddingModelId: Optional[str] = None
+    groupId: str | None = None
+    dimensions: int | None = None
+    embeddingModelId: str | None = None
     status: str = "completed"
-    error: Optional[str] = None
-    rerankModelId: Optional[str] = None
-    fileProcessorId: Optional[str] = None
+    error: str | None = None
+    rerankModelId: str | None = None
+    fileProcessorId: str | None = None
     chunkSize: int = 1024
     chunkOverlap: int = 200
-    threshold: Optional[float] = None
-    documentCount: Optional[int] = None
+    threshold: float | None = None
+    documentCount: int | None = None
     searchMode: str = "hybrid"
-    hybridAlpha: Optional[float] = None
+    hybridAlpha: float | None = None
 
 
 class MultiBaseSearchInput(BaseModel):
@@ -57,24 +70,24 @@ class RestoreBaseInput(BaseModel):
     sourceBaseId: str
     name: str
     embeddingModelId: str
-    dimensions: Optional[int] = None
+    dimensions: int | None = None
 
 
 class UpdateBaseInput(BaseModel):
-    name: Optional[str] = None
-    groupId: Optional[str] = None
-    rerankModelId: Optional[str] = None
-    fileProcessorId: Optional[str] = None
-    chunkSize: Optional[int] = None
-    chunkOverlap: Optional[int] = None
-    threshold: Optional[float] = None
-    documentCount: Optional[int] = None
-    searchMode: Optional[str] = None
-    hybridAlpha: Optional[float] = None
-    status: Optional[str] = None
-    error: Optional[str] = None
-    dimensions: Optional[int] = None
-    embeddingModelId: Optional[str] = None
+    name: str | None = None
+    groupId: str | None = None
+    rerankModelId: str | None = None
+    fileProcessorId: str | None = None
+    chunkSize: int | None = None
+    chunkOverlap: int | None = None
+    threshold: float | None = None
+    documentCount: int | None = None
+    searchMode: str | None = None
+    hybridAlpha: float | None = None
+    status: str | None = None
+    error: str | None = None
+    dimensions: int | None = None
+    embeddingModelId: str | None = None
 
 
 @router.get("")
@@ -108,7 +121,16 @@ def update_base(base_id: str, body: UpdateBaseInput, user: dict = Depends(get_cu
 
 
 @router.delete("/{base_id}")
-def delete_base(base_id: str, user: dict = Depends(get_current_user)):
+def delete_base(base_id: str, request: Request, user: dict = Depends(get_current_user)):
+    log_audit(
+        user["id"],
+        user.get("username", ""),
+        "kb.delete",
+        "knowledge_base",
+        base_id,
+        {},
+        request.client.host if request.client else "",
+    )
     ok = KnowledgeBaseService.delete(user["id"], base_id)
     if not ok:
         raise HTTPException(status_code=404, detail="知识库不存在")
@@ -133,8 +155,13 @@ def _build_directory_tree(files_meta: list[dict]) -> list[dict]:
                 break  # skip hidden
             if i == len(parts) - 1:
                 # 叶子节点 → 文件
-                curr[part] = {"type": "file", "name": part, "path": entry["path"],
-                              "originalName": rel_path, "size": entry.get("size", 0)}
+                curr[part] = {
+                    "type": "file",
+                    "name": part,
+                    "path": entry["path"],
+                    "originalName": rel_path,
+                    "size": entry.get("size", 0),
+                }
             else:
                 # 中间节点 → 目录
                 if part not in curr:
@@ -149,8 +176,15 @@ def _build_directory_tree(files_meta: list[dict]) -> list[dict]:
                 if children:  # 空目录跳过
                     result.append({"type": "directory", "name": name, "children": children})
             else:
-                result.append({"type": "file", "name": val["name"], "path": val["path"],
-                               "originalName": val["originalName"], "size": val["size"]})
+                result.append(
+                    {
+                        "type": "file",
+                        "name": val["name"],
+                        "path": val["path"],
+                        "originalName": val["originalName"],
+                        "size": val["size"],
+                    }
+                )
         return result
 
     return _to_list(tree)
@@ -159,6 +193,7 @@ def _build_directory_tree(files_meta: list[dict]) -> list[dict]:
 @router.post("/{base_id}/items/import-directory")
 async def import_directory(
     base_id: str,
+    request: Request,
     files: list[UploadFile] = File(...),
     user: dict = Depends(get_current_user),
 ):
@@ -166,13 +201,50 @@ async def import_directory(
     if not files:
         raise HTTPException(status_code=400, detail="未选择任何文件")
 
+    # 验证知识库归属权
+    db_check = get_db()
+    base_owner = db_check.execute(
+        "SELECT id FROM knowledge_bases WHERE id=? AND user_id=?",
+        (base_id, user["id"]),
+    ).fetchone()
+    db_check.close()
+    if not base_owner:
+        raise HTTPException(status_code=404, detail="知识库不存在")
+
     # 过滤支持的文件类型，跳过隐藏文件
     supported_extensions = {
-        '.pdf', '.docx', '.doc', '.txt', '.md', '.csv',
-        '.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.go', '.rs',
-        '.rb', '.php', '.c', '.cpp', '.h', '.hpp',
-        '.sql', '.yaml', '.yml', '.toml', '.json', '.xml',
-        '.sh', '.bash', '.zsh', '.env', '.ini', '.cfg',
+        ".pdf",
+        ".docx",
+        ".doc",
+        ".txt",
+        ".md",
+        ".csv",
+        ".py",
+        ".js",
+        ".ts",
+        ".jsx",
+        ".tsx",
+        ".java",
+        ".go",
+        ".rs",
+        ".rb",
+        ".php",
+        ".c",
+        ".cpp",
+        ".h",
+        ".hpp",
+        ".sql",
+        ".yaml",
+        ".yml",
+        ".toml",
+        ".json",
+        ".xml",
+        ".sh",
+        ".bash",
+        ".zsh",
+        ".env",
+        ".ini",
+        ".cfg",
     }
     valid_files = []
     for f in files:
@@ -194,16 +266,59 @@ async def import_directory(
     os.makedirs(upload_dir, exist_ok=True)
 
     saved_files = []
+    total_size = 0
     for file in valid_files:
         content = await file.read()
+        # ── File size validation ──
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail=f"文件 {file.filename} 超过大小限制 (50MB)")
+        total_size += len(content)
+        if total_size > MAX_TOTAL_SIZE:
+            raise HTTPException(status_code=400, detail="总文件大小超过限制 (500MB)")
+        # ── MIME type hint check ──
+        ext = os.path.splitext(file.filename or "")[1].lower()
+        expected_mime = SUPPORTED_MIME_TYPES.get(ext)
+        if (
+            expected_mime
+            and file.content_type
+            and file.content_type != expected_mime
+            and file.content_type != "application/octet-stream"
+        ):
+            # 仅对明显不匹配发警告（不阻止上传），application/octet-stream 是浏览器常见回退
+            logger.warning(
+                "MIME type mismatch for %s: expected %s, got %s", file.filename, expected_mime, file.content_type
+            )
+
         rel_path = file.filename or "unnamed"
-        # 保留原始相对路径结构（webkitdirectory 会保留相对路径）
+        # 路径穿越防护：去除目录组件
+        rel_path = os.path.basename(rel_path)
         safe_path = rel_path.replace("..", "_")
+
+        # 尝试上传到 MinIO/S3（如果已配置）
+        if file_storage.enabled:
+            s3_key = await file_storage.upload(user["id"], safe_path, content, base_id=base_id, item_id=item_id)
+            if s3_key:
+                saved_files.append({"name": rel_path, "path": s3_key, "size": len(content)})
+                continue
+            logger.warning("S3 upload failed for %s, falling back to local", safe_path)
+
+        # 回退到本地文件系统
         target_path = os.path.join(upload_dir, safe_path)
         os.makedirs(os.path.dirname(target_path), exist_ok=True)
         with open(target_path, "wb") as f:
             f.write(content)
         saved_files.append({"name": rel_path, "path": target_path, "size": len(content)})
+
+    # Audit log for the import operation
+    log_audit(
+        user["id"],
+        user.get("username", ""),
+        "kb.import",
+        "knowledge_base",
+        base_id,
+        {"fileCount": len(saved_files), "totalSize": total_size},
+        request.client.host if request.client else "",
+    )
 
     # 构建目录树结构
     tree = _build_directory_tree(saved_files)
@@ -221,9 +336,25 @@ async def import_directory(
         """INSERT INTO knowledge_items
            (id, base_id, group_id, type, data, status, error, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (item_id, base_id, None, "directory",
-         json.dumps({"source": root_name, "uploadDir": upload_dir, "tree": tree, "files": saved_files, "count": len(saved_files)}),
-         "idle", None, now, now),
+        (
+            item_id,
+            base_id,
+            None,
+            "directory",
+            json.dumps(
+                {
+                    "source": root_name,
+                    "uploadDir": upload_dir,
+                    "tree": tree,
+                    "files": saved_files,
+                    "count": len(saved_files),
+                }
+            ),
+            "idle",
+            None,
+            now,
+            now,
+        ),
     )
     db.commit()
     db.close()
@@ -259,12 +390,14 @@ async def restore_base(base_id: str, body: RestoreBaseInput, user: dict = Depend
     items = KnowledgeItemService.get_items_by_base_id(user["id"], body.sourceBaseId)
     new_items = []
     for item in items:
-        new_items.append({
-            "id": str(uuid.uuid4()),
-            "type": item["type"],
-            "data": item["data"],
-            "groupId": item.get("groupId"),
-        })
+        new_items.append(
+            {
+                "id": str(uuid.uuid4()),
+                "type": item["type"],
+                "data": item["data"],
+                "groupId": item.get("groupId"),
+            }
+        )
 
     await knowledge_orchestration_service.add_items(user["id"], new_base_id, new_items)
     return {"data": new_base, "message": "知识库恢复成功", "code": 200}
@@ -298,6 +431,7 @@ async def process_url_item(base_id: str, item_id: str, user: dict = Depends(get_
 
     try:
         import httpx
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.get(url, follow_redirects=True)
             resp.raise_for_status()
@@ -329,19 +463,26 @@ async def process_url_item(base_id: str, item_id: str, user: dict = Depends(get_
     )
     db.commit()
     db.close()
-    return {"data": {"id": item_id, "url": url, "contentLength": len(content)}, "message": "URL 内容已获取", "code": 200}
+    return {
+        "data": {"id": item_id, "url": url, "contentLength": len(content)},
+        "message": "URL 内容已获取",
+        "code": 200,
+    }
 
 
 @router.post("/search")
 async def multi_base_search(body: MultiBaseSearchInput, user: dict = Depends(get_current_user)):
     """跨多个知识库搜索，返回去重并按分数降序的结果"""
-    results = await asyncio.gather(*[
-        knowledge_orchestration_service.search(user["id"], base_id, body.query, top_k=body.topK)
-        for base_id in body.baseIds
-    ], return_exceptions=True)
+    results = await asyncio.gather(
+        *[
+            knowledge_orchestration_service.search(user["id"], base_id, body.query, top_k=body.topK)
+            for base_id in body.baseIds
+        ],
+        return_exceptions=True,
+    )
 
     seen: dict[str, dict] = {}
-    for base_id, batch in zip(body.baseIds, results):
+    for base_id, batch in zip(body.baseIds, results, strict=False):
         if isinstance(batch, BaseException):
             logger.warning("Search failed for base %s: %s", base_id, batch)
             continue

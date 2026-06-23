@@ -1,0 +1,114 @@
+"""
+应用配置 — Pydantic Settings，从环境变量读取。
+替代散落在各模块的 os.getenv() 调用。
+"""
+
+from __future__ import annotations
+
+import secrets
+import warnings
+from typing import Annotated, Any, Literal
+
+from pydantic import (
+    AliasChoices,
+    AnyUrl,
+    BeforeValidator,
+    Field,
+    PostgresDsn,
+    computed_field,
+    model_validator,
+)
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def parse_cors(v: Any) -> list[str] | str:
+    if isinstance(v, str) and not v.startswith("["):
+        return [i.strip() for i in v.split(",") if i.strip()]
+    elif isinstance(v, list | str):
+        return v
+    raise ValueError(v)
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file="../.env",
+        env_ignore_empty=True,
+        extra="ignore",
+        populate_by_name=True,
+    )
+
+    # ── 应用基础 ──
+    PROJECT_NAME: str = "InnovOS"
+    API_V1_STR: str = "/api"
+    ENVIRONMENT: Literal["development", "production"] = Field(default="development", validation_alias=AliasChoices("ENVIRONMENT", "ENV"))
+    BACKEND_CORS_ORIGINS: Annotated[list[AnyUrl] | str, BeforeValidator(parse_cors)] = []
+
+    @computed_field
+    @property
+    def all_cors_origins(self) -> list[str]:
+        return [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS]
+
+    # ── 认证 ──
+    SECRET_KEY: str = Field(default=secrets.token_urlsafe(32), validation_alias=AliasChoices("INNOVOS_JWT_SECRET", "SECRET_KEY"))
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+
+    # ── 数据库 ──
+    POSTGRES_SERVER: str = "localhost"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_USER: str = "innovos"
+    POSTGRES_PASSWORD: str = ""
+    POSTGRES_DB: str = "innovos"
+    DATABASE_URL: str | None = None
+
+    @computed_field
+    @property
+    def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn | None:
+        if self.DATABASE_URL:
+            return PostgresDsn(self.DATABASE_URL)
+        return PostgresDsn.build(
+            scheme="postgresql+psycopg2",
+            username=self.POSTGRES_USER,
+            password=self.POSTGRES_PASSWORD,
+            host=self.POSTGRES_SERVER,
+            port=self.POSTGRES_PORT,
+            path=self.POSTGRES_DB,
+        )
+
+    # ── 管理员（从环境变量实时验证，不存数据库）──
+    FIRST_SUPERUSER: str = Field(default="", validation_alias=AliasChoices("INNOVOS_ADMIN_USER", "FIRST_SUPERUSER"))
+    FIRST_SUPERUSER_PASSWORD: str = Field(default="", validation_alias=AliasChoices("INNOVOS_ADMIN_PASSWORD", "FIRST_SUPERUSER_PASSWORD"))
+
+    # ── S3 / MinIO ──
+    S3_ENDPOINT: str = ""
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+    S3_BUCKET: str = "innovos-files"
+    S3_REGION: str = "us-east-1"
+    PUBLIC_URL: str = "http://localhost"
+
+    def _check_default_secret(self, var_name: str, value: str | None) -> None:
+        if value and value == "changethis":
+            msg = f'The value of {var_name} is "changethis", for security, please change it.'
+            if self.ENVIRONMENT == "development":
+                warnings.warn(msg, stacklevel=1)
+            else:
+                raise ValueError(msg)
+
+    @model_validator(mode="after")
+    def _build_database_url(self) -> Settings:
+        if not self.DATABASE_URL:
+            self.DATABASE_URL = (
+                f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+                f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _enforce_non_default_secrets(self) -> Settings:
+        self._check_default_secret("SECRET_KEY", self.SECRET_KEY)
+        self._check_default_secret("POSTGRES_PASSWORD", self.POSTGRES_PASSWORD)
+        self._check_default_secret("FIRST_SUPERUSER_PASSWORD", self.FIRST_SUPERUSER_PASSWORD)
+        return self
+
+
+settings = Settings()

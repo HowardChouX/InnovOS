@@ -1,20 +1,24 @@
+import type { RouteObject } from 'react-router-dom';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ProtectedRoute } from '../components/layout/ProtectedRoute';
-import { DashboardPage } from '../features/dashboard/DashboardPage';
+import { lazyPage } from '../components/common/LazyPage';
 
-import { LoginPage } from '../features/auth/LoginPage';
-import { RegisterPage } from '../features/auth/RegisterPage';
-import { PlaceholderPage } from '../features/PlaceholderPage';
-import { PatentSearchPage } from '../features/patents/PatentSearchPage';
-import { KnowledgeBasePage } from '../features/knowledge/KnowledgeBasePage';
-import { KeyManagementPage } from '../features/admin/KeyManagementPage';
-import { UserManagementPage } from '../features/admin/UserManagementPage';
-import { PatentDbPage } from '../features/admin/PatentDbPage';
-import { MonitorPage } from '../features/monitor/MonitorPage';
-import { PatentConversionPage } from '../features/patent_conversion/PatentConversionPage';
+const DashboardPage = lazyPage(() => import('../features/dashboard/DashboardPage'));
+const LoginPage = lazyPage(() => import('../features/auth/LoginPage'));
+const RegisterPage = lazyPage(() => import('../features/auth/RegisterPage'));
+const PlaceholderPage = lazyPage(() => import('../features/PlaceholderPage'));
+const PatentSearchPage = lazyPage(() => import('../features/patents/PatentSearchPage'));
+const KnowledgeBasePage = lazyPage(() => import('../features/knowledge/KnowledgeBasePage'));
+const KeyManagementPage = lazyPage(() => import('../features/admin/KeyManagementPage'));
+const UserManagementPage = lazyPage(() => import('../features/admin/UserManagementPage'));
+const PatentDbPage = lazyPage(() => import('../features/admin/PatentDbPage'));
+const PatentConversionPage = lazyPage(
+  () => import('../features/patent_conversion/PatentConversionPage'),
+);
+const GuidePage = lazyPage(() => import('../features/guide/GuidePage'));
+const ProfilePage = lazyPage(() => import('../features/profile/ProfilePage'));
 
-
-export const routes = [
+export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
   {
@@ -28,11 +32,12 @@ export const routes = [
       { index: true, element: <DashboardPage /> },
       { path: 'patents', element: <PatentSearchPage /> },
       { path: 'knowledge', element: <KnowledgeBasePage /> },
-      { path: 'monitor', element: <MonitorPage /> },
-      { path: 'history', element: <PlaceholderPage title="历史方案" /> },
+      { path: 'history', element: <PatentConversionPage /> },
       { path: 'history-solutions', element: <PatentConversionPage /> },
       { path: 'workflow/demand', element: <PlaceholderPage title="需求画像" /> },
       { path: 'workflow/modeling', element: <PlaceholderPage title="问题建模" /> },
+      { path: 'guide', element: <GuidePage /> },
+      { path: 'profile', element: <ProfilePage /> },
       { path: 'admin/keys', element: <KeyManagementPage /> },
       { path: 'admin/users', element: <UserManagementPage /> },
       { path: 'admin/patents', element: <PatentDbPage /> },

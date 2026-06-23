@@ -7,14 +7,15 @@ Checks no items are in "deleting" status (skips if so). Deletes vectors for
 leaf items, deletes descendant items for container roots, resets root status,
 and enqueues prepare-root or index-documents for each root.
 """
+
 import json
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from app.algorithm.knowledge.vector_store import VectorStore
 from app.database import get_db
-from app.services.knowledge_job_manager import JobHandler, JobSignal
 from app.services.knowledge_item_service import KnowledgeItemService
+from app.services.knowledge_job_manager import JobHandler, JobSignal
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +43,13 @@ class ReindexSubtreeHandler(JobHandler):
             if item and item["status"] == "deleting":
                 logger.info(
                     "Root item %s is being deleted — skipping reindex-subtree for base %s",
-                    rid, base_id,
+                    rid,
+                    base_id,
                 )
                 return
 
         # Get all items in the subtrees (including roots)
-        subtree_items = KnowledgeItemService.get_subtree_items(
-            user_id, base_id, root_item_ids, include_roots=True
-        )
+        subtree_items = KnowledgeItemService.get_subtree_items(user_id, base_id, root_item_ids, include_roots=True)
         if not subtree_items:
             return
 
@@ -61,7 +61,6 @@ class ReindexSubtreeHandler(JobHandler):
                 roots.append(item)
 
         container_roots = [r for r in roots if r["type"] == "directory"]
-        leaf_roots = [r for r in roots if r["type"] in ("file", "note", "url")]
 
         # Collect all leaf items for vector deletion
         leaf_items = [it for it in subtree_items if it["type"] in ("file", "note", "url")]
@@ -104,10 +103,11 @@ class ReindexSubtreeHandler(JobHandler):
 
         logger.info(
             "Reindex initiated for %d roots in base %s",
-            len(roots), base_id,
+            len(roots),
+            base_id,
         )
 
-    async def on_settled(self, job_id: str, status: str, error: Optional[str]) -> None:
+    async def on_settled(self, job_id: str, status: str, error: str | None) -> None:
         if status != "failed":
             return
         _mark_active_roots_failed(job_id, error)
@@ -116,9 +116,7 @@ class ReindexSubtreeHandler(JobHandler):
 def _get_user_id_from_base(base_id: str) -> int:
     db = get_db()
     try:
-        row = db.execute(
-            "SELECT user_id FROM knowledge_bases WHERE id=?", (base_id,)
-        ).fetchone()
+        row = db.execute("SELECT user_id FROM knowledge_bases WHERE id=?", (base_id,)).fetchone()
         if not row:
             raise ValueError(f"Knowledge base not found: {base_id}")
         return row["user_id"]
@@ -126,13 +124,11 @@ def _get_user_id_from_base(base_id: str) -> int:
         db.close()
 
 
-def _mark_active_roots_failed(job_id: str, error: Optional[str]) -> None:
+def _mark_active_roots_failed(job_id: str, error: str | None) -> None:
     """Mark roots that are still in an active (non-terminal) status as failed."""
     db = get_db()
     try:
-        row = db.execute(
-            "SELECT input_data FROM knowledge_jobs WHERE id=?", (job_id,)
-        ).fetchone()
+        row = db.execute("SELECT input_data FROM knowledge_jobs WHERE id=?", (job_id,)).fetchone()
         if not row:
             return
         input_data = json.loads(row["input_data"])
@@ -146,8 +142,6 @@ def _mark_active_roots_failed(job_id: str, error: Optional[str]) -> None:
         for rid in root_item_ids:
             item = KnowledgeItemService.get_by_id(user_id, rid)
             if item and item["status"] not in terminal_statuses:
-                KnowledgeItemService.update_status(
-                    user_id, rid, "failed", error or "Reindex failed"
-                )
+                KnowledgeItemService.update_status(user_id, rid, "failed", error or "Reindex failed")
     finally:
         db.close()

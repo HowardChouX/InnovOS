@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { knowledgeApi } from '../../../api/knowledge';
 import type { KnowledgeGroup } from '../../../types/knowledge';
 import { normalizeKnowledgeError } from '../utils';
@@ -24,10 +24,6 @@ export const useKnowledgeGroups = () => {
       setIsLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
 
   return { groups, isLoading, error, refetch };
 };

@@ -1,15 +1,16 @@
 """
 问题建模编排器 — 综合 6 种分析器并行分析，生成创新方向列表（用户评分）
 """
+
 import asyncio
 import json
 import logging
 from typing import Any
 
-from app.algorithm.base import AIBase
-from app.algorithm.analyzers.resource_analyzer import ResourceAnalyzer
 from app.algorithm.analyzers.evolution_analyzer import EvolutionAnalyzer
+from app.algorithm.analyzers.resource_analyzer import ResourceAnalyzer
 from app.algorithm.analyzers.sufield_analyzer import SuFieldAnalyzer
+from app.algorithm.base import AIBase
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,9 @@ class ProblemModelingAnalyzer:
 
 只输出JSON：
 {{"system_components": [{{"name": "组件名", "description": "功能描述"}}], "supersystem_components": [{{"name": "超系统组件", "description": "与系统的交互"}}], "key_interactions": [{{"tool": "组件A", "receiver": "组件B", "type": "有害/不足/正常", "verb": "交互动词"}}]}}"""
-            result = await self.ai.call_ai_async("", prompt, temperature=0.1, logger_prefix="功能分析(简化)", json_mode=True)
+            result = await self.ai.call_ai_async(
+                "", prompt, temperature=0.1, logger_prefix="功能分析(简化)", json_mode=True
+            )
             return result if isinstance(result, dict) else None
 
         # 因果链分析：简化版，1 次 AI 调用直接识别根因
@@ -66,7 +69,9 @@ class ProblemModelingAnalyzer:
 
 只输出JSON：
 {{"root_causes": [{{"id": "rc1", "text": "根因描述"}}], "key_insights": ["关键洞察1"], "initial_defect": "初始问题描述"}}"""
-            result = await self.ai.call_ai_async("", prompt, temperature=0.2, logger_prefix="因果链(简化)", json_mode=True)
+            result = await self.ai.call_ai_async(
+                "", prompt, temperature=0.2, logger_prefix="因果链(简化)", json_mode=True
+            )
             return result if isinstance(result, dict) else None
 
         function_task = simple_function_analysis()
@@ -74,8 +79,11 @@ class ProblemModelingAnalyzer:
 
         # 并行运行 5 路
         results = await asyncio.gather(
-            resource_task, evolution_task, sufield_task,
-            function_task, root_cause_task,
+            resource_task,
+            evolution_task,
+            sufield_task,
+            function_task,
+            root_cause_task,
             return_exceptions=True,
         )
 
@@ -101,19 +109,26 @@ class ProblemModelingAnalyzer:
             trim_prompt = f"""分析以下系统，判断哪些组件可以被裁剪（消除）而功能可由其他组件或超系统承接。
 
 系统描述：{problem}
-系统组件：{', '.join(sys_names) if sys_names else '无'}
-超系统组件：{', '.join(super_names) if super_names else '无'}
+系统组件：{", ".join(sys_names) if sys_names else "无"}
+超系统组件：{", ".join(super_names) if super_names else "无"}
 
 只输出JSON：
 {{"trimming_candidates": [{{"component": "组件名", "reason": "裁剪理由", "transferred_to": "承接方"}}], "summary": "裁剪分析总结"}}"""
-            trim_result = await self.ai.call_ai_async("", trim_prompt, temperature=0.2, logger_prefix="裁剪分析(简化)", json_mode=True)
+            trim_result = await self.ai.call_ai_async(
+                "", trim_prompt, temperature=0.2, logger_prefix="裁剪分析(简化)", json_mode=True
+            )
             trimming_result = trim_result if isinstance(trim_result, dict) else None
         except Exception as e:
             logger.warning(f"裁剪分析失败: {e}")
 
         innovations = await self._generate_innovations(
-            problem, resource_result, evolution_result, sufield_result,
-            function_result, root_cause_result, trimming_result,
+            problem,
+            resource_result,
+            evolution_result,
+            sufield_result,
+            function_result,
+            root_cause_result,
+            trimming_result,
             demand_results,
         )
 
@@ -128,9 +143,9 @@ class ProblemModelingAnalyzer:
             "trimming_analysis": trimming_result,
             "innovations": innovations,
         }
+
     async def _generate_innovations(
-        self, problem, resource, evolution, sufield,
-        function_result, root_cause, trimming, demands
+        self, problem, resource, evolution, sufield, function_result, root_cause, trimming, demands
     ) -> list[dict]:
         context_parts = [f"系统描述：{problem}"]
 
@@ -153,7 +168,10 @@ class ProblemModelingAnalyzer:
         if demands:
             context_parts.append(f"【用户需求评分参考】\n{json.dumps(demands, ensure_ascii=False, indent=2)}")
 
-        prompt = '\n\n'.join(context_parts) + '\n\n请基于以上所有分析结果，生成创新方向。创新方向是解决核心问题的思路和策略，不是具体实施方案。至少 5 条，每条标注来源于哪个分析器。'
+        prompt = (
+            "\n\n".join(context_parts)
+            + "\n\n请基于以上所有分析结果，生成创新方向。创新方向是解决核心问题的思路和策略，不是具体实施方案。至少 5 条，每条标注来源于哪个分析器。"
+        )
 
         result = await self.ai.call_ai_async(
             INNOVATION_SYSTEM_PROMPT,

@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+
 from app.auth import get_current_user, require_admin
 from app.database import get_db
 from app.utils import utc_iso
-from pydantic import BaseModel
-from typing import Optional
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 
@@ -19,7 +19,7 @@ class BatchNotificationInput(BaseModel):
     title: str
     content: str
     type: str = "system"
-    user_ids: Optional[list[int]] = None
+    user_ids: list[int] | None = None
 
 
 def _row_to_dict(row) -> dict:
@@ -36,6 +36,7 @@ def _row_to_dict(row) -> dict:
 
 
 # ─── 用户端 ───────────────────────────────────────────────
+
 
 @router.get("")
 def list_notifications(
@@ -129,6 +130,7 @@ def delete_notification(notification_id: int, user: dict = Depends(get_current_u
 
 
 # ─── 管理员端 ─────────────────────────────────────────────
+
 
 @router.post("")
 def create_notification(body: CreateNotificationInput, user: dict = Depends(require_admin)):

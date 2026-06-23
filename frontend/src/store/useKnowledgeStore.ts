@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { knowledgeApi } from '../api/knowledge';
-import type { KnowledgeBase, KnowledgeBaseListItem, KnowledgeItem, KnowledgeGroup, KnowledgeTabKey } from '../types/knowledge';
+import type {
+  KnowledgeBase,
+  KnowledgeBaseListItem,
+  KnowledgeItem,
+  KnowledgeGroup,
+  KnowledgeTabKey,
+} from '../types/knowledge';
 
 interface KnowledgeStore {
   bases: KnowledgeBaseListItem[];
@@ -26,16 +32,19 @@ interface KnowledgeStore {
   fetchBases: () => Promise<void>;
   fetchGroups: () => Promise<void>;
   selectBase: (id: string) => void;
-  createBase: (name: string, groupId?: string, extra?: Record<string, any>) => Promise<void>;
+  createBase: (name: string, groupId?: string, extra?: Record<string, unknown>) => Promise<void>;
   updateBase: (id: string, data: Partial<KnowledgeBase>) => Promise<void>;
   deleteBase: (id: string) => Promise<void>;
   createGroup: (name: string) => Promise<void>;
   deleteGroup: (id: string) => Promise<void>;
   renameBase: (id: string, name: string) => Promise<void>;
   renameGroup: (id: string, name: string) => Promise<void>;
-  fetchItems: (baseId?: string, page?: number) => Promise<void>;
+  fetchItems: (baseId?: string, page?: number, skipLoading?: boolean) => Promise<void>;
   uploadFile: (file: File) => Promise<void>;
-  addItem: (type: 'file' | 'url' | 'note' | 'directory', data: Record<string, any>) => Promise<void>;
+  addItem: (
+    type: 'file' | 'url' | 'note' | 'directory',
+    data: Record<string, unknown>,
+  ) => Promise<void>;
   importDirectory: (files: File[]) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   setActiveTab: (tab: KnowledgeTabKey) => void;
@@ -52,7 +61,12 @@ interface KnowledgeStore {
   closeRename: () => void;
   openRestoreBase: (base: KnowledgeBase) => void;
   closeRestoreBase: () => void;
-  restoreBase: (input: { sourceBaseId: string; name: string; embeddingModelId: string; dimensions?: number }) => Promise<KnowledgeBase>;
+  restoreBase: (input: {
+    sourceBaseId: string;
+    name: string;
+    embeddingModelId: string;
+    dimensions?: number;
+  }) => Promise<KnowledgeBase>;
   reindexItem: (itemId: string) => Promise<void>;
 }
 
@@ -106,7 +120,13 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
   },
 
   selectBase: (id) => {
-    set({ selectedBaseId: id, selectedItemId: null, activeTab: 'file', searchQuery: '', items: [] });
+    set({
+      selectedBaseId: id,
+      selectedItemId: null,
+      activeTab: 'file',
+      searchQuery: '',
+      items: [],
+    });
     if (id) get().fetchItems(id);
   },
 
@@ -117,7 +137,7 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
   },
 
   updateBase: async (id, data) => {
-    const payload: Record<string, any> = {};
+    const payload: Record<string, unknown> = {};
     if (data.name !== undefined) payload.name = data.name;
     if (data.groupId !== undefined) payload.groupId = data.groupId;
     if (data.rerankModelId !== undefined) payload.rerankModelId = data.rerankModelId;
@@ -138,9 +158,15 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
 
   deleteBase: async (id) => {
     await knowledgeApi.deleteBase(id);
-      if (get().selectedBaseId === id) {
-        set({ selectedBaseId: '', selectedItemId: null, items: [], itemsTotal: 0, tabCounts: { file: 0, note: 0, directory: 0, url: 0 } });
-      }
+    if (get().selectedBaseId === id) {
+      set({
+        selectedBaseId: '',
+        selectedItemId: null,
+        items: [],
+        itemsTotal: 0,
+        tabCounts: { file: 0, note: 0, directory: 0, url: 0 },
+      });
+    }
     await get().fetchBases();
   },
 
@@ -180,11 +206,19 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
         items: filteredRes.data?.items || [],
         itemsTotal: filteredRes.data?.total || 0,
         itemsPage: filteredRes.data?.page || 1,
-        tabCounts: (countsRes.data || { file: 0, note: 0, directory: 0, url: 0 }) as Record<KnowledgeTabKey, number>,
+        tabCounts: (countsRes.data || { file: 0, note: 0, directory: 0, url: 0 }) as Record<
+          KnowledgeTabKey,
+          number
+        >,
       });
     } catch (e) {
       console.error('[useKnowledgeStore] fetchItems failed:', e);
-      set({ items: [], itemsTotal: 0, tabCounts: { file: 0, note: 0, directory: 0, url: 0 }, error: e instanceof Error ? e.message : '加载知识项失败' });
+      set({
+        items: [],
+        itemsTotal: 0,
+        tabCounts: { file: 0, note: 0, directory: 0, url: 0 },
+        error: e instanceof Error ? e.message : '加载知识项失败',
+      });
     } finally {
       set({ loading: false });
     }

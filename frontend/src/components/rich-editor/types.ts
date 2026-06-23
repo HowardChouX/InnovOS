@@ -1,40 +1,40 @@
 export interface RichEditorProps {
   /** Initial content for the editor (can be markdown or HTML) */
-  initialContent?: string
+  initialContent?: string;
   /** Placeholder text when editor is empty */
-  placeholder?: string
+  placeholder?: string;
   /** Enable in-editor content search UI */
-  enableContentSearch?: boolean
+  enableContentSearch?: boolean;
   /** Callback when content changes (plain text) */
-  onContentChange?: (content: string) => void
+  onContentChange?: (content: string) => void;
   /** Callback when HTML content changes */
-  onHtmlChange?: (html: string) => void
+  onHtmlChange?: (html: string) => void;
   /** Callback when Markdown content changes */
-  onMarkdownChange?: (markdown: string) => void
+  onMarkdownChange?: (markdown: string) => void;
   /** Callback when editor loses focus */
-  onBlur?: () => void
+  onBlur?: () => void;
   /** Callback when paste event occurs */
-  onPaste?: (event: ClipboardEvent) => string
+  onPaste?: (event: ClipboardEvent) => string;
   /** Whether the editor is editable */
-  editable?: boolean
+  editable?: boolean;
   /** Whether to show the table of contents component */
-  showTableOfContents?: boolean
+  showTableOfContents?: boolean;
   /** Custom CSS class name */
-  className?: string
+  className?: string;
   /** Custom styles for the outer editor wrapper */
-  wrapperStyle?: React.CSSProperties
+  wrapperStyle?: React.CSSProperties;
   /** Whether to show the toolbar */
-  showToolbar?: boolean
+  showToolbar?: boolean;
   /** Minimum height of the editor */
-  minHeight?: number
+  minHeight?: number;
   /** Maximum height of the editor */
-  maxHeight?: number
+  maxHeight?: number;
   /** Available toolbar tools */
-  toolbarItems?: ToolbarItem[]
+  toolbarItems?: ToolbarItem[];
   /** Whether initial content is markdown (default: auto-detect) */
-  isMarkdown?: boolean
+  isMarkdown?: boolean;
   /** Initial commands to register on mount */
-  initialCommands?: Command[]
+  initialCommands?: Command[];
   /** Command configuration callback called after editor initialization */
   onCommandsReady?: (
     commandAPI: Pick<
@@ -44,161 +44,164 @@ export interface RichEditorProps {
       | 'unregisterCommand'
       | 'unregisterToolbarCommand'
       | 'setCommandAvailability'
-    >
-  ) => void
+    >,
+  ) => void;
   /** Whether to use full width layout */
-  isFullWidth?: boolean
+  isFullWidth?: boolean;
   /** Font family setting */
-  fontFamily?: 'default' | 'serif'
+  fontFamily?: 'default' | 'serif';
   /** Font size in pixels */
-  fontSize?: number
+  fontSize?: number;
   /** Whether to enable spell check */
-  enableSpellCheck?: boolean
+  enableSpellCheck?: boolean;
 }
 
 export interface ToolbarItem {
   /** Unique identifier for the toolbar item */
-  id: string
+  id: string;
   /** Type of toolbar item */
-  type: 'button' | 'divider' | 'dropdown'
+  type: 'button' | 'divider' | 'dropdown';
   /** Display label */
-  label?: string
+  label?: string;
   /** Icon component or icon name */
-  icon?: React.ComponentType | string
+  icon?: React.ComponentType | string;
   /** Click handler for buttons */
-  onClick?: () => void
+  onClick?: () => void;
   /** Whether the item is active/pressed */
-  active?: boolean
+  active?: boolean;
   /** Whether the item is disabled */
-  disabled?: boolean
+  disabled?: boolean;
   /** Dropdown options (for dropdown type) */
-  options?: ToolbarDropdownOption[]
+  options?: ToolbarDropdownOption[];
 }
 
 export interface ToolbarDropdownOption {
   /** Option value */
-  value: string
+  value: string;
   /** Option label */
-  label: string
+  label: string;
   /** Option icon */
-  icon?: React.ComponentType | string
+  icon?: React.ComponentType | string;
   /** Click handler */
-  onClick: () => void
+  onClick: () => void;
 }
 
 export interface RichEditorRef {
   /** Get current editor content as plain text */
-  getContent: () => string
+  getContent: () => string;
   /** Get current editor content as HTML */
-  getHtml: () => string
+  getHtml: () => string;
   /** Get current editor content as Markdown */
-  getMarkdown: () => string
+  getMarkdown: () => string;
   /** Set editor content (plain text) */
-  setContent: (content: string) => void
+  setContent: (content: string) => void;
   /** Set editor HTML content */
-  setHtml: (html: string) => void
+  setHtml: (html: string) => void;
   /** Set editor Markdown content */
-  setMarkdown: (markdown: string) => void
+  setMarkdown: (markdown: string) => void;
   /** Focus the editor */
-  focus: () => void
+  focus: () => void;
   /** Clear all content */
-  clear: () => void
+  clear: () => void;
   /** Insert text at current cursor position */
-  insertText: (text: string) => void
+  insertText: (text: string) => void;
   /** Execute a formatting command */
-  executeCommand: (command: string, value?: any) => void
+  executeCommand: (command: string, value?: unknown) => void;
   /** Get preview text from current content */
-  getPreviewText: (maxLength?: number) => string
+  getPreviewText: (maxLength?: number) => string;
   /** Get scrollTop of the editor scroll container */
-  getScrollTop: () => number
+  getScrollTop: () => number;
   /** Set scrollTop of the editor scroll container */
-  setScrollTop: (value: number) => void
+  setScrollTop: (value: number) => void;
   /** Scroll to specific line number in markdown */
-  scrollToLine: (lineNumber: number, options?: { highlight?: boolean; lineContent?: string }) => void
+  scrollToLine: (
+    lineNumber: number,
+    options?: { highlight?: boolean; lineContent?: string },
+  ) => void;
   // Dynamic command management
   /** Register a new command/toolbar item */
-  registerCommand: (cmd: Command) => void
+  registerCommand: (cmd: Command) => void;
   /** Register a command that shows in toolbar */
-  registerToolbarCommand: (cmd: Command) => void
+  registerToolbarCommand: (cmd: Command) => void;
   /** Remove a command completely */
-  unregisterCommand: (id: string) => void
+  unregisterCommand: (id: string) => void;
   /** Hide a command from toolbar (keep in slash menu) */
-  unregisterToolbarCommand: (id: string) => void
+  unregisterToolbarCommand: (id: string) => void;
   /** Set command availability condition */
-  setCommandAvailability: (id: string, isAvailable: (editor: any) => boolean) => void
+  setCommandAvailability: (id: string, isAvailable: (editor: Editor) => boolean) => void;
   /** Get all registered commands */
-  getAllCommands: () => Command[]
+  getAllCommands: () => Command[];
   /** Get toolbar commands only */
-  getToolbarCommands: () => Command[]
+  getToolbarCommands: () => Command[];
 }
 
 export interface FormattingState {
   /** Whether bold is active */
-  isBold: boolean
+  isBold: boolean;
   /** Whether bold command can be executed */
-  canBold: boolean
+  canBold: boolean;
   /** Whether italic is active */
-  isItalic: boolean
+  isItalic: boolean;
   /** Whether italic command can be executed */
-  canItalic: boolean
+  canItalic: boolean;
   /** Whether underline is active */
-  isUnderline: boolean
+  isUnderline: boolean;
   /** Whether underline command can be executed */
-  canUnderline: boolean
+  canUnderline: boolean;
   /** Whether strike is active */
-  isStrike: boolean
+  isStrike: boolean;
   /** Whether strike command can be executed */
-  canStrike: boolean
+  canStrike: boolean;
   /** Whether code is active */
-  isCode: boolean
+  isCode: boolean;
   /** Whether code command can be executed */
-  canCode: boolean
+  canCode: boolean;
   /** Whether marks can be cleared */
-  canClearMarks: boolean
+  canClearMarks: boolean;
   /** Whether paragraph is active */
-  isParagraph: boolean
+  isParagraph: boolean;
   /** Whether heading level 1 is active */
-  isHeading1: boolean
+  isHeading1: boolean;
   /** Whether heading level 2 is active */
-  isHeading2: boolean
+  isHeading2: boolean;
   /** Whether heading level 3 is active */
-  isHeading3: boolean
+  isHeading3: boolean;
   /** Whether heading level 4 is active */
-  isHeading4: boolean
+  isHeading4: boolean;
   /** Whether heading level 5 is active */
-  isHeading5: boolean
+  isHeading5: boolean;
   /** Whether heading level 6 is active */
-  isHeading6: boolean
+  isHeading6: boolean;
   /** Whether bullet list is active */
-  isBulletList: boolean
+  isBulletList: boolean;
   /** Whether ordered list is active */
-  isOrderedList: boolean
+  isOrderedList: boolean;
   /** Whether code block is active */
-  isCodeBlock: boolean
+  isCodeBlock: boolean;
   /** Whether blockquote is active */
-  isBlockquote: boolean
+  isBlockquote: boolean;
   /** Whether link is active */
-  isLink: boolean
+  isLink: boolean;
   /** Whether link command can be executed */
-  canLink: boolean
+  canLink: boolean;
   /** Whether undo can be executed */
-  canUndo: boolean
+  canUndo: boolean;
   /** Whether redo can be executed */
-  canRedo: boolean
+  canRedo: boolean;
   /** Whether table is active */
-  isTable: boolean
+  isTable: boolean;
   /** Whether table command can be executed */
-  canTable: boolean
+  canTable: boolean;
   /** Whether image command can be executed */
-  canImage: boolean
+  canImage: boolean;
   /** Whether math is active */
-  isMath: boolean
+  isMath: boolean;
   /** Whether inline math is active */
-  isInlineMath: boolean
+  isInlineMath: boolean;
   /** Whether math command can be executed */
-  canMath: boolean
+  canMath: boolean;
   /** Whether taskList is active */
-  isTaskList: boolean
+  isTaskList: boolean;
 }
 
 export type FormattingCommand =
@@ -226,84 +229,85 @@ export type FormattingCommand =
   | 'inlineMath'
   | 'table'
   | 'taskList'
-  | 'image'
+  | 'image';
 
 export interface ToolbarProps {
   /** Editor instance ref */
-  editor: Editor
+  editor: Editor;
   /** Custom toolbar items */
-  items?: ToolbarItem[]
+  items?: ToolbarItem[];
   /** Current formatting state */
-  formattingState: FormattingState
+  formattingState: FormattingState;
   /** Callback when formatting command is executed */
-  onCommand: (command: FormattingCommand) => void
+  onCommand: (command: FormattingCommand) => void;
   /** Scroll container reference to prevent scrolling when dialogs open */
-  scrollContainer?: React.RefObject<HTMLDivElement | null>
+  scrollContainer?: React.RefObject<HTMLDivElement | null>;
 }
 
 // Command System Types for Slash Commands
-import type { Editor } from '@tiptap/core'
-import type { LucideIcon } from 'lucide-react'
+import type { Editor } from '@tiptap/core';
+import type { LucideIcon } from 'lucide-react';
 
-export enum CommandCategory {
-  TEXT = 'text',
-  LISTS = 'lists',
-  BLOCKS = 'blocks',
-  MEDIA = 'media',
-  STRUCTURE = 'structure',
-  SPECIAL = 'special'
-}
+export const CommandCategory = {
+  TEXT: 'text',
+  LISTS: 'lists',
+  BLOCKS: 'blocks',
+  MEDIA: 'media',
+  STRUCTURE: 'structure',
+  SPECIAL: 'special',
+} as const;
+export type CommandCategory = (typeof CommandCategory)[keyof typeof CommandCategory];
 
 export interface Command {
   /** Unique identifier for the command */
-  id: string
+  id: string;
   /** Display title for the command */
-  title: string
+  title: string;
   /** Description of what the command does */
-  description: string
+  description: string;
   /** Search keywords for filtering */
-  keywords: string[]
+  keywords: string[];
   /** Command category for grouping */
-  category: CommandCategory
+  category: CommandCategory;
   /** Icon component or icon name */
-  icon: LucideIcon
+  icon: LucideIcon;
   /** Handler function to execute the command */
-  handler: (editor: Editor) => void
+  handler: (editor: Editor) => void;
   /** Whether the command is available in current context */
-  isAvailable?: (editor: Editor) => boolean
+  isAvailable?: (editor: Editor) => boolean;
   // Toolbar support
-  showInToolbar?: boolean
-  toolbarGroup?: 'text' | 'formatting' | 'blocks' | 'media' | 'structure' | 'history'
-  formattingCommand?: string // Maps to FormattingCommand for state checking
+  showInToolbar?: boolean;
+  toolbarGroup?: 'text' | 'formatting' | 'blocks' | 'media' | 'structure' | 'history';
+  formattingCommand?: string; // Maps to FormattingCommand for state checking
 }
 
 export interface CommandSuggestion {
   /** Range where the suggestion was triggered */
-  range: Range
+  range: Range;
   /** Current query text after the trigger character */
-  query: string
+  query: string;
   /** Text content of the suggestion */
-  text: string
+  text: string;
   /** Whether suggestion is active */
-  active: boolean
+  active: boolean;
 }
 
 export interface CommandListProps {
   /** List of filtered commands to display */
-  commands: Command[]
+  commands: Command[];
   /** Currently selected command index */
-  selectedIndex: number
+  selectedIndex: number;
   /** Callback when command is selected */
-  onSelect: (command: Command) => void
+  onSelect: (command: Command) => void;
   /** Callback when selection changes via keyboard */
-  onSelectionChange: (index: number) => void
+  onSelectionChange: (index: number) => void;
 }
 
 export interface CommandFilterOptions {
   /** Query string to filter commands */
-  query: string
+  query: string;
   /** Category to filter by */
-  category?: string
+  category?: string;
   /** Current editor state for availability checks */
-  editor?: any
+  editor?: Editor;
 }

@@ -1,16 +1,27 @@
-from fastapi import APIRouter, Depends, HTTPException
-from app.auth import get_current_user
-from app.database import get_db
-from app.utils import utc_iso
-from pydantic import BaseModel
-from typing import Optional
+"""
+Admin user management — SQLModel-based.
 
-router = APIRouter(prefix="/users", tags=["users"])
+Migrated from raw psycopg2 to SQLModel ORM + deps.CurrentUser.
+"""
+
+import logging
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from sqlmodel import select, text
+
+from app.api.deps import CurrentUser, SessionDep, SuperUserDep
+from app.models.user import User
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/users", tags=["admin-users"])
 
 
 class UpdateUserInput(BaseModel):
-    is_active: Optional[bool] = None
-    role: Optional[str] = None
+    is_active: bool | None = None
+    role: str | None = None
+    email: str | None = None
 
 
 class SendNotificationInput(BaseModel):
@@ -21,27 +32,53 @@ class SendNotificationInput(BaseModel):
 
 
 @router.get("")
-def list_users(user: dict = Depends(get_current_user)):
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
-    
-    db = get_db()
-    rows = db.execute(
-        "SELECT id, username, email, role, is_active, created_at FROM users ORDER BY created_at DESC"
+def list_users(session: SessionDep, _admin: SuperUserDep):
+    """List all users with usage statistics (admin only)."""
+    users = session.exec(select(User).order_by(User.created_at.desc())).all()
+
+    # Per-user aggregate stats via raw SQL
+    rows = session.execute(
+        text("""
+            SELECT
+                t.user_id,
+                COUNT(*)                                        AS total_tasks,
+                COUNT(*) FILTER (WHERE t.status = 'completed')  AS completed_tasks,
+                COUNT(*) FILTER (WHERE t.status = 'failed')     AS failed_tasks,
+                COUNT(DISTINCT s.id)                            AS total_solutions,
+                MAX(t.updated_at)                               AS last_active
+            FROM tasks t
+            LEFT JOIN solutions s ON s.task_id = t.id
+            GROUP BY t.user_id
+        """)
     ).fetchall()
-    db.close()
-    
+    stats_map: dict[int, dict] = {}
+    for r in rows:
+        stats_map[r[0]] = {
+            "totalTasks": r[1],
+            "completedTasks": r[2],
+            "failedTasks": r[3],
+            "totalSolutions": r[4],
+            "lastActive": r[5] or "",
+        }
+
     return {
         "data": [
             {
-                "id": row["id"],
-                "username": row["username"],
-                "email": row["email"],
-                "role": row["role"],
-                "isActive": bool(row["is_active"]),
-                "createdAt": utc_iso(row["created_at"]),
+                "id": u.id,
+                "username": u.username,
+                "email": u.email or "",
+                "role": u.role,
+                "isActive": bool(u.is_active),
+                "createdAt": u.created_at or "",
+                "stats": stats_map.get(u.id, {
+                    "totalTasks": 0,
+                    "completedTasks": 0,
+                    "failedTasks": 0,
+                    "totalSolutions": 0,
+                    "lastActive": "",
+                }),
             }
-            for row in rows
+            for u in users
         ],
         "message": "success",
         "code": 200,
@@ -49,44 +86,38 @@ def list_users(user: dict = Depends(get_current_user)):
 
 
 @router.put("/{user_id}")
-def update_user(user_id: int, body: UpdateUserInput, user: dict = Depends(get_current_user)):
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
-    
-    db = get_db()
-    target = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-    if not target:
-        db.close()
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    updates = []
-    params = []
+def update_user(
+    user_id: int,
+    body: UpdateUserInput,
+    session: SessionDep,
+    _admin: SuperUserDep,
+):
+    """Update user's is_active or role (admin only)."""
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
     if body.is_active is not None:
-        updates.append("is_active = ?")
-        params.append(1 if body.is_active else 0)
+        user.is_active = 1 if body.is_active else 0
     if body.role is not None:
         if body.role not in ("admin", "user"):
-            db.close()
-            raise HTTPException(status_code=400, detail="Invalid role")
-        updates.append("role = ?")
-        params.append(body.role)
-    
-    if updates:
-        params.extend([user_id])
-        db.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ?", params)
-        db.commit()
-    
-    row = db.execute("SELECT id, username, email, role, is_active, created_at FROM users WHERE id = ?", (user_id,)).fetchone()
-    db.close()
-    
+            raise HTTPException(status_code=400, detail="无效角色")
+        user.role = body.role
+    if body.email is not None:
+        user.email = body.email
+
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
     return {
         "data": {
-            "id": row["id"],
-            "username": row["username"],
-            "email": row["email"],
-            "role": row["role"],
-            "isActive": bool(row["is_active"]),
-            "createdAt": utc_iso(row["created_at"]),
+            "id": user.id,
+            "username": user.username,
+            "email": user.email or "",
+            "role": user.role,
+            "isActive": bool(user.is_active),
+            "createdAt": user.created_at or "",
         },
         "message": "success",
         "code": 200,
@@ -94,31 +125,37 @@ def update_user(user_id: int, body: UpdateUserInput, user: dict = Depends(get_cu
 
 
 @router.delete("/{user_id}")
-def delete_user(user_id: int, user: dict = Depends(get_current_user)):
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
-    if user_id == user["id"]:
-        raise HTTPException(status_code=400, detail="Cannot delete yourself")
-    
-    db = get_db()
-    target = db.execute("SELECT id FROM users WHERE id = ?", (user_id,)).fetchone()
-    if not target:
-        db.close()
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    print(f"[DELETE USER] Deleting user {user_id} and related records")
-    # Delete related records first to avoid foreign key constraint errors
-    # analyses, solutions, workflows reference tasks(id)
-    db.execute("DELETE FROM analyses WHERE task_id IN (SELECT id FROM tasks WHERE user_id = ?)", (user_id,))
-    db.execute("DELETE FROM workflows WHERE task_id IN (SELECT id FROM tasks WHERE user_id = ?)", (user_id,))
-    db.execute("DELETE FROM solutions WHERE task_id IN (SELECT id FROM tasks WHERE user_id = ?)", (user_id,))
-    db.execute("DELETE FROM tasks WHERE user_id = ?", (user_id,))
-    db.execute("DELETE FROM evaluations WHERE user_id = ?", (user_id,))
-    db.execute("DELETE FROM feedbacks WHERE user_id = ?", (user_id,))
-    db.execute("DELETE FROM audit_logs WHERE user_id = ?", (user_id,))
-    db.execute("DELETE FROM notifications WHERE user_id = ?", (user_id,))
-    db.execute("DELETE FROM users WHERE id = ?", (user_id,))
-    db.commit()
-    db.close()
-    
-    return {"data": None, "message": "deleted", "code": 200}
+def delete_user(
+    user_id: int,
+    session: SessionDep,
+    current_user: CurrentUser,
+    _admin: SuperUserDep,
+):
+    """Delete user and related records (admin only, cannot delete self)."""
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="不能删除自己")
+
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    logger.info("Deleting user %s and related records", user_id)
+
+    # Delete related records via raw SQL (tables without SQLModel ORM)
+    _sql_deps: list[str] = [
+        "DELETE FROM analyses WHERE task_id IN (SELECT id FROM tasks WHERE user_id = :uid)",
+        "DELETE FROM workflows WHERE task_id IN (SELECT id FROM tasks WHERE user_id = :uid)",
+        "DELETE FROM solutions WHERE task_id IN (SELECT id FROM tasks WHERE user_id = :uid)",
+        "DELETE FROM tasks WHERE user_id = :uid",
+        "DELETE FROM evaluations WHERE user_id = :uid",
+        "DELETE FROM feedbacks WHERE user_id = :uid",
+        "DELETE FROM audit_log WHERE user_id = :uid",
+        "DELETE FROM notifications WHERE user_id = :uid",
+    ]
+    for sql in _sql_deps:
+        session.execute(text(sql), {"uid": user_id})
+
+    session.delete(user)
+    session.commit()
+
+    return {"data": None, "message": "已删除", "code": 200}

@@ -1,26 +1,29 @@
-import type { FocusEvent, MouseEvent } from 'react'
-import RecallHistoryList from './RecallHistoryList'
-import { useRecallTest } from './RecallTestProvider'
+import type { FocusEvent, MouseEvent } from 'react';
+import RecallHistoryList from './RecallHistoryList';
+import { useRecallTest } from './useRecallTest';
 
 export default function RecallSearchBar() {
   const {
     state: { query, historyItems, isHistoryOpen, isSearching },
-    actions: { setQuery, setHistoryOpen, runSearch }
-  } = useRecallTest()
-  const canSearch = query.trim().length > 0 && !isSearching
-  const hasHistory = historyItems.length > 0
+    actions: { setQuery, setHistoryOpen, runSearch },
+  } = useRecallTest();
+  const canSearch = query.trim().length > 0 && !isSearching;
+  const hasHistory = historyItems.length > 0;
 
   const closeHistoryOnInputBlur = (event: FocusEvent<HTMLInputElement>) => {
-    const nextFocusedElement = event.relatedTarget
-    if (nextFocusedElement instanceof HTMLElement && nextFocusedElement.closest('[data-recall-history]')) {
-      return
+    const nextFocusedElement = event.relatedTarget;
+    if (
+      nextFocusedElement instanceof HTMLElement &&
+      nextFocusedElement.closest('[data-recall-history]')
+    ) {
+      return;
     }
-    setHistoryOpen(false)
-  }
+    setHistoryOpen(false);
+  };
 
   const keepInputFocus = (event: MouseEvent) => {
-    event.preventDefault()
-  }
+    event.preventDefault();
+  };
 
   return (
     <div className="mx-auto flex w-full max-w-3xl items-center gap-2">
@@ -33,8 +36,8 @@ export default function RecallSearchBar() {
           onBlur={closeHistoryOnInputBlur}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && canSearch) {
-              runSearch()
-              setHistoryOpen(false)
+              runSearch();
+              setHistoryOpen(false);
             }
           }}
           placeholder="输入查询内容测试检索效果..."
@@ -47,10 +50,11 @@ export default function RecallSearchBar() {
             className={`min-h-0 shrink-0 rounded-none p-0 shadow-none transition-colors hover:bg-transparent hover:text-foreground ${isHistoryOpen ? 'text-primary' : 'text-foreground-muted'}`}
             onMouseDown={keepInputFocus}
             onClick={(event) => {
-              event.stopPropagation()
-              setHistoryOpen(!isHistoryOpen)
+              event.stopPropagation();
+              setHistoryOpen(!isHistoryOpen);
             }}
-            aria-label="搜索历史">
+            aria-label="搜索历史"
+          >
             <i className="fa-solid fa-clock-rotate-left text-xs" />
           </button>
         ) : null}
@@ -59,7 +63,8 @@ export default function RecallSearchBar() {
           <div
             data-recall-history
             className="absolute top-full right-0 left-0 z-[300] mt-1 max-h-[180px] overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            onMouseDown={keepInputFocus}>
+            onMouseDown={keepInputFocus}
+          >
             <RecallHistoryList />
           </div>
         ) : null}
@@ -70,12 +75,13 @@ export default function RecallSearchBar() {
         disabled={!canSearch}
         className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         onClick={() => {
-          runSearch()
-          setHistoryOpen(false)
-        }}>
+          runSearch();
+          setHistoryOpen(false);
+        }}
+      >
         <i className="fa-solid fa-bolt text-xs" />
         搜索
       </button>
     </div>
-  )
+  );
 }

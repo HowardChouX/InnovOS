@@ -12,11 +12,11 @@
   - knowledge pipeline — 嵌入/重排
   - 后续 patent knowledge base — 嵌入
 """
+
 from __future__ import annotations
-import json
+
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +24,9 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ResolvedModelConfig:
     """解析后的 API 调用配置"""
+
     provider_id: str
-    model_id: str          # API 调用时用的 model 名
+    model_id: str  # API 调用时用的 model 名
     api_key: str
     api_host: str
 
@@ -37,12 +38,19 @@ class ModelResolver:
     def get_assigned_settings() -> dict:
         """从 system_settings 表读取全局模型分配"""
         from app.database import get_db
+
         db = get_db()
         rows = db.execute(
             "SELECT key, value FROM system_settings WHERE key IN ('chat_model','embedding_model','rerank_model','ocr_model','extract_model')"
         ).fetchall()
         db.close()
-        result = {"chat_model": None, "embedding_model": None, "rerank_model": None, "ocr_model": None, "extract_model": None}
+        result = {
+            "chat_model": None,
+            "embedding_model": None,
+            "rerank_model": None,
+            "ocr_model": None,
+            "extract_model": None,
+        }
         for r in rows:
             result[r["key"]] = r["value"]
         return result
@@ -58,7 +66,7 @@ class ModelResolver:
         return "", composite_id
 
     @classmethod
-    def resolve_chat(cls) -> Optional[ResolvedModelConfig]:
+    def resolve_chat(cls) -> ResolvedModelConfig | None:
         """解析全局分配的聊天模型配置"""
         settings = cls.get_assigned_settings()
         composite = settings.get("chat_model")
@@ -68,7 +76,7 @@ class ModelResolver:
         return cls.resolve(composite)
 
     @classmethod
-    def resolve_embedding(cls) -> Optional[ResolvedModelConfig]:
+    def resolve_embedding(cls) -> ResolvedModelConfig | None:
         """解析全局分配的嵌入模型配置"""
         settings = cls.get_assigned_settings()
         composite = settings.get("embedding_model")
@@ -78,7 +86,7 @@ class ModelResolver:
         return cls.resolve(composite)
 
     @classmethod
-    def resolve_rerank(cls) -> Optional[ResolvedModelConfig]:
+    def resolve_rerank(cls) -> ResolvedModelConfig | None:
         """解析全局分配的重排模型配置"""
         settings = cls.get_assigned_settings()
         composite = settings.get("rerank_model")
@@ -88,41 +96,36 @@ class ModelResolver:
         return cls.resolve(composite)
 
     @classmethod
-    def resolve(cls, composite_id: str) -> Optional[ResolvedModelConfig]:
+    def resolve(cls, composite_id: str) -> ResolvedModelConfig | None:
         """解析 'providerId:modelId' → API 配置（公开方法）
 
         1. 解析 providerId:modelId
-        2. 查 model_providers 表获取 api_key_encrypted + api_host
-        3. 解密 api_key
+        2. 查 model_providers 表获取 api_host
+        3. 从环境变量读取 API Key
         4. 返回 ResolvedModelConfig
         """
+        from app.algorithm.model_service import _get_provider_api_key
         from app.database import get_db
-        from app.algorithm.crypto import decrypt_key
 
         provider_id, model_id = cls.parse_composite_id(composite_id)
         if not provider_id or not model_id:
             logger.warning(f"_resolve: 无效的模型 ID 格式: {composite_id}")
             return None
 
+        api_key = _get_provider_api_key(provider_id)
+        if not api_key:
+            logger.warning(f"_resolve: provider '{provider_id}' 未配置 API Key")
+            return None
+
         db = get_db()
         row = db.execute(
-            "SELECT api_host, api_key_encrypted FROM model_providers WHERE provider_id=? AND is_enabled=1",
+            "SELECT api_host FROM model_providers WHERE provider_id=? AND is_enabled=1",
             (provider_id,),
         ).fetchone()
         db.close()
 
         if not row:
             logger.warning(f"_resolve: provider '{provider_id}' 不存在或未启用")
-            return None
-
-        if not row["api_key_encrypted"]:
-            logger.warning(f"_resolve: provider '{provider_id}' 未配置 API Key")
-            return None
-
-        try:
-            api_key = decrypt_key(row["api_key_encrypted"])
-        except Exception as e:
-            logger.error(f"_resolve: API Key 解密失败: {e}")
             return None
 
         return ResolvedModelConfig(

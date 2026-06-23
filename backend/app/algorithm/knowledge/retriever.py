@@ -4,9 +4,10 @@ RAG 检索管线 — Cherry Studio 模式
 整合 chunker、embedder、reranker、vector_store。
 每个 knowledge_item 通过 replaceByExternalId 原子索引/替换向量节点。
 """
+
 from __future__ import annotations
+
 import logging
-from typing import Optional
 
 from app.algorithm.knowledge.chunker import chunk_document
 from app.algorithm.knowledge.embedder import Embedder
@@ -21,8 +22,8 @@ class KnowledgeRetriever:
     def __init__(
         self,
         user_id: int,
-        embedder_config: Optional[dict] = None,
-        reranker_config: Optional[dict] = None,
+        embedder_config: dict | None = None,
+        reranker_config: dict | None = None,
     ):
         self.user_id = user_id
         self.chunker = chunk_document
@@ -44,12 +45,15 @@ class KnowledgeRetriever:
         # 向量存储
         self.vector_store = VectorStore(user_id=self.user_id)
 
-    async def index_item(self, base_id: str, item_id: str, content: str, chunk_size: Optional[int] = None, chunk_overlap: Optional[int] = None) -> int:
+    async def index_item(
+        self, base_id: str, item_id: str, content: str, chunk_size: int | None = None, chunk_overlap: int | None = None
+    ) -> int:
         """索引单个知识项：分块 → 向量化 → 原子替换存储。返回分块数。
 
         使用 replaceByExternalId 语义：先删除该 item 的所有旧向量节点，再插入新节点。
         """
         import time
+
         t0 = time.time()
         content_len = len(content)
         logger.info(f"索引开始 item={item_id} 内容长度={content_len}")
@@ -58,6 +62,7 @@ class KnowledgeRetriever:
         if chunk_size is None or chunk_overlap is None:
             try:
                 from app.database import get_db
+
                 db = get_db()
                 rows = db.execute(
                     "SELECT key, value FROM system_settings WHERE key IN (?, ?)",
@@ -75,26 +80,25 @@ class KnowledgeRetriever:
 
         chunks = self.chunker(content, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         t1 = time.time()
-        logger.info(f"  分块完成: {len(chunks)} 块 ({((t1-t0)*1000):.0f}ms)")
+        logger.info(f"  分块完成: {len(chunks)} 块 ({((t1 - t0) * 1000):.0f}ms)")
         if not chunks:
             self.vector_store.replace_by_external_id(base_id, item_id, [], [])
-            logger.info(f"  空内容，已清除向量")
+            logger.info("  空内容，已清除向量")
             return 0
 
         texts = [c["text"] for c in chunks]
         logger.info(f"  开始向量化: {len(texts)} 段文本...")
         vectors = await self.embedder.embed(texts)
         t2 = time.time()
-        logger.info(f"  向量化完成: {len(vectors)} 个向量, 维度={len(vectors[0]) if vectors else 0} ({((t2-t1)*1000):.0f}ms)")
+        logger.info(
+            f"  向量化完成: {len(vectors)} 个向量, 维度={len(vectors[0]) if vectors else 0} ({((t2 - t1) * 1000):.0f}ms)"
+        )
 
-        metadata = [
-            {"chunk_idx": c["index"], "text": c["text"]}
-            for c in chunks
-        ]
+        metadata = [{"chunk_idx": c["index"], "text": c["text"]} for c in chunks]
         self.vector_store.replace_by_external_id(base_id, item_id, vectors, metadata)
         t3 = time.time()
-        logger.info(f"  向量写入完成 ({((t3-t2)*1000):.0f}ms)")
-        logger.info(f"知识项 {item_id} 索引完成: {len(chunks)} 个分块, 总耗时 {((t3-t0)*1000):.0f}ms")
+        logger.info(f"  向量写入完成 ({((t3 - t2) * 1000):.0f}ms)")
+        logger.info(f"知识项 {item_id} 索引完成: {len(chunks)} 个分块, 总耗时 {((t3 - t0) * 1000):.0f}ms")
         return len(chunks)
 
     async def search(
@@ -156,7 +160,9 @@ class KnowledgeRetriever:
     ) -> list[dict]:
         """检索 + 重排。"""
         results = await self.search(
-            base_id, query, top_k,
+            base_id,
+            query,
+            top_k,
             search_mode=search_mode,
             hybrid_alpha=hybrid_alpha,
         )
@@ -173,11 +179,13 @@ class KnowledgeRetriever:
         for r in reranked:
             idx = r["index"]
             if idx < len(results):
-                mapped.append({
-                    **results[idx],
-                    "score": r["relevance_score"],
-                    "rank": len(mapped) + 1,
-                })
+                mapped.append(
+                    {
+                        **results[idx],
+                        "score": r["relevance_score"],
+                        "rank": len(mapped) + 1,
+                    }
+                )
         return mapped
 
     @property
@@ -191,8 +199,8 @@ _retrievers: dict[int, KnowledgeRetriever] = {}
 
 def get_retriever(
     user_id: int,
-    embedder_config: Optional[dict] = None,
-    reranker_config: Optional[dict] = None,
+    embedder_config: dict | None = None,
+    reranker_config: dict | None = None,
 ) -> KnowledgeRetriever:
     """获取或创建用户的检索器实例。"""
     if user_id not in _retrievers or embedder_config is not None:

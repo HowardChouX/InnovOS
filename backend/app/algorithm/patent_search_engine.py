@@ -5,9 +5,10 @@
 1. 全局系统嵌入模型分配（model_resolver.resolve_embedding）
 2. 降级：从所有已配置的 embedding Key 中选第一个可用
 """
+
 import json
 import logging
-import numpy as np
+
 from app.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,7 @@ def _get_embedder_config():
     """获取嵌入模型配置（从全局设置 → 首模型降级）"""
     try:
         from app.algorithm.model_resolver import model_resolver
+
         s = model_resolver.get_assigned_settings()
         embed_model = s.get("embedding_model") or ""
         if embed_model and ":" in embed_model:
@@ -30,6 +32,7 @@ def _get_embedder_config():
 
         # 降级：选第一个可用 embedding key
         from app.algorithm.model_runtime import ModelRuntime
+
         cfg = ModelRuntime.resolve_first_embedding()
         if cfg:
             return {
@@ -44,9 +47,11 @@ def _get_embedder_config():
 
 PATENT_VECTOR_DIM = 4000  # halfvec HNSW 索引限制 4000 维
 
+
 def init_patent_vectors_table():
     """确保 patent_vectors 表存在"""
     from app.database import get_db
+
     db = get_db()
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS patent_vectors (
@@ -64,6 +69,7 @@ class PatentSearchEngine:
 
     def __init__(self):
         from app.algorithm.knowledge.embedder import Embedder
+
         cfg = _get_embedder_config()
         if cfg:
             self.embedder = Embedder(
@@ -82,7 +88,9 @@ class PatentSearchEngine:
         results = await self.embedder.embed([text])
         return results[0] if results else []
 
-    async def index_patent(self, patent_id: int, title: str, abstract: str, claims: str = "", description: str = "") -> bool:
+    async def index_patent(
+        self, patent_id: int, title: str, abstract: str, claims: str = "", description: str = ""
+    ) -> bool:
         """对单个专利生成向量并存储（title + abstract + claims + description）"""
         text = "。".join(filter(None, [title, abstract, claims, description])).strip()
         if not text.strip():
@@ -142,7 +150,9 @@ class PatentSearchEngine:
         q_json = json.dumps(q_vec)
 
         import psycopg2
+
         from app.database import DATABASE_URL
+
         conn = psycopg2.connect(DATABASE_URL)
         try:
             cur = conn.cursor()
@@ -154,10 +164,10 @@ class PatentSearchEngine:
                    WHERE pv.embedding IS NOT NULL
                    ORDER BY pv.embedding <=> %s::halfvec({PATENT_VECTOR_DIM})
                    LIMIT %s""",
-                (q_json, q_json, top_k)
+                (q_json, q_json, top_k),
             )
             columns = [desc[0] for desc in cur.description]
-            return [dict(zip(columns, row)) for row in cur.fetchall()]
+            return [dict(zip(columns, row, strict=False)) for row in cur.fetchall()]
         except Exception as e:
             logger.error(f"向量搜索失败: {e}")
             return []
@@ -214,3 +224,16 @@ class PatentSearchEngine:
             finally:
                 db2.close()
         return count
+
+
+# ── Module-level singleton ──────────────────────────────
+
+_patent_search_engine: "PatentSearchEngine | None" = None
+
+
+def get_patent_search_engine() -> PatentSearchEngine:
+    """获取 PatentSearchEngine 单例（避免每次请求重建 _get_embedder_config）"""
+    global _patent_search_engine
+    if _patent_search_engine is None:
+        _patent_search_engine = PatentSearchEngine()
+    return _patent_search_engine

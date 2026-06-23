@@ -5,8 +5,10 @@ Knowledge Lock Manager — 完全复现 CherryStudio KnowledgeLockManager
 - 每个知识库的互斥锁
 - 序列化同库变更
 """
+
 import asyncio
-from typing import Awaitable, Callable, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import TypeVar
 
 T = TypeVar("T")
 

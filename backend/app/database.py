@@ -11,16 +11,23 @@ Compatible with existing sqlite3-based code patterns:
   db.commit()
   db.close()
 """
-import os
-import re
+
 import logging
+import re
+from contextlib import contextmanager
 from typing import Any
+
+import psycopg2
+import psycopg2.extras
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = os.getenv("DATABASE_URL", "")
+DATABASE_URL = settings.DATABASE_URL or ""
 
 _QMARK = re.compile(r"\?")
+
 
 def is_postgres() -> bool:
     return True  # PostgreSQL only now
@@ -28,6 +35,7 @@ def is_postgres() -> bool:
 
 class _Row(dict):
     """Dict row that also supports integer indexing."""
+
     def __getitem__(self, key):
         if isinstance(key, (int,)):
             return list(self.values())[key]
@@ -71,9 +79,6 @@ class _Cursor:
         return self._cur.lastrowid
 
 
-import psycopg2
-import psycopg2.extras
-
 _pg_pool: Any = None
 
 
@@ -84,7 +89,6 @@ class _PostgresDatabase:
         self._conn = conn
 
     def execute(self, sql: str, params=None):
-        import psycopg2.extras
         if params is not None:
             sql = _QMARK.sub("%s", sql)
         cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -110,10 +114,10 @@ def _get_pg_db():
     global _pg_pool
     if _pg_pool is None:
         from psycopg2 import pool as _pool
+
         if not DATABASE_URL:
             raise RuntimeError(
-                "DATABASE_URL environment variable not set. "
-                "Example: postgresql://user:password@host:5432/innovos"
+                "DATABASE_URL environment variable not set. Example: postgresql://user:password@host:5432/innovos"
             )
         logger.info(f"Connecting to PostgreSQL: {DATABASE_URL[:30]}...")
         _pg_pool = _pool.ThreadedConnectionPool(1, 50, DATABASE_URL)
@@ -124,6 +128,41 @@ def _get_pg_db():
 def get_db():
     """Get a PostgreSQL database connection."""
     return _get_pg_db()
+
+
+@contextmanager
+def db_session():
+    """Get a DB connection with guaranteed return to pool.
+
+    Auto-commits on success, auto-rollbacks on exception, auto-closes on exit.
+    """
+    db = get_db()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def get_db_dep():
+    """FastAPI dependency yielding a DB connection."""
+    with db_session() as db:
+        yield db
+
+
+def pool_usage() -> dict:
+    """Return pool usage stats for health monitoring."""
+    global _pg_pool
+    if _pg_pool is None:
+        return {"status": "not_initialized"}
+    return {
+        "status": "ok",
+        "used": getattr(_pg_pool, "_used", 0),
+        "max": getattr(_pg_pool, "_maxconn", 50),
+    }
 
 
 def init_db():

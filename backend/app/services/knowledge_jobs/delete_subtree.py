@@ -6,19 +6,19 @@ Input: {baseId: str, rootItemIds: list[str]}
 Finds all subtree items, cancels active jobs touching those items, deletes
 vectors from the vector store, and deletes items from the database.
 """
+
 import json
 import logging
-from typing import Any, Optional
 
 from app.algorithm.knowledge.vector_store import VectorStore
 from app.database import get_db
+from app.services.knowledge_item_service import KnowledgeItemService
 from app.services.knowledge_job_manager import (
-    JobHandler,
-    JobSignal,
     JOB_PENDING,
     JOB_RUNNING,
+    JobHandler,
+    JobSignal,
 )
-from app.services.knowledge_item_service import KnowledgeItemService
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +41,7 @@ class DeleteSubtreeHandler(JobHandler):
         signal.throw_if_aborted()
 
         # Find all subtree items (they should already have "deleting" status set by the workflow)
-        subtree_items = KnowledgeItemService.get_subtree_items(
-            user_id, base_id, root_item_ids, include_roots=True
-        )
+        subtree_items = KnowledgeItemService.get_subtree_items(user_id, base_id, root_item_ids, include_roots=True)
         if not subtree_items:
             logger.info("No subtree items found for deletion (base=%s)", base_id)
             return
@@ -51,7 +49,9 @@ class DeleteSubtreeHandler(JobHandler):
         all_ids = [item["id"] for item in subtree_items]
         logger.info(
             "Deleting %d items (subtree roots=%s) from base %s",
-            len(all_ids), root_item_ids, base_id,
+            len(all_ids),
+            root_item_ids,
+            base_id,
         )
 
         # Cancel active jobs touching these items
@@ -68,9 +68,7 @@ class DeleteSubtreeHandler(JobHandler):
 
         logger.info("Deleted %d items (subtree) from base %s", len(all_ids), base_id)
 
-    def _cancel_jobs_for_item_ids(
-        self, base_id: str, item_ids: list[str], current_job_id: Optional[str] = None
-    ) -> None:
+    def _cancel_jobs_for_item_ids(self, base_id: str, item_ids: list[str], current_job_id: str | None = None) -> None:
         """Cancel pending/running jobs whose input_data references any of the given item IDs."""
         item_set = set(item_ids)
 
@@ -96,9 +94,9 @@ class DeleteSubtreeHandler(JobHandler):
                 job_item_id = inp.get("itemId", "")
                 job_item_ids = inp.get("rootItemIds", [])
 
-                if job_item_id in item_set:
-                    self.job_manager.cancel_job(jid, reason="item-deleted")
-                elif any(iid in item_set for iid in (job_item_ids if isinstance(job_item_ids, list) else [])):
+                if job_item_id in item_set or any(
+                    iid in item_set for iid in (job_item_ids if isinstance(job_item_ids, list) else [])
+                ):
                     self.job_manager.cancel_job(jid, reason="item-deleted")
         finally:
             db.close()
@@ -107,9 +105,7 @@ class DeleteSubtreeHandler(JobHandler):
 def _get_user_id_from_base(base_id: str) -> int:
     db = get_db()
     try:
-        row = db.execute(
-            "SELECT user_id FROM knowledge_bases WHERE id=?", (base_id,)
-        ).fetchone()
+        row = db.execute("SELECT user_id FROM knowledge_bases WHERE id=?", (base_id,)).fetchone()
         if not row:
             raise ValueError(f"Knowledge base not found: {base_id}")
         return row["user_id"]

@@ -7,10 +7,16 @@ AI客户端
 
 import asyncio
 import json
+import logging
 import random
 from typing import Any
+
+import httpx
 from openai import OpenAI
+
 from app.algorithm.key_manager import key_manager
+
+logger = logging.getLogger(__name__)
 
 
 def pick_model(api_model: str) -> str:
@@ -35,11 +41,12 @@ def _resolve_base_url(key_config: dict, provider_id: str = "") -> str:
     if provider_id:
         try:
             from app.algorithm.model_service import model_service
+
             provider = model_service.get(provider_id)
             if provider and provider.get("apiHost"):
                 return provider["apiHost"]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to resolve base URL from model service: {e}")
 
     return "https://api.deepseek.com"
 
@@ -116,9 +123,12 @@ async def _chat_with_model(
     for attempt in range(max_retries):
         try:
             from app.algorithm.model_runtime import ModelRuntime
+
+            http_client = httpx.Client(timeout=httpx.Timeout(30.0, connect=10.0))
             client = OpenAI(
                 api_key=resolved.api_key,
                 base_url=ModelRuntime.ensure_v1_url(resolved.api_host),
+                http_client=http_client,
             )
             messages = []
             if system_prompt:
@@ -130,19 +140,18 @@ async def _chat_with_model(
                 "messages": messages,
                 "temperature": temperature,
             }
-            if response_format == dict:
+            if response_format is dict:
                 kwargs["response_format"] = {"type": "json_object"}
 
             resp = client.chat.completions.create(**kwargs)
             content = resp.choices[0].message.content
 
-            if response_format == dict:
+            if response_format is dict:
                 return json.loads(content)
             return content
 
         except Exception as e:
             last_error = e
-            error_msg = str(e).lower()
             if attempt < max_retries - 1:
                 await asyncio.sleep(1)
                 continue
@@ -169,9 +178,11 @@ async def _chat_with_key_manager(
             key_config = await key_manager.get_key_for_request(provider_id)
             base_url = _resolve_base_url(key_config, provider_id)
 
+            http_client = httpx.Client(timeout=httpx.Timeout(30.0, connect=10.0))
             client = OpenAI(
                 api_key=key_config["api_key"],
                 base_url=base_url,
+                http_client=http_client,
             )
 
             messages = []
@@ -184,16 +195,13 @@ async def _chat_with_key_manager(
                 "messages": messages,
                 "temperature": temperature,
             }
-            if response_format == dict:
+            if response_format is dict:
                 kwargs["response_format"] = {"type": "json_object"}
 
             resp = client.chat.completions.create(**kwargs)
             content = resp.choices[0].message.content
 
-            if key_config["id"]:
-                key_manager.record_usage(key_config["id"])
-
-            if response_format == dict:
+            if response_format is dict:
                 return json.loads(content)
             return content
 
@@ -201,17 +209,13 @@ async def _chat_with_key_manager(
             last_error = e
             error_msg = str(e).lower()
 
-            if key_config and key_config.get("id"):
-                if "401" in error_msg or "403" in error_msg or "unauthorized" in error_msg or "invalid" in error_msg:
-                    key_manager.mark_key_failed(key_config["id"], "401")
+            # 环境变量模式：不再标记 Key 失败（无法禁用环境变量中的 Key）
+            # 遇到限流或鉴权错误，等待后重试
+            if "429" in error_msg or "rate" in error_msg or "too many" in error_msg:
+                await asyncio.sleep(2)
+                if attempt < max_retries - 1:
                     continue
-                elif "429" in error_msg or "rate" in error_msg or "too many" in error_msg:
-                    key_manager.mark_key_failed(key_config["id"], "429")
-                    await asyncio.sleep(1)
-                    continue
-                elif "insufficient_quota" in error_msg or "exceeded" in error_msg:
-                    key_manager.mark_key_failed(key_config["id"], "403")
-                    continue
+                raise
 
             if attempt < max_retries - 1:
                 await asyncio.sleep(1)

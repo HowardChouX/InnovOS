@@ -32,12 +32,10 @@ export const useAnalysisStore = create<AnalysisStore>((set) => ({
     set({ analyzing: true, loading: true });
     try {
       await analysisApi.triggerAnalysis(taskId, knowledgeBaseIds);
-      // 分析已启动，不设置 analysis，等待后台完成
-      // 完成后通过 fetchAnalysis 获取结果
       set({ analyzing: false, loading: false });
     } catch (e) {
-      console.error('[useAnalysisStore] triggerAnalysis failed:', e);
-      set({ analyzing: false, loading: false, error: e instanceof Error ? e.message : '触发分析失败' });
+      set({ analyzing: false, loading: false });
+      throw e; // 让调用方能捕获并展示错误
     }
   },
 }));

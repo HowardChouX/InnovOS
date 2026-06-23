@@ -1,6 +1,7 @@
 """
 进化趋势分析器 — S曲线和八大进化法则（从 RootSeek 迁移）
 """
+
 import logging
 from typing import Any
 
@@ -97,10 +98,14 @@ class EvolutionAnalyzer(AIAnalyzer):
             laws = laws[:8]
         while len(laws) < 8:
             idx = len(laws)
-            laws.append({
-                "name": DEFAULT_LAW_NAMES[idx] if idx < len(DEFAULT_LAW_NAMES) else f"法则{idx + 1}",
-                "score": 0.0, "description": "", "suggestion": "",
-            })
+            laws.append(
+                {
+                    "name": DEFAULT_LAW_NAMES[idx] if idx < len(DEFAULT_LAW_NAMES) else f"法则{idx + 1}",
+                    "score": 0.0,
+                    "description": "",
+                    "suggestion": "",
+                }
+            )
         for i, law in enumerate(laws):
             if not law.get("name"):
                 law["name"] = DEFAULT_LAW_NAMES[i] if i < len(DEFAULT_LAW_NAMES) else f"法则{i + 1}"

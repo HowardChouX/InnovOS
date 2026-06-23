@@ -30,20 +30,22 @@ export const useTaskStore = create<TaskStore>((set) => ({
     set({ loading: true });
     try {
       const res = await tasksApi.list({ pageSize: 50, ...params });
-      set({ tasks: res.data, total: res.total, page: res.page, totalPages: res.totalPages, loading: false });
+      set({
+        tasks: res.data,
+        total: res.total,
+        page: res.page,
+        totalPages: res.totalPages,
+        loading: false,
+      });
     } catch (e) {
       console.error('[useTaskStore] fetchTasks failed:', e);
       set({ loading: false, error: e instanceof Error ? e.message : '获取任务列表失败' });
     }
   },
   createTask: async (input) => {
-    try {
-      const task = await tasksApi.create(input);
-      set((s) => ({ tasks: [task, ...s.tasks], selectedTaskId: task.id }));
-      return task;
-    } catch (e) {
-      console.error('[useTaskStore] createTask failed:', e);
-    }
+    const task = await tasksApi.create(input);
+    set((s) => ({ tasks: [task, ...s.tasks], selectedTaskId: task.id }));
+    return task;
   },
   updateTask: async (id, input) => {
     try {

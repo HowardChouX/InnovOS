@@ -3,9 +3,9 @@
 
 流程：上传 → 解析 → 分块 → 嵌入 → 原子替换索引（replaceByExternalId）
 """
+
 import json
 import logging
-from typing import Any, Optional
 
 from app.algorithm.file_parser import parse_file
 from app.algorithm.model_runtime import ModelRuntime
@@ -24,8 +24,8 @@ class KnowledgePipeline:
     def __init__(self, user_id: int, base_id: str = "default"):
         self.user_id = user_id
         self.base_id = base_id
-        self._embedder_config: Optional[dict] = None
-        self._reranker_config: Optional[dict] = None
+        self._embedder_config: dict | None = None
+        self._reranker_config: dict | None = None
 
     def _load_model_configs(self):
         """从知识库配置中加载嵌入和重排模型配置。"""
@@ -35,6 +35,7 @@ class KnowledgePipeline:
         # 1. 知识库级模型配置
         if self.base_id and self.base_id != "default":
             from app.database import get_db
+
             db = get_db()
             row = db.execute(
                 "SELECT embedding_model_id, rerank_model_id FROM knowledge_bases WHERE id=? AND user_id=?",
@@ -129,6 +130,7 @@ class KnowledgePipeline:
         返回分块数。失败时异常冒泡 → job 重试 → 标记 failed（与 CherryStudio 一致）。
         """
         from app.algorithm.knowledge.retriever import get_retriever
+
         self._load_model_configs()
         retriever = get_retriever(
             self.user_id,
@@ -137,9 +139,14 @@ class KnowledgePipeline:
         )
         return await retriever.index_item(self.base_id, item_id, content)
 
-    async def search(self, query: str, top_k: Optional[int] = None, use_rerank: bool = True,
-                     search_mode: Optional[str] = None,
-                     hybrid_alpha: Optional[float] = None) -> list[dict]:
+    async def search(
+        self,
+        query: str,
+        top_k: int | None = None,
+        use_rerank: bool = True,
+        search_mode: str | None = None,
+        hybrid_alpha: float | None = None,
+    ) -> list[dict]:
         """RAG 检索（按 base_id 过滤，支持重排）。
 
         top_k/search_mode/hybrid_alpha 为 None 时从全局设置读取默认值。
@@ -147,6 +154,7 @@ class KnowledgePipeline:
         # 读取全局 RAG 默认值
         try:
             from app.database import get_db
+
             db = get_db()
             rows = db.execute(
                 "SELECT key, value FROM system_settings WHERE key IN (?, ?, ?, ?, ?)",
@@ -168,13 +176,14 @@ class KnowledgePipeline:
                     top_k = 10
             if not use_rerank:
                 use_rerank = bool(cfg.get("rag_rerank_model"))
-            threshold_val: Optional[float] = None
+            threshold_val: float | None = None
             try:
                 if cfg.get("threshold"):
                     threshold_val = float(cfg["threshold"])
-            except (ValueError, TypeError):
-                pass
-        except Exception:
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Failed to parse threshold value: {e}")
+        except Exception as e:
+            logger.warning(f"知识库管道异常: {e}")
             if search_mode is None:
                 search_mode = "hybrid"
             if hybrid_alpha is None:
@@ -184,6 +193,7 @@ class KnowledgePipeline:
 
         try:
             from app.algorithm.knowledge.retriever import get_retriever
+
             self._load_model_configs()
             retriever = get_retriever(
                 self.user_id,
@@ -192,13 +202,20 @@ class KnowledgePipeline:
             )
             if use_rerank and self._reranker_config:
                 results = await retriever.search_with_rerank(
-                    self.base_id, query, top_k * 2, rerank_top_k=top_k,
-                    search_mode=search_mode, hybrid_alpha=hybrid_alpha,
+                    self.base_id,
+                    query,
+                    top_k * 2,
+                    rerank_top_k=top_k,
+                    search_mode=search_mode,
+                    hybrid_alpha=hybrid_alpha,
                 )
             else:
                 results = await retriever.search(
-                    self.base_id, query, top_k,
-                    search_mode=search_mode, hybrid_alpha=hybrid_alpha,
+                    self.base_id,
+                    query,
+                    top_k,
+                    search_mode=search_mode,
+                    hybrid_alpha=hybrid_alpha,
                 )
             # 按阈值过滤
             if threshold_val and threshold_val > 0:
@@ -211,28 +228,35 @@ class KnowledgePipeline:
 
 # 获取指定供应商的嵌入模型 API 配置
 def get_embedding_api_config(provider_id: str = "") -> dict:
-    """从已配置的模型服务中获取嵌入模型 API 配置。"""
+    """从已配置的模型服务中获取嵌入模型 API 配置（密钥从环境变量读取）。"""
+    from app.algorithm.model_service import _get_provider_api_key
     from app.database import get_db
 
     db = get_db()
     if provider_id:
         row = db.execute(
-            "SELECT api_host, api_key_encrypted, api_model, models FROM model_providers WHERE provider_id=? AND is_enabled=1",
+            "SELECT api_host, api_model, models FROM model_providers WHERE provider_id=? AND is_enabled=1",
             (provider_id,),
         ).fetchone()
     else:
         row = db.execute(
-            "SELECT api_host, api_key_encrypted, api_model, models FROM model_providers WHERE is_enabled=1 AND api_key_encrypted IS NOT NULL LIMIT 1",
+            "SELECT api_host, api_model, models FROM model_providers WHERE is_enabled=1 LIMIT 1",
         ).fetchone()
     db.close()
 
     if not row:
         return {}
 
-    api_host = row["api_host"]
-    api_key = row["api_key_encrypted"] if row["api_key_encrypted"] else ""
+    pid = provider_id or row.get("provider_id", "")
+    api_key = _get_provider_api_key(pid)
+    if not api_key:
+        return {}
 
-    models_raw = row["models"] if isinstance(row["models"], list) else (json.loads(row["models"]) if row["models"] else [])
+    api_host = row["api_host"]
+
+    models_raw = (
+        row["models"] if isinstance(row["models"], list) else (json.loads(row["models"]) if row["models"] else [])
+    )
     embed_keywords = ["embedding", "embed", "bge", "e5-", "text-embedding"]
     embed_model = ""
     for m in models_raw:

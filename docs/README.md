@@ -19,12 +19,12 @@ make dev       # 启动开发环境（前端 :5173 + 后端 :8000）
 
 ## 技术栈
 
-| 层 | 技术 |
-|---|------|
-| 前端 | React 19 + TypeScript + Vite 8 + Zustand 5 + TailwindCSS 4 |
-| 后端 | FastAPI + SQLite（开发）/ PostgreSQL（生产） |
-| AI | ZR-MoA 多模型架构（DeepSeek-R1 / Qwen-Turbo / Qwen-Max / BGE-M3） |
-| 核心算法 | ZR-IPM 智融创新问题映射（准确率 87.4%） |
+| 层       | 技术                                                               |
+| -------- | ------------------------------------------------------------------ |
+| 前端     | React 19 + TypeScript + Vite 8 + Zustand 5 + TailwindCSS 4         |
+| 后端     | FastAPI + PostgreSQL (pgvector)                                    |
+| AI       | 多模型架构（DeepSeek / Qwen / 千问 / BGE-M3 等，2600+ 模型注册表） |
+| 核心算法 | ZR-IPM 智融创新问题映射（6-Agent 协同管线）                        |
 
 ## 许可证
 

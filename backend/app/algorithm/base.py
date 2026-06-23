@@ -6,6 +6,7 @@ AI 分析器基类 — 从 RootSeek 移植，适配 InnovOS 的 key_manager。
 - AIAnalyzer: 分析器基类，所有领域分析器的父类
 - JSON 解析工具函数
 """
+
 from __future__ import annotations
 
 import json
@@ -13,7 +14,7 @@ import logging
 import re
 from typing import Any
 
-from openai import OpenAI, APIError, APITimeoutError, APIConnectionError
+from openai import APIConnectionError, APIError, APITimeoutError, OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +23,8 @@ logger = logging.getLogger(__name__)
 # JSON 解析工具函数（从 RootSeek 移植）
 # ---------------------------------------------------------------------------
 
-_THINK_TAG_RE = re.compile(
-    r"<(think|thinking)>.*?</\1>", re.IGNORECASE | re.DOTALL
-)
-_THINK_BRACKET_RE = re.compile(
-    r"\[thinking\].*?\[/thinking\]", re.IGNORECASE | re.DOTALL
-)
+_THINK_TAG_RE = re.compile(r"<(think|thinking)>.*?</\1>", re.IGNORECASE | re.DOTALL)
+_THINK_BRACKET_RE = re.compile(r"\[thinking\].*?\[/thinking\]", re.IGNORECASE | re.DOTALL)
 
 
 def strip_think_tags(content: str) -> str:
@@ -110,7 +107,7 @@ def _scan_for_json(content: str, open_ch: str, close_ch: str) -> str | None:
                 elif ch == close_ch:
                     stack -= 1
                     if stack == 0:
-                        candidate = content[start: j + 1]
+                        candidate = content[start : j + 1]
                         if open_ch == "[" or '"' in candidate:
                             return candidate
                         break
@@ -147,9 +144,7 @@ def repair_json(json_str: str) -> str | None:
         if not in_string:
             if ch in "{[":
                 stack.append(ch)
-            elif ch == "}" and stack and stack[-1] == "{":
-                stack.pop()
-            elif ch == "]" and stack and stack[-1] == "[":
+            elif ch == "}" and stack and stack[-1] == "{" or ch == "]" and stack and stack[-1] == "[":
                 stack.pop()
 
     if in_string:
@@ -174,9 +169,7 @@ def repair_json(json_str: str) -> str | None:
         for ch in candidate:
             if ch in "{[":
                 sc.append(ch)
-            elif ch == "}" and sc and sc[-1] == "{":
-                sc.pop()
-            elif ch == "]" and sc and sc[-1] == "[":
+            elif ch == "}" and sc and sc[-1] == "{" or ch == "]" and sc and sc[-1] == "[":
                 sc.pop()
         while sc:
             ch = sc.pop()
@@ -217,6 +210,7 @@ def parse_ai_json(content: str) -> dict | str | None:
 # AIBase — AI 通信基类
 # ---------------------------------------------------------------------------
 
+
 class AIBase:
     """AI 通信基类 — 封装统一的 API 调用管道，适配 InnovOS key_manager。"""
 
@@ -238,6 +232,7 @@ class AIBase:
     def _init_client(self) -> None:
         try:
             from app.algorithm.model_runtime import ModelRuntime
+
             self.client = OpenAI(
                 api_key=self.api_key,
                 base_url=ModelRuntime.ensure_v1_url(self.base_url),
@@ -301,14 +296,18 @@ class AIBase:
 
                 # json_mode=True 但解析结果不是 dict → 重试
                 if json_mode and not isinstance(parsed, dict):
-                    logger.warning(f"[{logger_prefix}] 返回非 JSON 格式（{type(parsed).__name__}），重试 {attempt + 1}/{max_attempts}")
+                    logger.warning(
+                        f"[{logger_prefix}] 返回非 JSON 格式（{type(parsed).__name__}），重试 {attempt + 1}/{max_attempts}"
+                    )
                     # 重试时移除 response_format（部分模型不支持 json_object）
                     kwargs.pop("response_format", None)
                     json_mode = False
                     # 在用户提示词末尾追加 JSON 格式要求
                     for i, msg in enumerate(kwargs.get("messages", [])):
                         if msg["role"] == "user":
-                            kwargs["messages"][i]["content"] = str(msg["content"]) + "\n\n【重要】请只输出合法的JSON对象，不要包含其他文字。"
+                            kwargs["messages"][i]["content"] = (
+                                str(msg["content"]) + "\n\n【重要】请只输出合法的JSON对象，不要包含其他文字。"
+                            )
                     continue
 
                 return parsed
@@ -317,6 +316,7 @@ class AIBase:
                 if getattr(e, "status_code", None) == 429:
                     if attempt < max_attempts - 1:
                         import time
+
                         wait = (attempt + 1) * 2.0
                         logger.warning(f"[{logger_prefix}] 429 限流，{wait}s 后重试")
                         time.sleep(wait)
@@ -328,6 +328,7 @@ class AIBase:
             except (APITimeoutError, APIConnectionError):
                 if attempt < max_attempts - 1:
                     import time
+
                     time.sleep((attempt + 1) * 1.5)
                     continue
                 logger.error(f"[{logger_prefix}] 超时/连接失败")
@@ -350,9 +351,11 @@ class AIBase:
     ) -> str | dict | None:
         """异步调用 AI（通过 asyncio.to_thread 包装同步调用）。"""
         import asyncio
+
         return await asyncio.to_thread(
             self.call_ai,
-            system_prompt, user_prompt,
+            system_prompt,
+            user_prompt,
             temperature=temperature,
             max_tokens=max_tokens,
             logger_prefix=logger_prefix,
@@ -364,6 +367,7 @@ class AIBase:
 # ---------------------------------------------------------------------------
 # AIAnalyzer — 分析器基类
 # ---------------------------------------------------------------------------
+
 
 class AIAnalyzer:
     """AI 分析器基类 — 所有领域分析器的父类。"""
@@ -382,7 +386,8 @@ class AIAnalyzer:
         json_mode: bool = False,
     ) -> str | dict | None:
         return self.ai.call_ai(
-            system_prompt, user_prompt,
+            system_prompt,
+            user_prompt,
             temperature=temperature,
             max_tokens=max_tokens,
             logger_prefix=logger_prefix,
@@ -401,7 +406,8 @@ class AIAnalyzer:
         json_mode: bool = False,
     ) -> str | dict | None:
         return await self.ai.call_ai_async(
-            system_prompt, user_prompt,
+            system_prompt,
+            user_prompt,
             temperature=temperature,
             max_tokens=max_tokens,
             logger_prefix=logger_prefix,

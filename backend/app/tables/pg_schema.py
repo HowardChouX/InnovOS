@@ -3,6 +3,7 @@ Database schema — PostgreSQL only.
 Uses SERIAL PRIMARY KEY, to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
 and information_schema.columns for migration.
 """
+
 import json
 import logging
 
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════════
 #  DDL helpers
 # ═══════════════════════════════════════════════════════════════
+
 
 def _ddl_int_pk() -> str:
     """Primary key type: SERIAL PRIMARY KEY for PG."""
@@ -45,6 +47,7 @@ def _ensure_columns(db, table: str, columns: list[tuple[str, str]]):
 #  Per-table DDL
 # ═══════════════════════════════════════════════════════════════
 
+
 def init_users(db):
     pk = _ddl_int_pk()
     now = _ddl_now()
@@ -59,11 +62,32 @@ def init_users(db):
             created_at TEXT DEFAULT ({now})
         );
     """)
-    _ensure_columns(db, "users", [
-        ("role", "TEXT DEFAULT 'user'"),
-        ("email", "TEXT DEFAULT ''"),
-        ("is_active", "INTEGER DEFAULT 1"),
-    ])
+    _ensure_columns(
+        db,
+        "users",
+        [
+            ("role", "TEXT DEFAULT 'user'"),
+            ("email", "TEXT DEFAULT ''"),
+            ("is_active", "INTEGER DEFAULT 1"),
+        ],
+    )
+
+
+def seed_admin_user(db):
+    """注入一条 id=0 的管理员记录，确保 FK 约束（tasks.user_id→users.id）对 env 管理员可用。
+
+    仅在首次启动时执行一次，后续 on conflict 跳过。
+    """
+    from app.core.config import settings
+
+    username = settings.FIRST_SUPERUSER or "admin"
+    db.execute(
+        """INSERT INTO users (id, username, password_hash, role, email, is_active, created_at)
+           VALUES (0, ?, '', 'admin', '', 1, to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))
+           ON CONFLICT (id) DO NOTHING""",
+        (username,),
+    )
+    db.commit()
 
 
 def init_tasks(db):
@@ -205,22 +229,24 @@ def init_feedbacks(db):
     """)
 
 
-def init_audit_logs(db):
-    pk = _ddl_int_pk()
-    now = _ddl_now()
-    db.execute(f"""
-        CREATE TABLE IF NOT EXISTS audit_logs (
-            id {pk},
-            user_id INTEGER REFERENCES users(id),
+def init_audit_log(db):
+    """审计日志表 — 记录所有破坏性操作以便安全审查。"""
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id BIGSERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            username TEXT NOT NULL DEFAULT '',
             action TEXT NOT NULL,
-            resource_type TEXT NOT NULL,
-            resource_id INTEGER,
-            detail TEXT DEFAULT '{{}}',
-            ip_address TEXT DEFAULT '',
-            status TEXT DEFAULT 'success',
-            created_at TEXT DEFAULT ({now})
-        );
+            resource_type TEXT NOT NULL DEFAULT '',
+            resource_id TEXT NOT NULL DEFAULT '',
+            detail TEXT NOT NULL DEFAULT '{}',
+            ip_address TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
     """)
+    db.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at)")
 
 
 def init_api_keys(db):
@@ -244,9 +270,13 @@ def init_api_keys(db):
             created_at TEXT DEFAULT ({now})
         );
     """)
-    _ensure_columns(db, "api_keys", [
-        ("provider_id", "TEXT DEFAULT ''"),
-    ])
+    _ensure_columns(
+        db,
+        "api_keys",
+        [
+            ("provider_id", "TEXT DEFAULT ''"),
+        ],
+    )
 
 
 def init_notifications(db):
@@ -264,9 +294,13 @@ def init_notifications(db):
             created_at TEXT DEFAULT ({now})
         );
     """)
-    _ensure_columns(db, "notifications", [
-        ("is_recalled", "INTEGER DEFAULT 0"),
-    ])
+    _ensure_columns(
+        db,
+        "notifications",
+        [
+            ("is_recalled", "INTEGER DEFAULT 0"),
+        ],
+    )
 
 
 def init_knowledge_bases(db):
@@ -459,13 +493,13 @@ def init_models(db):
             metadata TEXT DEFAULT '{{}}'
         );
     """)
-    try:
+    import contextlib
+
+    with contextlib.suppress(Exception):
         db.execute("""
             CREATE UNIQUE INDEX IF NOT EXISTS idx_models_provider_model
             ON models(provider_id, model_id)
         """)
-    except Exception:
-        pass
     _migrate_models_from_json_column(db)
 
 
@@ -519,14 +553,18 @@ def init_model_providers(db):
             created_at TEXT DEFAULT ({now})
         );
     """)
-    _ensure_columns(db, "model_providers", [
-        ("api_model", "TEXT DEFAULT ''"),
-        ("max_rpm", "INTEGER DEFAULT 60"),
-        ("current_rpm", "INTEGER DEFAULT 0"),
-        ("request_count", "INTEGER DEFAULT 0"),
-        ("last_used_at", "TEXT"),
-        ("last_reset_at", "TEXT"),
-    ])
+    _ensure_columns(
+        db,
+        "model_providers",
+        [
+            ("api_model", "TEXT DEFAULT ''"),
+            ("max_rpm", "INTEGER DEFAULT 60"),
+            ("current_rpm", "INTEGER DEFAULT 0"),
+            ("request_count", "INTEGER DEFAULT 0"),
+            ("last_used_at", "TEXT"),
+            ("last_reset_at", "TEXT"),
+        ],
+    )
     # 迁移：删除废弃的 priority 列
     try:
         db.execute("ALTER TABLE model_providers DROP COLUMN IF EXISTS priority")
@@ -539,9 +577,13 @@ def init_model_providers(db):
 #  Unified entry point
 # ═══════════════════════════════════════════════════════════════
 
+
 def init_all_tables(db):
     """按依赖顺序初始化所有表。"""
     logger.info("Initializing PostgreSQL schema...")
+    # pgvector 扩展必须最先创建
+    db.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+    logger.info("pgvector extension ready")
     init_users(db)
     init_tasks(db)
     init_analyses(db)
@@ -551,7 +593,7 @@ def init_all_tables(db):
     init_patent_vectors(db)
     init_evaluations(db)
     init_feedbacks(db)
-    init_audit_logs(db)
+    init_audit_log(db)
     init_api_keys(db)
     init_notifications(db)
     init_knowledge_bases(db)
@@ -564,4 +606,59 @@ def init_all_tables(db):
     init_system_settings(db)
     init_model_providers(db)
     init_models(db)
-    logger.info("PostgreSQL schema initialization complete")
+
+    # ── Foreign Key constraints ──────────────────────────────────
+    logger.info("Adding foreign key constraints...")
+
+    for fk_name, fk_sql in [
+        (
+            "fk_kv_item",
+            """
+            ALTER TABLE knowledge_vectors
+            ADD CONSTRAINT fk_kv_item
+            FOREIGN KEY (item_id) REFERENCES knowledge_items(id) ON DELETE CASCADE
+        """,
+        ),
+        (
+            "fk_kv_base",
+            """
+            ALTER TABLE knowledge_vectors
+            ADD CONSTRAINT fk_kv_base
+            FOREIGN KEY (base_id) REFERENCES knowledge_bases(id) ON DELETE CASCADE
+        """,
+        ),
+    ]:
+        try:
+            db.execute("SAVEPOINT sp_fk")
+            db.execute(fk_sql)
+            db.execute("RELEASE SAVEPOINT sp_fk")
+            logger.info(f"FK {fk_name} added")
+        except Exception:
+            db.execute("ROLLBACK TO SAVEPOINT sp_fk")
+            logger.debug(f"FK {fk_name} already exists")
+
+    # ── Performance indexes ──────────────────────────────────────
+    logger.info("Creating performance indexes...")
+
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_api_keys_is_active ON api_keys(is_active)",
+        "CREATE INDEX IF NOT EXISTS idx_knowledge_vectors_item_id ON knowledge_vectors(item_id)",
+        "CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_analyses_task_id ON analyses(task_id)",
+        "CREATE INDEX IF NOT EXISTS idx_solutions_task_id ON solutions(task_id)",
+        "CREATE INDEX IF NOT EXISTS idx_knowledge_bases_user_id ON knowledge_bases(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_knowledge_items_base_id ON knowledge_items(base_id)",
+        "CREATE INDEX IF NOT EXISTS idx_knowledge_items_status ON knowledge_items(status)",
+    ]
+
+    for idx_sql in indexes:
+        try:
+            db.execute("SAVEPOINT sp_idx")
+            db.execute(idx_sql)
+            db.execute("RELEASE SAVEPOINT sp_idx")
+        except Exception as e:
+            db.execute("ROLLBACK TO SAVEPOINT sp_idx")
+            logger.warning(f"Index creation skipped: {e}")
+
+    logger.info("Schema migration complete")

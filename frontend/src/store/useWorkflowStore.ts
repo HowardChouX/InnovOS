@@ -47,13 +47,16 @@ const DEFAULT_PHASE_STATUS: Record<string, 'pending' | 'running' | 'completed' |
 };
 
 /** 从 workflow.steps 同步 phaseStatus */
-function syncPhaseStatus(steps: { agentId?: string; agent_id?: string; status: string }[]): Record<string, 'pending' | 'running' | 'completed' | 'failed'> {
+function syncPhaseStatus(
+  steps: { agentId?: string; agent_id?: string; status: string }[],
+): Record<string, 'pending' | 'running' | 'completed' | 'failed'> {
   const status = { ...DEFAULT_PHASE_STATUS };
   for (const step of steps) {
     const agentId = step.agentId || step.agent_id;
     const phase = AGENT_TO_PHASE[agentId || ''];
     if (phase) {
-      (status as any)[phase] = step.status;
+      (status as Record<string, 'pending' | 'running' | 'completed' | 'failed'>)[phase] =
+        step.status as 'pending' | 'running' | 'completed' | 'failed';
     }
   }
   return status;
@@ -61,7 +64,14 @@ function syncPhaseStatus(steps: { agentId?: string; agent_id?: string; status: s
 
 /** 确定当前阶段：找到第一个 running 或 pending 的阶段 */
 function determineCurrentPhase(phaseStatus: Record<string, string>): string {
-  const order = ['demand_portrait', 'problem_modeling', 'patent_search', 'solution_gen', 'evaluation', 'conversion'];
+  const order = [
+    'demand_portrait',
+    'problem_modeling',
+    'patent_search',
+    'solution_gen',
+    'evaluation',
+    'conversion',
+  ];
   for (const phase of order) {
     if (phaseStatus[phase] === 'running' || phaseStatus[phase] === 'pending') {
       return phase;
@@ -118,9 +128,26 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
     pollTimer = setInterval(poll, 3000);
   },
   stopPolling: () => {
-    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
     set({ polling: false, isRunning: false });
   },
-  clearWorkflow: () => set({ workflow: null, isRunning: false, phaseStatus: { ...DEFAULT_PHASE_STATUS }, currentPhase: 'demand_portrait' }),
-  reset: () => { get().stopPolling(); set({ workflow: null, isRunning: false, phaseStatus: { ...DEFAULT_PHASE_STATUS }, currentPhase: 'demand_portrait' }); },
+  clearWorkflow: () =>
+    set({
+      workflow: null,
+      isRunning: false,
+      phaseStatus: { ...DEFAULT_PHASE_STATUS },
+      currentPhase: 'demand_portrait',
+    }),
+  reset: () => {
+    get().stopPolling();
+    set({
+      workflow: null,
+      isRunning: false,
+      phaseStatus: { ...DEFAULT_PHASE_STATUS },
+      currentPhase: 'demand_portrait',
+    });
+  },
 }));

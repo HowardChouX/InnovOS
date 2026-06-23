@@ -44,12 +44,15 @@ export interface UpdateKnowledgeBaseInput {
 export interface CreateKnowledgeItemInput {
   type: 'file' | 'url' | 'note' | 'directory';
   groupId?: string | null;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
 }
 
 export const knowledgeApi = {
   // ─── 知识库 CRUD ─────────────────────────────────────
-  async listBases(page = 1, limit = 20): Promise<{ data: OffsetPaginationResponse<KnowledgeBaseListItem> }> {
+  async listBases(
+    page = 1,
+    limit = 20,
+  ): Promise<{ data: OffsetPaginationResponse<KnowledgeBaseListItem> }> {
     return apiRequest(`/api/knowledge-bases?page=${page}&limit=${limit}`);
   },
 
@@ -62,7 +65,10 @@ export const knowledgeApi = {
   },
 
   async updateBase(id: string, data: UpdateKnowledgeBaseInput): Promise<{ data: KnowledgeBase }> {
-    return apiRequest(`/api/knowledge-bases/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+    return apiRequest(`/api/knowledge-bases/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   },
 
   async deleteBase(id: string): Promise<void> {
@@ -70,7 +76,10 @@ export const knowledgeApi = {
   },
 
   // ─── 知识项 CRUD ─────────────────────────────────────
-  async listItems(baseId: string, params: { page?: number; limit?: number; type?: string; groupId?: string } = {}): Promise<{ data: OffsetPaginationResponse<KnowledgeItem> }> {
+  async listItems(
+    baseId: string,
+    params: { page?: number; limit?: number; type?: string; groupId?: string } = {},
+  ): Promise<{ data: OffsetPaginationResponse<KnowledgeItem> }> {
     const sp = new URLSearchParams();
     if (params.page) sp.set('page', String(params.page));
     if (params.limit) sp.set('limit', String(params.limit));
@@ -80,16 +89,28 @@ export const knowledgeApi = {
     return apiRequest(`/api/knowledge/bases/${baseId}/items${qs ? `?${qs}` : ''}`);
   },
 
-  async createItem(baseId: string, data: CreateKnowledgeItemInput): Promise<{ data: KnowledgeItem }> {
-    return apiRequest(`/api/knowledge/bases/${baseId}/items`, { method: 'POST', body: JSON.stringify(data) });
+  async createItem(
+    baseId: string,
+    data: CreateKnowledgeItemInput,
+  ): Promise<{ data: KnowledgeItem }> {
+    return apiRequest(`/api/knowledge/bases/${baseId}/items`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
   async getItem(itemId: string): Promise<{ data: KnowledgeItem }> {
     return apiRequest(`/api/knowledge/items/${itemId}`);
   },
 
-  async updateItem(itemId: string, data: { status?: string; error?: string; data?: Record<string, any> }): Promise<{ data: KnowledgeItem }> {
-    return apiRequest(`/api/knowledge/items/${itemId}`, { method: 'PATCH', body: JSON.stringify(data) });
+  async updateItem(
+    itemId: string,
+    data: { status?: string; error?: string; data?: Record<string, unknown> },
+  ): Promise<{ data: KnowledgeItem }> {
+    return apiRequest(`/api/knowledge/items/${itemId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   },
 
   async deleteItem(itemId: string): Promise<void> {
@@ -97,15 +118,14 @@ export const knowledgeApi = {
   },
 
   // ─── 文件上传 ────────────────────────────────────────
-  async uploadFile(file: File, baseId?: string): Promise<{ data: any }> {
+  async uploadFile(file: File, baseId?: string): Promise<{ data: unknown }> {
     const formData = new FormData();
     formData.append('file', file);
     if (baseId) formData.append('base_id', baseId);
-    const token = localStorage.getItem('token');
     const base = import.meta.env.VITE_API_URL ?? '';
     const res = await fetch(`${base}/api/knowledge/upload`, {
       method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'include',
       body: formData,
     });
     return res.json();
@@ -117,18 +137,21 @@ export const knowledgeApi = {
     for (const file of files) {
       formData.append('files', file);
     }
-    const token = localStorage.getItem('token');
     const base = import.meta.env.VITE_API_URL ?? '';
     const res = await fetch(`${base}/api/knowledge-bases/${baseId}/items/import-directory`, {
       method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'include',
       body: formData,
     });
     return res.json();
   },
 
   // ─── 搜索 ────────────────────────────────────────────
-  async search(params: { q: string; base_id?: string; limit?: number }): Promise<{ data: any[]; total: number }> {
+  async search(params: {
+    q: string;
+    base_id?: string;
+    limit?: number;
+  }): Promise<{ data: unknown[]; total: number }> {
     const sp = new URLSearchParams();
     sp.set('q', params.q);
     if (params.base_id) sp.set('base_id', params.base_id);
@@ -137,11 +160,27 @@ export const knowledgeApi = {
   },
 
   // ─── 模型列表 ──────────────────────────────────────
-  async listEmbeddingModels(): Promise<{ data: Array<{ id: string; providerId: string; providerName: string; modelId: string; label: string }> }> {
+  async listEmbeddingModels(): Promise<{
+    data: Array<{
+      id: string;
+      providerId: string;
+      providerName: string;
+      modelId: string;
+      label: string;
+    }>;
+  }> {
     return apiRequest('/api/models/embedding');
   },
 
-  async listRerankModels(): Promise<{ data: Array<{ id: string; providerId: string; providerName: string; modelId: string; label: string }> }> {
+  async listRerankModels(): Promise<{
+    data: Array<{
+      id: string;
+      providerId: string;
+      providerName: string;
+      modelId: string;
+      label: string;
+    }>;
+  }> {
     return apiRequest('/api/models/rerank');
   },
 
@@ -159,7 +198,24 @@ export const knowledgeApi = {
   },
 
   async updateGroup(id: string, data: { name: string }): Promise<{ data: KnowledgeGroup }> {
-    return apiRequest(`/api/knowledge/groups/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+    return apiRequest(`/api/knowledge/groups/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // ─── 分块 CRUD ──────────────────────────────────────
+  async listItemChunks(
+    baseId: string,
+    itemId: string,
+  ): Promise<{ data: Array<{ id: string; chunkIndex: number; text: string }> }> {
+    return apiRequest(`/api/knowledge/items/${itemId}/chunks?base_id=${baseId}`);
+  },
+
+  async deleteItemChunk(baseId: string, itemId: string, chunkId: string): Promise<void> {
+    await apiRequest(`/api/knowledge/items/${itemId}/chunks/${chunkId}?base_id=${baseId}`, {
+      method: 'DELETE',
+    });
   },
 
   async getItemTypeCounts(baseId: string): Promise<{ data: Record<string, number> }> {
@@ -170,19 +226,34 @@ export const knowledgeApi = {
     await apiRequest(`/api/knowledge-bases/${baseId}/items/${itemId}/reindex`, { method: 'POST' });
   },
 
-  async restoreBase(sourceBaseId: string, data: { name: string; embeddingModelId: string; dimensions?: number }): Promise<{ data: KnowledgeBase }> {
-    return apiRequest(`/api/knowledge-bases/${sourceBaseId}/restore`, { method: 'POST', body: JSON.stringify(data) });
+  async restoreBase(
+    sourceBaseId: string,
+    data: { name: string; embeddingModelId: string; dimensions?: number },
+  ): Promise<{ data: KnowledgeBase }> {
+    return apiRequest(`/api/knowledge-bases/${sourceBaseId}/restore`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
   // ─── 多知识库搜索 ────────────────────────────────────
-  async multiBaseSearch(params: { query: string; baseIds: string[]; topK?: number }): Promise<{ data: Array<{ text: string; score: number; source: string; baseId: string }> }> {
-    return apiRequest('/api/knowledge-bases/search', { method: 'POST', body: JSON.stringify(params) });
+  async multiBaseSearch(params: {
+    query: string;
+    baseIds: string[];
+    topK?: number;
+  }): Promise<{ data: Array<{ text: string; score: number; source: string; baseId: string }> }> {
+    return apiRequest('/api/knowledge-bases/search', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
   },
 };
 
 // 保留旧 API 兼容
 export const knowledgeApiLegacy = {
-  async listDocs(params: { base_id?: string; q?: string; page?: number; page_size?: number } = {}): Promise<{ data: any[]; total: number }> {
+  async listDocs(
+    params: { base_id?: string; q?: string; page?: number; page_size?: number } = {},
+  ): Promise<{ data: unknown[]; total: number }> {
     const sp = new URLSearchParams();
     if (params.base_id) sp.set('base_id', params.base_id);
     if (params.q) sp.set('q', params.q);
@@ -192,7 +263,14 @@ export const knowledgeApiLegacy = {
     return apiRequest(`/api/knowledge/docs${qs ? `?${qs}` : ''}`);
   },
 
-  async createDoc(data: { title: string; content: string; base_id?: string; category?: string; tags?: string[]; source?: string }): Promise<{ data: any }> {
+  async createDoc(data: {
+    title: string;
+    content: string;
+    base_id?: string;
+    category?: string;
+    tags?: string[];
+    source?: string;
+  }): Promise<{ data: unknown }> {
     return apiRequest('/api/knowledge/docs', { method: 'POST', body: JSON.stringify(data) });
   },
 

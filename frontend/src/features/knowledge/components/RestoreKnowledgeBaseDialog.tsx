@@ -7,7 +7,12 @@ interface RestoreKnowledgeBaseDialogProps {
   open: boolean;
   base: KnowledgeBase | null;
   isRestoring?: boolean;
-  onRestore: (input: { sourceBaseId: string; name: string; embeddingModelId: string; dimensions?: number }) => Promise<KnowledgeBase>;
+  onRestore: (input: {
+    sourceBaseId: string;
+    name: string;
+    embeddingModelId: string;
+    dimensions?: number;
+  }) => Promise<KnowledgeBase>;
   onOpenChange: (open: boolean) => void;
   onRestored: (base: KnowledgeBase) => void;
 }
@@ -30,7 +35,27 @@ const RestoreKnowledgeBaseDialog = ({
   onOpenChange,
   onRestored,
 }: RestoreKnowledgeBaseDialogProps) => {
-  const [name, setName] = useState('');
+  if (!open || !base) return null;
+
+  return (
+    <RestoreDialogForm
+      base={base}
+      isRestoring={isRestoring}
+      onRestore={onRestore}
+      onOpenChange={onOpenChange}
+      onRestored={onRestored}
+    />
+  );
+};
+
+function RestoreDialogForm({
+  base,
+  isRestoring,
+  onRestore,
+  onOpenChange,
+  onRestored,
+}: Omit<RestoreKnowledgeBaseDialogProps, 'open'> & { base: KnowledgeBase }) {
+  const [name, setName] = useState(`${base.name} (恢复)`);
   const [embeddingModelId, setEmbeddingModelId] = useState('');
   const [dimensions, setDimensions] = useState(String(DEFAULT_DIMENSIONS));
   const [embeddingModels, setEmbeddingModels] = useState<ModelOption[]>([]);
@@ -38,29 +63,19 @@ const RestoreKnowledgeBaseDialog = ({
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (open && base) {
-      const defaultName = `${base.name} (恢复)`;
-      setName(defaultName);
-      setEmbeddingModelId('');
-      setDimensions(String(DEFAULT_DIMENSIONS));
-      setError('');
-      loadModels();
-    }
-  }, [open, base?.id]);
-
-  const loadModels = async () => {
-    setLoadingModels(true);
-    try {
-      const res = await knowledgeApi.listEmbeddingModels();
-      setEmbeddingModels(res.data || []);
-    } catch {
-      setEmbeddingModels([]);
-    } finally {
-      setLoadingModels(false);
-    }
-  };
-
-  if (!open || !base) return null;
+    const loadModels = async () => {
+      setLoadingModels(true);
+      try {
+        const res = await knowledgeApi.listEmbeddingModels();
+        setEmbeddingModels(res.data || []);
+      } catch {
+        setEmbeddingModels([]);
+      } finally {
+        setLoadingModels(false);
+      }
+    };
+    loadModels();
+  }, []);
 
   const handleSubmit = async () => {
     const trimmedName = name.trim();
@@ -82,8 +97,8 @@ const RestoreKnowledgeBaseDialog = ({
       });
       onRestored(restored);
       onOpenChange(false);
-    } catch (e: any) {
-      setError(e?.message || '恢复失败');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '恢复失败');
     }
   };
 
@@ -94,7 +109,7 @@ const RestoreKnowledgeBaseDialog = ({
     >
       <div
         className="flex w-[480px] flex-col overflow-hidden rounded-xl border border-border bg-card"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border-light px-5 py-3.5">
@@ -130,7 +145,7 @@ const RestoreKnowledgeBaseDialog = ({
             <label className="mb-1.5 block text-xs font-medium text-foreground">名称</label>
             <input
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={(e) => setName(e.target.value)}
               placeholder="知识库名称"
               className="w-full rounded-md border border-border bg-background-muted px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
             />
@@ -141,12 +156,14 @@ const RestoreKnowledgeBaseDialog = ({
             <label className="mb-1.5 block text-xs font-medium text-foreground">嵌入模型</label>
             <select
               value={embeddingModelId}
-              onChange={e => setEmbeddingModelId(e.target.value)}
+              onChange={(e) => setEmbeddingModelId(e.target.value)}
               className="w-full rounded-md border border-border bg-background-muted px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
             >
               <option value="">{loadingModels ? '加载中...' : '请选择嵌入模型'}</option>
-              {embeddingModels.map(m => (
-                <option key={m.id} value={m.id}>{m.label}</option>
+              {embeddingModels.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
               ))}
             </select>
           </div>
@@ -156,17 +173,13 @@ const RestoreKnowledgeBaseDialog = ({
             <label className="mb-1.5 block text-xs font-medium text-foreground">嵌入维度</label>
             <input
               value={dimensions}
-              onChange={e => setDimensions(e.target.value)}
+              onChange={(e) => setDimensions(e.target.value)}
               placeholder="留空表示不设置"
               className="w-full rounded-md border border-border bg-background-muted px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
 
-          {error && (
-            <div className="rounded-md badge-danger px-3 py-2 text-xs">
-              {error}
-            </div>
-          )}
+          {error && <div className="rounded-md badge-danger px-3 py-2 text-xs">{error}</div>}
         </div>
 
         {/* Footer */}
@@ -187,8 +200,8 @@ const RestoreKnowledgeBaseDialog = ({
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
-};
+}
 
 export default RestoreKnowledgeBaseDialog;

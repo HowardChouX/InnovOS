@@ -1,8 +1,10 @@
 import os
-import time
 import platform
+import time
 from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends
+
 from app.auth import get_current_user, require_admin
 from app.database import get_db
 
@@ -32,20 +34,25 @@ def get_overview(user: dict = Depends(get_current_user)):
         avg_rating = db.execute("SELECT AVG(rating) FROM solutions WHERE rating > 0").fetchone()[0] or 0
     else:
         total_tasks = db.execute("SELECT COUNT(*) FROM tasks WHERE user_id=?", (user["id"],)).fetchone()[0]
-        completed = db.execute("SELECT COUNT(*) FROM tasks WHERE user_id=? AND status='completed'", (user["id"],)).fetchone()[0]
-        failed = db.execute("SELECT COUNT(*) FROM tasks WHERE user_id=? AND status='failed'", (user["id"],)).fetchone()[0]
+        completed = db.execute(
+            "SELECT COUNT(*) FROM tasks WHERE user_id=? AND status='completed'", (user["id"],)
+        ).fetchone()[0]
+        failed = db.execute("SELECT COUNT(*) FROM tasks WHERE user_id=? AND status='failed'", (user["id"],)).fetchone()[
+            0
+        ]
         total_analyses = db.execute(
-            "SELECT COUNT(*) FROM analyses a JOIN tasks t ON a.task_id=t.id WHERE t.user_id=?",
-            (user["id"],)
+            "SELECT COUNT(*) FROM analyses a JOIN tasks t ON a.task_id=t.id WHERE t.user_id=?", (user["id"],)
         ).fetchone()[0]
         total_solutions = db.execute(
-            "SELECT COUNT(*) FROM solutions s JOIN tasks t ON s.task_id=t.id WHERE t.user_id=?",
-            (user["id"],)
+            "SELECT COUNT(*) FROM solutions s JOIN tasks t ON s.task_id=t.id WHERE t.user_id=?", (user["id"],)
         ).fetchone()[0]
-        avg_rating = db.execute(
-            "SELECT AVG(s.rating) FROM solutions s JOIN tasks t ON s.task_id=t.id WHERE t.user_id=? AND s.rating > 0",
-            (user["id"],)
-        ).fetchone()[0] or 0
+        avg_rating = (
+            db.execute(
+                "SELECT AVG(s.rating) FROM solutions s JOIN tasks t ON s.task_id=t.id WHERE t.user_id=? AND s.rating > 0",
+                (user["id"],),
+            ).fetchone()[0]
+            or 0
+        )
 
     db.close()
 
@@ -72,23 +79,20 @@ def get_task_stats(user: dict = Depends(get_current_user)):
     cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
 
     if user["role"] == "admin":
-        by_status = db.execute(
-            "SELECT status, COUNT(*) as cnt FROM tasks GROUP BY status"
-        ).fetchall()
+        by_status = db.execute("SELECT status, COUNT(*) as cnt FROM tasks GROUP BY status").fetchall()
         recent = db.execute(
             "SELECT date(created_at) as d, COUNT(*) as cnt FROM tasks "
             "WHERE created_at >= ? GROUP BY date(created_at) ORDER BY d",
-            (cutoff,)
+            (cutoff,),
         ).fetchall()
     else:
         by_status = db.execute(
-            "SELECT status, COUNT(*) as cnt FROM tasks WHERE user_id=? GROUP BY status",
-            (user["id"],)
+            "SELECT status, COUNT(*) as cnt FROM tasks WHERE user_id=? GROUP BY status", (user["id"],)
         ).fetchall()
         recent = db.execute(
             "SELECT date(created_at) as d, COUNT(*) as cnt FROM tasks "
             "WHERE user_id=? AND created_at >= ? GROUP BY date(created_at) ORDER BY d",
-            (user["id"], cutoff)
+            (user["id"], cutoff),
         ).fetchall()
 
     db.close()
@@ -151,7 +155,8 @@ def get_system_status(user: dict = Depends(require_admin)):
     uptime_str = f"{days}d {hours}h {mins}m"
 
     # 数据库大小
-    from app.database import get_db, is_postgres, get_sqlite_path
+    from app.database import get_sqlite_path, is_postgres
+
     db = get_db()
     try:
         if is_postgres():
@@ -174,7 +179,7 @@ def get_system_status(user: dict = Depends(require_admin)):
     # 内存使用（Linux /proc/meminfo）
     memory_info = {"total": 0, "used": 0, "percent": 0}
     try:
-        with open("/proc/meminfo", "r") as f:
+        with open("/proc/meminfo") as f:
             mem = {}
             for line in f:
                 parts = line.split()
@@ -195,9 +200,10 @@ def get_system_status(user: dict = Depends(require_admin)):
     cpu_info = {"cores": 0, "usage": 0}
     try:
         import multiprocessing
+
         cpu_info["cores"] = multiprocessing.cpu_count()
         # 简易 CPU 使用率（读取 /proc/stat）
-        with open("/proc/stat", "r") as f:
+        with open("/proc/stat") as f:
             line = f.readline()
             parts = line.split()
             idle = int(parts[4])
@@ -214,7 +220,7 @@ def get_system_status(user: dict = Depends(require_admin)):
         total_tasks = db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
         completed_tasks = db.execute("SELECT COUNT(*) FROM tasks WHERE status='completed'").fetchone()[0]
         failed_tasks = db.execute("SELECT COUNT(*) FROM tasks WHERE status='failed'").fetchone()[0]
-        
+
         ai_stats = {
             "totalCalls": total_analyses + total_solutions,
             "successCalls": completed_tasks,

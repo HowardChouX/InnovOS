@@ -1,21 +1,21 @@
 import json
-import os
 import logging
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+import os
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel
+
+from app.algorithm.knowledge.pipeline import KnowledgePipeline, get_embedding_api_config
 from app.auth import get_current_user
 from app.database import get_db
-from app.utils import utc_iso
-from app.algorithm.knowledge.retriever import get_retriever
-from app.algorithm.knowledge.pipeline import KnowledgePipeline
-from app.services.knowledge_item_service import KnowledgeItemService
 from app.services.file_storage_service import file_storage
+from app.services.knowledge_item_service import KnowledgeItemService
 from app.services.knowledge_job_manager import (
     JOB_TYPE_INDEX_DOCUMENTS,
-    knowledge_queue_name,
     knowledge_idempotency_key,
+    knowledge_queue_name,
 )
-from pydantic import BaseModel
-from typing import Optional
+from app.utils import utc_iso
 
 logger = logging.getLogger(__name__)
 
@@ -29,37 +29,39 @@ router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 
 class CreateItemInput(BaseModel):
     type: str  # file, url, note, directory
-    groupId: Optional[str] = None
+    groupId: str | None = None
     data: dict
 
 
 class UpdateItemInput(BaseModel):
-    status: Optional[str] = None
-    error: Optional[str] = None
-    data: Optional[dict] = None
+    status: str | None = None
+    error: str | None = None
+    data: dict | None = None
 
 
 # ─── 文件上传 ──────────────────────────────────────────
 
+
 @router.post("/upload")
-async def upload_file(
-    file: UploadFile = File(...),
-    base_id: str = Form(""),
-    user: dict = Depends(get_current_user)
-):
+async def upload_file(file: UploadFile = File(...), base_id: str = Form(""), user: dict = Depends(get_current_user)):
     """上传文件 → 持久化存储 → 解析 → 存储为知识项"""
     content_bytes = await file.read()
     filename = file.filename or "untitled"
+    # 路径穿越防护：去除目录组件
+    filename = os.path.basename(filename)
 
     # 1. 持久化存储到 MinIO/S3（如果已配置）
-    s3_key = await file_storage.upload(user["id"], filename, content_bytes)
+    s3_key = await file_storage.upload(user["id"], filename, content_bytes, base_id=base_id)
 
-    # 2. 写入持久化目录用于解析
-    user_upload_dir = os.path.join(UPLOAD_DIR, str(user["id"]))
-    os.makedirs(user_upload_dir, exist_ok=True)
-    file_path = os.path.join(user_upload_dir, f"{base_id or 'default'}_{filename}")
-    with open(file_path, "wb") as f:
-        f.write(content_bytes)
+    # 2. 写入持久化目录用于解析（S3 不可用时回退到本地）
+    if s3_key:
+        file_path = s3_key
+    else:
+        user_upload_dir = os.path.join(UPLOAD_DIR, str(user["id"]))
+        os.makedirs(user_upload_dir, exist_ok=True)
+        file_path = os.path.join(user_upload_dir, f"{base_id or 'default'}_{filename}")
+        with open(file_path, "wb") as f:
+            f.write(content_bytes)
 
     # 3. 创建 knowledge_item 记录
     if not base_id:
@@ -73,12 +75,13 @@ async def upload_file(
         item_data["s3Key"] = s3_key
 
     item = KnowledgeItemService.create(
-        user["id"], base_id,
+        user["id"],
+        base_id,
         {
             "type": "file",
             "data": item_data,
             "status": "processing",
-        }
+        },
     )
 
     # 4. 异步索引（通过 job queue，与 URL/Note 统一）
@@ -97,6 +100,7 @@ async def upload_file(
 
 # ─── 知识项 CRUD ─────────────────────────────────────
 
+
 @router.get("/bases/{base_id}/items")
 def list_items(
     base_id: str,
@@ -107,8 +111,12 @@ def list_items(
     user: dict = Depends(get_current_user),
 ):
     result = KnowledgeItemService.list(
-        user["id"], base_id, page=page, limit=limit,
-        type=type or None, groupId=groupId or None,
+        user["id"],
+        base_id,
+        page=page,
+        limit=limit,
+        type=type or None,
+        groupId=groupId or None,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="知识库不存在")
@@ -141,9 +149,7 @@ def update_item(item_id: str, body: UpdateItemInput, user: dict = Depends(get_cu
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     # 简化实现：只支持 status/error 更新
     if "status" in data:
-        result = KnowledgeItemService.update_status(
-            user["id"], item_id, data["status"], data.get("error", "")
-        )
+        result = KnowledgeItemService.update_status(user["id"], item_id, data["status"], data.get("error", ""))
         if not result:
             raise HTTPException(status_code=404, detail="知识项不存在")
         return {"data": result, "message": "updated", "code": 200}
@@ -159,6 +165,7 @@ def delete_item(item_id: str, user: dict = Depends(get_current_user)):
 
 
 # ─── 搜索 ───────────────────────────────────────────
+
 
 @router.get("/search")
 async def search_knowledge(user: dict = Depends(get_current_user), q: str = "", base_id: str = "", limit: int = 10):
@@ -183,40 +190,60 @@ async def search_knowledge(user: dict = Depends(get_current_user), q: str = "", 
                 source = ""
                 if item:
                     item_data = json.loads(item["data"]) if isinstance(item["data"], str) else item["data"]
-                    source = (item_data.get("url") or item_data.get("source") or item_data.get("originalName") or "")
+                    source = item_data.get("url") or item_data.get("source") or item_data.get("originalName") or ""
 
-                mapped.append({
-                    "chunkId": r.get("id", ""),
-                    "pageContent": r.get("text", ""),
-                    "score": r.get("score", 0),
-                    "scoreKind": "relevance",
-                    "rank": i + 1,
-                    "metadata": {
-                        "source": source,
-                        "chunkIndex": r.get("chunk_index", 0),
-                        "tokenCount": len(r.get("text", "").split()),
-                    },
-                })
+                mapped.append(
+                    {
+                        "chunkId": r.get("id", ""),
+                        "pageContent": r.get("text", ""),
+                        "score": r.get("score", 0),
+                        "scoreKind": "relevance",
+                        "rank": i + 1,
+                        "metadata": {
+                            "source": source,
+                            "chunkIndex": r.get("chunk_index", 0),
+                            "tokenCount": len(r.get("text", "").split()),
+                        },
+                    }
+                )
             db.close()
             return {"data": mapped, "total": len(mapped), "message": "success", "code": 200}
 
     # LIKE 降级
-    rows = db.execute(
-        """SELECT id, title, content, category, tags, source, doc_type, updated_at FROM knowledge_docs
+    rows = (
+        db.execute(
+            """SELECT id, title, content, category, tags, source, doc_type, updated_at FROM knowledge_docs
            WHERE user_id=? AND is_active=1 AND (title LIKE ? OR content LIKE ?)
            ORDER BY updated_at DESC LIMIT ?""",
-        (user["id"], f"%{q}%", f"%{q}%", limit),
-    ).fetchall() if q else db.execute(
-        "SELECT id, title, content, category, tags, source, doc_type, updated_at FROM knowledge_docs WHERE user_id=? AND is_active=1 ORDER BY updated_at DESC LIMIT ?",
-        (user["id"], limit),
-    ).fetchall()
+            (user["id"], f"%{q}%", f"%{q}%", limit),
+        ).fetchall()
+        if q
+        else db.execute(
+            "SELECT id, title, content, category, tags, source, doc_type, updated_at FROM knowledge_docs WHERE user_id=? AND is_active=1 ORDER BY updated_at DESC LIMIT ?",
+            (user["id"], limit),
+        ).fetchall()
+    )
     db.close()
 
-    data = [{"id": str(r["id"]), "title": r["title"], "content": r["content"], "category": r["category"], "tags": json.loads(r["tags"]), "source": r["source"], "docType": r["doc_type"], "relevance": 0, "updatedAt": utc_iso(r["updated_at"])} for r in rows]
+    data = [
+        {
+            "id": str(r["id"]),
+            "title": r["title"],
+            "content": r["content"],
+            "category": r["category"],
+            "tags": json.loads(r["tags"]),
+            "source": r["source"],
+            "docType": r["doc_type"],
+            "relevance": 0,
+            "updatedAt": utc_iso(r["updated_at"]),
+        }
+        for r in rows
+    ]
     return {"data": data, "total": len(data), "message": "success", "code": 200}
 
 
 # ─── 文件下载 ─────────────────────────────────────────
+
 
 @router.get("/files/{item_id}/download")
 async def download_item_file(
@@ -251,7 +278,38 @@ async def download_item_file(
     )
 
 
+# ─── 分块 CRUD ──────────────────────────────────────
+
+
+@router.get("/items/{item_id}/chunks")
+async def list_item_chunks(
+    item_id: str,
+    base_id: str = "",
+    user: dict = Depends(get_current_user),
+):
+    """列出知识项的分块"""
+    from app.services.knowledge_orchestration_service import knowledge_orchestration_service
+
+    chunks = await knowledge_orchestration_service.list_item_chunks(user["id"], base_id, item_id)
+    return {"data": chunks, "message": "success", "code": 200}
+
+
+@router.delete("/items/{item_id}/chunks/{chunk_id}")
+async def delete_item_chunk(
+    item_id: str,
+    chunk_id: str,
+    base_id: str = "",
+    user: dict = Depends(get_current_user),
+):
+    """删除知识项分块"""
+    from app.services.knowledge_orchestration_service import knowledge_orchestration_service
+
+    await knowledge_orchestration_service.delete_item_chunk(user["id"], base_id, item_id, chunk_id)
+    return {"message": "deleted", "code": 200}
+
+
 # ─── 嵌入模型配置 ─────────────────────────────────────
+
 
 @router.get("/embed-config")
 def get_embed_config(user: dict = Depends(get_current_user)):
@@ -260,6 +318,7 @@ def get_embed_config(user: dict = Depends(get_current_user)):
 
 
 # ─── 类型计数 API ────────────────────────────────────
+
 
 @router.get("/bases/{base_id}/items/type-counts")
 def get_item_type_counts(base_id: str, user: dict = Depends(get_current_user)):
@@ -290,6 +349,7 @@ def get_item_type_counts(base_id: str, user: dict = Depends(get_current_user)):
 
 # ─── 分组 API ────────────────────────────────────────
 
+
 @router.get("/groups")
 def list_groups(user: dict = Depends(get_current_user)):
     db = get_db()
@@ -301,18 +361,22 @@ def list_groups(user: dict = Depends(get_current_user)):
     return {
         "data": [
             {
-                "id": r["id"], "name": r["name"],
-                "createdAt": utc_iso(r["created_at"]), "updatedAt": utc_iso(r["updated_at"]),
+                "id": r["id"],
+                "name": r["name"],
+                "createdAt": utc_iso(r["created_at"]),
+                "updatedAt": utc_iso(r["updated_at"]),
             }
             for r in rows
         ],
-        "message": "success", "code": 200,
+        "message": "success",
+        "code": 200,
     }
 
 
 @router.post("/groups")
 def create_group(body: dict, user: dict = Depends(get_current_user)):
     import uuid
+
     db = get_db()
     gid = str(uuid.uuid4())
     db.execute(
@@ -324,10 +388,13 @@ def create_group(body: dict, user: dict = Depends(get_current_user)):
     db.close()
     return {
         "data": {
-            "id": row["id"], "name": row["name"],
-            "createdAt": utc_iso(row["created_at"]), "updatedAt": utc_iso(row["updated_at"]),
+            "id": row["id"],
+            "name": row["name"],
+            "createdAt": utc_iso(row["created_at"]),
+            "updatedAt": utc_iso(row["updated_at"]),
         },
-        "message": "created", "code": 200,
+        "message": "created",
+        "code": 200,
     }
 
 
@@ -340,3 +407,38 @@ def delete_group(group_id: str, user: dict = Depends(get_current_user)):
     db.commit()
     db.close()
     return {"message": "deleted", "code": 200}
+
+
+@router.patch("/groups/{group_id}")
+def update_knowledge_group(group_id: str, body: dict, user: dict = Depends(get_current_user)):
+    """更新知识分组名称"""
+    name = body.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="分组名称不能为空")
+
+    db = get_db()
+    try:
+        cursor = db.execute(
+            "UPDATE knowledge_groups SET name=? WHERE id=? AND user_id=?",
+            (name, group_id, user["id"]),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="分组不存在")
+
+        db.commit()
+        row = db.execute(
+            "SELECT id, name, created_at, updated_at FROM knowledge_groups WHERE id=?",
+            (group_id,),
+        ).fetchone()
+        return {
+            "data": {
+                "id": row["id"],
+                "name": row["name"],
+                "createdAt": utc_iso(row["created_at"]),
+                "updatedAt": utc_iso(row["updated_at"]),
+            },
+            "message": "updated",
+            "code": 200,
+        }
+    finally:
+        db.close()

@@ -1,6 +1,7 @@
 """
 STC算子分析器 — 尺寸-时间-成本极限思维（从 RootSeek 迁移）
 """
+
 import logging
 from typing import Any
 

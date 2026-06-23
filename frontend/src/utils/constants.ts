@@ -2,7 +2,6 @@ export const ROUTES = {
   HOME: '/',
   PATENTS: '/patents',
   KNOWLEDGE: '/knowledge',
-  MONITOR: '/monitor',
   HISTORY: '/history',
   HISTORY_SOLUTIONS: '/history-solutions',
   WORKFLOW_DEMAND: '/workflow/demand',

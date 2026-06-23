@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+
 from .demand_portrait import router as demand_router
 from .problem_modeling import router as modeling_router
 

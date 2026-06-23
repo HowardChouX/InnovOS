@@ -1,5 +1,13 @@
 import { apiRequest } from './client';
 
+export interface UserStats {
+  totalTasks: number;
+  completedTasks: number;
+  failedTasks: number;
+  totalSolutions: number;
+  lastActive: string;
+}
+
 export interface User {
   id: number;
   username: string;
@@ -7,11 +15,13 @@ export interface User {
   role: string;
   isActive: boolean;
   createdAt: string;
+  stats?: UserStats;
 }
 
 export interface UpdateUserInput {
   is_active?: boolean;
   role?: string;
+  email?: string;
 }
 
 export const usersApi = {

@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
+
 from app.auth import get_current_user
-from app.data.triz_constants import PRINCIPLE_NAMES, PRINCIPLE_DETAILS
+from app.data.triz_constants import PRINCIPLE_DETAILS, PRINCIPLE_NAMES
 
 router = APIRouter(prefix="/api/principles", tags=["principles"])
 
@@ -11,13 +12,15 @@ def list_principles():
     principles = []
     for pid, name in PRINCIPLE_NAMES.items():
         detail = PRINCIPLE_DETAILS.get(pid, {})
-        principles.append({
-            "id": pid,
-            "name": name,
-            "definition": detail.get("definition", ""),
-            "category": detail.get("category", ""),
-            "examples": detail.get("examples", []),
-        })
+        principles.append(
+            {
+                "id": pid,
+                "name": name,
+                "definition": detail.get("definition", ""),
+                "category": detail.get("category", ""),
+                "examples": detail.get("examples", []),
+            }
+        )
     return {"data": principles, "message": "success"}
 
 
@@ -36,15 +39,19 @@ def recommend_by_task(task_id: int, user: dict = Depends(get_current_user)):
     from app.database import get_db
 
     db = get_db()
-    analysis = db.execute(
-        "SELECT principles FROM analyses WHERE task_id=?", (task_id,)
-    ).fetchone()
+    # 验证任务归属权
+    task = db.execute("SELECT id FROM tasks WHERE id=? AND user_id=?", (task_id, user["id"])).fetchone()
+    if not task:
+        db.close()
+        return {"data": [], "message": "任务不存在"}
+    analysis = db.execute("SELECT principles FROM analyses WHERE task_id=?", (task_id,)).fetchone()
     db.close()
 
     if not analysis:
         return {"data": [], "message": "暂无分析数据"}
 
     import json
+
     principle_names = json.loads(analysis["principles"])
 
     recommended = []

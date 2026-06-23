@@ -7,21 +7,21 @@ Polls the external processor for completion.
 When done, indexes the extracted content into vector store.
 On failure after max attempts, marks item as failed.
 """
+
 import json
 import logging
-from typing import Optional
 
 from app.algorithm.knowledge.pipeline import KnowledgePipeline
 from app.algorithm.knowledge.processors import file_processor_registry
 from app.database import get_db
+from app.services.knowledge_item_service import KnowledgeItemService
 from app.services.knowledge_job_manager import (
+    JOB_TYPE_CHECK_PROCESSING_RESULT,
     JobHandler,
     JobSignal,
-    JOB_TYPE_CHECK_PROCESSING_RESULT,
-    knowledge_queue_name,
     knowledge_idempotency_key,
+    knowledge_queue_name,
 )
-from app.services.knowledge_item_service import KnowledgeItemService
 
 logger = logging.getLogger(__name__)
 
@@ -107,14 +107,14 @@ class CheckProcessingResultHandler(JobHandler):
         user_id: int,
         item_id: str,
         status: str,
-        error: Optional[str] = None,
+        error: str | None = None,
     ) -> None:
         async def _update():
             KnowledgeItemService.update_status(user_id, item_id, status, error or "")
 
         await self.lock_manager.with_base_mutation_lock(base_id, _update)
 
-    async def on_settled(self, job_id: str, status: str, error: Optional[str]) -> None:
+    async def on_settled(self, job_id: str, status: str, error: str | None) -> None:
         if status != "failed":
             return
         _mark_item_failed(job_id, error)
@@ -123,9 +123,7 @@ class CheckProcessingResultHandler(JobHandler):
 def _get_user_id_from_base(base_id: str) -> int:
     db = get_db()
     try:
-        row = db.execute(
-            "SELECT user_id FROM knowledge_bases WHERE id=?", (base_id,)
-        ).fetchone()
+        row = db.execute("SELECT user_id FROM knowledge_bases WHERE id=?", (base_id,)).fetchone()
         if not row:
             raise ValueError(f"Knowledge base not found: {base_id}")
         return row["user_id"]
@@ -133,12 +131,10 @@ def _get_user_id_from_base(base_id: str) -> int:
         db.close()
 
 
-def _mark_item_failed(job_id: str, error: Optional[str]) -> None:
+def _mark_item_failed(job_id: str, error: str | None) -> None:
     db = get_db()
     try:
-        row = db.execute(
-            "SELECT input_data FROM knowledge_jobs WHERE id=?", (job_id,)
-        ).fetchone()
+        row = db.execute("SELECT input_data FROM knowledge_jobs WHERE id=?", (job_id,)).fetchone()
         if not row:
             return
         input_data = json.loads(row["input_data"])

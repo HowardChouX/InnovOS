@@ -2,7 +2,7 @@
 IFR（理想最终解）生成器 — 从 RootSeek 迁移
 两步管线：主生成 + 一致性验证
 """
-import json
+
 import logging
 from typing import Any
 
@@ -56,8 +56,10 @@ class IFRGenerator(AIAnalyzer):
 
         def _s(v):
             return v if isinstance(v, str) else ""
+
         def _d(v):
             return v if isinstance(v, dict) else {}
+
         def _l(v):
             return v if isinstance(v, list) else []
 

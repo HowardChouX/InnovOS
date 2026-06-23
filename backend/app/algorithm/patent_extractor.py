@@ -5,11 +5,9 @@
   1. AI 模型提取结构化字段（使用已配置的对话模型）
   2. 正则兜底（AI 不可用时）
 """
-import json
+
 import logging
 import re
-from typing import Optional
-
 
 EXTRACT_SYSTEM_PROMPT = """你是一个专利文档结构化提取器。从专利文本中提取以下字段，只输出JSON：
 
@@ -37,6 +35,7 @@ async def extract_patent_fields_ai(text: str) -> dict | None:
     """使用 extract_model 提取专利结构化字段"""
     try:
         from app.algorithm.model_resolver import model_resolver
+
         s = model_resolver.get_assigned_settings()
         extract_model_id = s.get("extract_model") or ""
 
@@ -70,6 +69,7 @@ async def extract_patent_fields_ai(text: str) -> dict | None:
         logger.warning(f"AI 提取失败: {e}")
     return None
 
+
 logger = logging.getLogger(__name__)
 
 # ── 通用正则（兼容全角/半角括号） ──
@@ -93,10 +93,15 @@ RE_PUB_DATE = re.compile(rf"{_RE_BRACKET}43[）)][^0-9]*?(\d{{4}}\.\d{{2}}\.\d{{
 RE_IPC = re.compile(r"(?:[A-Z]\d+\w*\s+\d+/\d+|\d+-\d+)")
 
 # 发明名称 — 从 (54) 到 (57)摘要 或下一个括号标记，匹配完整内容
-RE_TITLE = re.compile(rf"{_RE_BRACKET}54[）)](?:发明名称|实用新型名称|专利名称|使用外观设计的产品名称)?\s*([\s\S]+?)(?={_RE_BRACKET}5[78][）)]|\Z)", re.DOTALL)
+RE_TITLE = re.compile(
+    rf"{_RE_BRACKET}54[）)](?:发明名称|实用新型名称|专利名称|使用外观设计的产品名称)?\s*([\s\S]+?)(?={_RE_BRACKET}5[78][）)]|\Z)",
+    re.DOTALL,
+)
 
 # 摘要 — 从 (57)摘要 或 (57)外观设计简要说明
-RE_ABSTRACT = re.compile(rf"{_RE_BRACKET}57[）)](?:摘要|外观设计简要说明)\s*(.+?)(?=\n\s*CN[^书]|\n\s*[1．\.]\s|权利要求书|\Z)", re.DOTALL)
+RE_ABSTRACT = re.compile(
+    rf"{_RE_BRACKET}57[）)](?:摘要|外观设计简要说明)\s*(.+?)(?=\n\s*CN[^书]|\n\s*[1．\.]\s|权利要求书|\Z)", re.DOTALL
+)
 
 # 权利要求书 — 从 "1." 到 "技术领域" 或 "发明内容"
 RE_CLAIMS = re.compile(r"(?:^|\n)([1．\.]\s*.+?)(?=技术领域|发明内容|附图说明|\Z)", re.DOTALL)
@@ -107,7 +112,7 @@ RE_DESC = re.compile(r"(?:技术领域|发明内容)\s*(.+?)(?=附图说明|\Z)"
 
 def _clean_pdfminer_noise(text: str) -> str:
     """清理 pdfminer 提取的页码噪声。
-    
+
     pdfminer 会在每页之间插入孤立的数字/字母标记：
       A\\n0\\n4\\n0\\n8  → 移除
       权\\u3000利\\u3000要\\u3000求\\u3000书 → 合并
@@ -177,7 +182,7 @@ def extract_patent_fields(text: str) -> dict:
     }
 
     # 申请公布号: CN122158040A
-    m = re.search(rf"[（(]10[）)]\s*申请公布号\s*(CN[\s\dA-Z]+)", text)
+    m = re.search(r"[（(]10[）)]\s*申请公布号\s*(CN[\s\dA-Z]+)", text)
     if m:
         fields["publication_number"] = m.group(1).replace(" ", "")
     else:
@@ -301,40 +306,40 @@ def extract_deepseek_fields(text: str) -> dict:
       - 可能缺少 "权利要求书" 章节标记
       - (74) 代理编号被空行包裹
     """
-    fields = {k: v for k, v in _empty_fields().items()}
+    fields = dict(_empty_fields().items())
     text = _clean_deepseek_text(text)
 
     # (10) 申请公布号
-    m = re.search(rf"[（(]10[）)]\s*申请公布号\s*(CN[\s\dA-Z]+)", text)
+    m = re.search(r"[（(]10[）)]\s*申请公布号\s*(CN[\s\dA-Z]+)", text)
     if m:
         fields["publication_number"] = m.group(1).replace(" ", "")
 
     # (21) 申请号
-    m = re.search(rf"[（(]21[）)][^0-9]*?(\d{{12}}\.?\d*)", text)
+    m = re.search(r"[（(]21[）)][^0-9]*?(\d{12}\.?\d*)", text)
     if m:
         fields["patent_number"] = m.group(1).replace(" ", "")
 
     # (22) 申请日
-    m = re.search(rf"[（(]22[）)][^0-9]*?(\d{{4}}\.\d{{2}}\.\d{{2}})", text)
+    m = re.search(r"[（(]22[）)][^0-9]*?(\d{4}\.\d{2}\.\d{2})", text)
     if m:
         fields["filing_date"] = m.group(1)
 
     # (43) 公开日
-    m = re.search(rf"[（(]43[）)][^0-9]*?(\d{{4}}\.\d{{2}}\.\d{{2}})", text)
+    m = re.search(r"[（(]43[）)][^0-9]*?(\d{4}\.\d{2}\.\d{2})", text)
     if m:
         fields["publication_date"] = m.group(1)
 
     # (54) 发明名称 — 到 (57)摘要
-    m = re.search(rf"[（(]54[）)]发明名称\s*(.+?)(?=[（(]57[）)]摘要|\Z)", text, re.DOTALL)
+    m = re.search(r"[（(]54[）)]发明名称\s*(.+?)(?=[（(]57[）)]摘要|\Z)", text, re.DOTALL)
     if m:
         fields["title"] = _clean_text(m.group(1))
 
     # (57) 摘要 — 到下一个章节
-    m = re.search(rf"[（(]57[）)]摘要\s*(.+?)(?=\n技术领域|\n背景技术|权利要求书|\n\s*1[．\.]\s|\Z)", text, re.DOTALL)
+    m = re.search(r"[（(]57[）)]摘要\s*(.+?)(?=\n技术领域|\n背景技术|权利要求书|\n\s*1[．\.]\s|\Z)", text, re.DOTALL)
     if m:
         abstract = m.group(1)
         if len(abstract) > 500:
-            abstract = abstract[:abstract.find('。')+1] if '。' in abstract[:500] else abstract[:300]
+            abstract = abstract[: abstract.find("。") + 1] if "。" in abstract[:500] else abstract[:300]
         fields["abstract"] = _clean_text(abstract)
 
     # (51) 全部 IPC
@@ -347,7 +352,7 @@ def extract_deepseek_fields(text: str) -> dict:
             fields["ipc_codes"].append(clean)
 
     # (71) 申请人
-    m = re.search(rf"[（(]71[）)]\s*(.*?)(?=[（(]72[）)])", text, re.DOTALL)
+    m = re.search(r"[（(]71[）)]\s*(.*?)(?=[（(]72[）)])", text, re.DOTALL)
     if m:
         block = m.group(1)
         for name in re.findall(r"申请人\s*([^\d(]+?)(?:\s*(?=申请人|地址|\Z))", block):
@@ -361,7 +366,7 @@ def extract_deepseek_fields(text: str) -> dict:
                     fields["applicants"].append(line)
 
     # (72) 发明人
-    m = re.search(rf"[（(]72[）)]\s*(.*?)(?=[（(]74[）)]|[（(]51[）)]|\Z)", text, re.DOTALL)
+    m = re.search(r"[（(]72[）)]\s*(.*?)(?=[（(]74[）)]|[（(]51[）)]|\Z)", text, re.DOTALL)
     if m:
         raw = m.group(1).strip()
         raw = re.sub(r"^\s*发明人[\s\u3000:：]*", "", raw)
@@ -369,7 +374,7 @@ def extract_deepseek_fields(text: str) -> dict:
         fields["inventors"] = [i for i in inventors if i and len(i) > 1]
 
     # (74) 专利代理
-    m = re.search(rf"[（(]74[）)]\s*(.*?)(?=[（(]51[）)]|\Z)", text, re.DOTALL)
+    m = re.search(r"[（(]74[）)]\s*(.*?)(?=[（(]51[）)]|\Z)", text, re.DOTALL)
     if m:
         block = m.group(1)
         m_a = re.search(r"专利代理机构\s+(.+?)(?=\n+专利代理师|\Z)", block, re.DOTALL)
@@ -399,11 +404,19 @@ def extract_deepseek_fields(text: str) -> dict:
 
 def _empty_fields() -> dict:
     return {
-        "title": "", "patent_number": "", "filing_date": "",
-        "publication_date": "", "publication_number": "",
-        "ipc_codes": [], "applicants": [], "inventors": [],
-        "abstract": "", "claims": "",
-        "description": "", "patent_agency": "", "patent_agent": "",
+        "title": "",
+        "patent_number": "",
+        "filing_date": "",
+        "publication_date": "",
+        "publication_number": "",
+        "ipc_codes": [],
+        "applicants": [],
+        "inventors": [],
+        "abstract": "",
+        "claims": "",
+        "description": "",
+        "patent_agency": "",
+        "patent_agent": "",
         "_missing": [],
     }
 
@@ -466,8 +479,9 @@ def extract_with_ai_fallback(text: str, ai_call_fn=None) -> dict:
     if fields["_missing"] and ai_call_fn:
         try:
             import asyncio
+
             system_prompt = "你是一个专利文档解析专家。从以下专利文本中提取指定字段。只输出JSON。"
-            user_prompt = f"""从以下专利文本中提取缺失字段: {fields['_missing']}
+            user_prompt = f"""从以下专利文本中提取缺失字段: {fields["_missing"]}
 
 文本内容:
 {text[:8000]}

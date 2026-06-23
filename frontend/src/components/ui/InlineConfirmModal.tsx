@@ -1,3 +1,5 @@
+import { AlertCircle } from 'lucide-react';
+
 interface InlineConfirmModalProps {
   open: boolean;
   title: string;
@@ -8,6 +10,25 @@ interface InlineConfirmModalProps {
   onConfirm: () => void;
   onCancel: () => void;
 }
+
+const colorClasses = {
+  red: {
+    title: 'text-red-400',
+    btn: 'bg-red-500 hover:bg-red-600',
+  },
+  blue: {
+    title: 'text-blue-400',
+    btn: 'bg-blue-500 hover:bg-blue-600',
+  },
+  yellow: {
+    title: 'text-yellow-400',
+    btn: 'bg-yellow-500 hover:bg-yellow-600',
+  },
+  green: {
+    title: 'text-green-400',
+    btn: 'bg-green-500 hover:bg-green-600',
+  },
+} as const;
 
 export function InlineConfirmModal({
   open,
@@ -21,91 +42,32 @@ export function InlineConfirmModal({
 }: InlineConfirmModalProps) {
   if (!open) return null;
 
-  const colorMap = {
-    red: { bg: 'rgba(248,113,113,0.15)', border: 'rgba(248,113,113,0.3)', text: 'var(--accent-red)', btn: 'var(--accent-red)' },
-    blue: { bg: 'rgba(59,130,246,0.15)', border: 'rgba(59,130,246,0.3)', text: 'var(--accent-blue)', btn: 'var(--accent-blue)' },
-    yellow: { bg: 'rgba(251,191,36,0.15)', border: 'rgba(251,191,36,0.3)', text: 'var(--accent-yellow)', btn: 'var(--accent-yellow)' },
-    green: { bg: 'rgba(74,222,128,0.15)', border: 'rgba(74,222,128,0.3)', text: 'var(--accent-green)', btn: 'var(--accent-green)' },
-  };
-
-  const c = colorMap[confirmColor];
+  const c = colorClasses[confirmColor];
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.6)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 300,
-      }}
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60"
       onClick={onCancel}
     >
       <div
-        style={{
-          background: 'var(--bg-card)',
-          borderRadius: 12,
-          border: `1px solid ${c.border}`,
-          padding: 24,
-          width: 360,
-          maxWidth: '90vw',
-        }}
+        className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-6 w-[360px] max-w-[90vw] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          style={{
-            fontSize: 15,
-            fontWeight: 600,
-            color: c.text,
-            marginBottom: 12,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          <i className="fa-solid fa-circle-question" />
+        <div className={`flex items-center gap-2 mb-3 text-[15px] font-semibold ${c.title}`}>
+          <AlertCircle className="w-5 h-5" />
           {title}
         </div>
-        <div
-          style={{
-            fontSize: 13,
-            color: 'var(--text-secondary)',
-            lineHeight: 1.6,
-            marginBottom: 20,
-          }}
-        >
-          {message}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+        <div className="text-[13px] text-slate-400 leading-relaxed mb-5">{message}</div>
+        <div className="flex justify-end gap-2.5">
           <button
             onClick={onCancel}
-            style={{
-              padding: '6px 14px',
-              borderRadius: 6,
-              fontSize: 12,
-              background: 'rgba(100,116,139,0.1)',
-              border: '1px solid var(--border-light)',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
+            className="px-3.5 py-1.5 rounded-md text-xs bg-slate-500/10 border border-[var(--border-light)] text-slate-400 hover:bg-slate-500/15 transition-colors cursor-pointer font-[inherit]"
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
-            style={{
-              padding: '6px 14px',
-              borderRadius: 6,
-              fontSize: 12,
-              background: c.btn,
-              border: 'none',
-              color: '#fff',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
+            className={`px-3.5 py-1.5 rounded-md text-xs border-none text-white transition-colors cursor-pointer font-[inherit] ${c.btn}`}
           >
             {confirmText}
           </button>

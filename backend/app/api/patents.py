@@ -1,18 +1,26 @@
 import json
-from fastapi import APIRouter, Depends, Query
-from app.database import get_db, is_postgres
-from app.auth import get_current_user
-from typing import Optional
+import logging
+
+from fastapi import APIRouter, Query
+
+from app.database import get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/patents", tags=["patents"])
 
 
 def row_to_patent(r, relevance=None):
     return {
-        "id": str(r["id"]), "title": r["title"], "abstract": r["abstract"],
-        "applicants": json.loads(r["applicants"]), "inventors": json.loads(r["inventors"]),
-        "filingDate": r["filing_date"], "publicationDate": r["publication_date"],
-        "patentNumber": r["patent_number"], "ipcCodes": json.loads(r["ipc_codes"]),
+        "id": str(r["id"]),
+        "title": r["title"],
+        "abstract": r["abstract"],
+        "applicants": json.loads(r["applicants"]),
+        "inventors": json.loads(r["inventors"]),
+        "filingDate": r["filing_date"],
+        "publicationDate": r["publication_date"],
+        "patentNumber": r["patent_number"],
+        "ipcCodes": json.loads(r["ipc_codes"]),
         "relevanceScore": round(relevance * 100) if relevance is not None else r["relevance_score"],
     }
 
@@ -20,8 +28,8 @@ def row_to_patent(r, relevance=None):
 async def _hybrid_search(query: str, all_rows: list) -> dict:
     """混合搜索：合并关键词结果和向量结果，去重后用 Reranker 精排，归一化到 0~1"""
     try:
-        from app.algorithm.model_resolver import model_resolver
         from app.algorithm.knowledge.reranker import Reranker
+        from app.algorithm.model_resolver import model_resolver
 
         cfg = model_resolver.resolve_rerank()
         if not cfg:
@@ -46,8 +54,7 @@ async def _hybrid_search(query: str, all_rows: list) -> dict:
             score_map[patent_id] = item["relevance_score"]
         return score_map
     except Exception as e:
-        print(f"[WARN] 混合搜索失败: {e}", flush=True)
-        import traceback; traceback.print_exc()
+        logger.warning(f"混合搜索失败: {e}")
         return {}
 
 
@@ -92,9 +99,12 @@ async def search_patents(
         db.close()
         return {
             "data": [row_to_patent(r) for r in rows],
-            "total": total, "page": page, "page_size": page_size,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
             "total_pages": (total + page_size - 1) // page_size,
-            "message": "success", "code": 200,
+            "message": "success",
+            "code": 200,
         }
 
     # === 混合搜索 ===
@@ -109,19 +119,23 @@ async def search_patents(
     # 2. 向量语义召回（top-20，扩展候选集）
     vector_rows_map = {}
     try:
-        from app.algorithm.patent_search_engine import PatentSearchEngine
-        engine = PatentSearchEngine()
+        from app.algorithm.patent_search_engine import get_patent_search_engine
+
+        engine = get_patent_search_engine()
         if engine.embedder:
             vec_results = await engine.search(q, top_k=20)
-            for vr in vec_results:
-                pid = vr.get("id")
-                if pid and pid not in keyword_ids:
-                    # 从 DB 补全完整信息
-                    full = db.execute("SELECT * FROM patents WHERE id=?", (pid,)).fetchone()
-                    if full:
-                        vector_rows_map[pid] = full
+            if vec_results:
+                vec_ids = [vr["id"] for vr in vec_results if vr.get("id") and vr["id"] not in keyword_ids]
+                if vec_ids:
+                    placeholders = ",".join("?" for _ in vec_ids)
+                    full_rows = db.execute(
+                        f"SELECT * FROM patents WHERE id IN ({placeholders})",
+                        vec_ids,
+                    ).fetchall()
+                    for r in full_rows:
+                        vector_rows_map[r["id"]] = r
     except Exception as e:
-        print(f"[WARN] 向量召回失败: {e}", flush=True)
+        logger.warning(f"向量召回失败: {e}")
 
     db.close()
 
@@ -135,13 +149,16 @@ async def search_patents(
     top_results = scored[:5]
     total = len(scored)
     start = (page - 1) * page_size
-    page_rows = top_results[start:start + page_size]
+    page_rows = top_results[start : start + page_size]
 
     return {
         "data": [row_to_patent(r, score) for r, score in page_rows],
-        "total": len(top_results), "page": page, "page_size": page_size,
+        "total": len(top_results),
+        "page": page,
+        "page_size": page_size,
         "total_pages": 1,
-        "message": "success", "code": 200,
+        "message": "success",
+        "code": 200,
     }
 
 
@@ -171,5 +188,6 @@ def get_patent_detail(patent_id: int):
     db.close()
     if not row:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="专利不存在")
     return {"data": row_to_patent(row), "message": "success", "code": 200}

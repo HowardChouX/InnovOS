@@ -14,17 +14,19 @@ HTML → Markdown 转换管线 — 移植自 MarkDownload 项目的 Readability.
 - 表格和代码块保留优化
 - 中文内容优化（无自动换行、保留全角字符）
 """
+
 import logging
 import re
-from typing import Optional
 from urllib.parse import urljoin, urlparse
 
-from lxml import etree, html as lxml_html
+from lxml import etree
+from lxml import html as lxml_html
 
 logger = logging.getLogger(__name__)
 
 
 # ── URL 验证（移植自 MarkDownload background.js validateUri）───────────────
+
 
 def validate_uri(href: str, base_uri: str) -> str:
     """验证并绝对化 URL 引用。
@@ -47,6 +49,7 @@ def validate_uri(href: str, base_uri: str) -> str:
 
 
 # ── DOM 预处理（移植自 MarkDownload getArticleFromDom）─────────────────────
+
 
 def preprocess_dom(html: str, base_url: str = "") -> str:
     """对原始 HTML 执行 MarkDownload 风格的 DOM 预处理。
@@ -82,7 +85,6 @@ def preprocess_dom(html: str, base_url: str = "") -> str:
     # 实际上 lxml 不需要 outerHTML 技巧，直接清理 class 即可
 
     # 2. 移除 <html> 的 class 属性
-    html_el = root.tag if hasattr(root, "tag") else None
     if root.tag == "html" and "class" in root.attrib:
         root.attrib.pop("class", None)
 
@@ -126,6 +128,7 @@ def preprocess_dom(html: str, base_url: str = "") -> str:
         new_el.text = tex
         # 生成随机 id 存储公式信息
         import uuid
+
         math_id = f"math-{uuid.uuid4().hex[:12]}"
         new_el.set("id", math_id)
         # 移除原节点
@@ -136,6 +139,7 @@ def preprocess_dom(html: str, base_url: str = "") -> str:
         annotation = el.find(".//annotation")
         if annotation is not None and annotation.text:
             import uuid
+
             math_id = f"math-{uuid.uuid4().hex[:12]}"
             el.set("id", math_id)
 
@@ -149,6 +153,7 @@ def preprocess_dom(html: str, base_url: str = "") -> str:
 
 
 # ── Readability + html2text 管线 ──────────────────────────────────────────
+
 
 def convert_to_markdown(html: str, base_url: str = "") -> str:
     """Readability 提取正文 → html2text 转 Markdown。
@@ -171,8 +176,8 @@ def convert_to_markdown(html: str, base_url: str = "") -> str:
         return html or ""
 
     try:
-        from readability import Document
         import html2text
+        from readability import Document
     except ImportError as e:
         logger.warning("缺少依赖: %s — 请安装 readability-lxml 和 html2text", e)
         return _fallback_extract_text(html)
@@ -196,19 +201,19 @@ def convert_to_markdown(html: str, base_url: str = "") -> str:
     # ── Step 3: html2text 转 Markdown ──
     try:
         h = html2text.HTML2Text()
-        h.body_width = 0               # 不自动换行（对中文友好）
-        h.ignore_links = False         # 保留链接
-        h.ignore_images = False        # 保留图片
-        h.protect_links = True         # 保护链接中的 Markdown 语法
-        h.bypass_tables = False        # 保留表格
-        h.mark_code = True             # 代码块围栏
-        h.ignore_emphasis = False      # 保留斜体/粗体
-        h.ignore_anchors = False       # 保留锚点
+        h.body_width = 0  # 不自动换行（对中文友好）
+        h.ignore_links = False  # 保留链接
+        h.ignore_images = False  # 保留图片
+        h.protect_links = True  # 保护链接中的 Markdown 语法
+        h.bypass_tables = False  # 保留表格
+        h.mark_code = True  # 代码块围栏
+        h.ignore_emphasis = False  # 保留斜体/粗体
+        h.ignore_anchors = False  # 保留锚点
 
         # MarkDownload 风格配置
-        h.wrap_links = False           # 不要打断链接
+        h.wrap_links = False  # 不要打断链接
         h.skip_internal_links = False  # 保留内部锚点
-        h.reference_links = False      # 使用内联链接而非引用
+        h.reference_links = False  # 使用内联链接而非引用
         h.use_automatic_links = False  # 不要自动检测 URL
         h.google_doc = False
 
@@ -260,6 +265,7 @@ def _fallback_extract_text(html: str) -> str:
 
 
 # ── 完整管线（预处理 + 转换）────────────────────────────────────────────────
+
 
 def url_to_markdown(html: str, base_url: str = "") -> str:
     """完整的 HTML → Markdown 转换管线。

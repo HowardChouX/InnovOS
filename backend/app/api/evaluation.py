@@ -1,5 +1,7 @@
 import json
+
 from fastapi import APIRouter, Depends, HTTPException
+
 from app.auth import get_current_user
 from app.database import get_db
 
@@ -35,7 +37,8 @@ def _row_to_dict(r):
 
 
 @router.post("/{solution_id}")
-def evaluate_solution(solution_id: int, user: dict = Depends(get_current_user)):
+async def evaluate_solution(solution_id: int, user: dict = Depends(get_current_user)):
+    """对方案进行 AI 四维评估"""
     db = get_db()
     sol = db.execute(
         "SELECT id FROM solutions WHERE id=? AND user_id=?",
@@ -43,20 +46,44 @@ def evaluate_solution(solution_id: int, user: dict = Depends(get_current_user)):
     ).fetchone()
     if not sol:
         db.close()
-        raise HTTPException(status_code=404, detail="Solution not found")
+        raise HTTPException(status_code=404, detail="方案不存在")
 
+    # Check for existing evaluation
     existing = db.execute(
-        "SELECT * FROM evaluations WHERE solution_id=? AND user_id=?",
+        "SELECT * FROM evaluations WHERE solution_id=? AND user_id=? ORDER BY created_at DESC LIMIT 1",
         (solution_id, user["id"]),
     ).fetchone()
-    if existing:
-        db.close()
-        return {
-            "data": _row_to_dict(existing),
-            "message": "success", "code": 200,
-        }
 
-    raise HTTPException(status_code=400, detail="AI evaluation not available. Configure DEEPSEEK_API_KEY.")
+    db.close()
+
+    if existing:
+        return {"data": _row_to_dict(existing), "message": "success", "code": 200}
+
+    # Run AI evaluation
+    try:
+        from app.algorithm.evaluation_service import evaluate_solution as ai_evaluate
+
+        result = await ai_evaluate(solution_id, user["id"])
+        return {
+            "data": {
+                "solution_title": str(sol["id"]),
+                "evaluation": {
+                    "scores": result["scores"],
+                    "overall": result["overall"],
+                    "strengths": result["strengths"],
+                    "weaknesses": result["weaknesses"],
+                    "recommendations": result["recommendations"],
+                },
+            },
+            "message": "success",
+            "code": 200,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger = __import__("logging").getLogger(__name__)
+        logger.error(f"AI evaluation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"评估失败: {str(e)}") from e
 
 
 @router.get("/{solution_id}/history")
@@ -69,7 +96,8 @@ def get_evaluation_history(solution_id: int, user: dict = Depends(get_current_us
     db.close()
     return {
         "data": [_row_to_dict(r) for r in rows],
-        "message": "success", "code": 200,
+        "message": "success",
+        "code": 200,
     }
 
 
@@ -78,17 +106,18 @@ def get_latest_evaluation(solution_id: int, user: dict = Depends(get_current_use
     """获取最新评估结果（智枢完整维度）"""
     db = get_db()
     row = db.execute(
-        """SELECT * FROM evaluations 
-           WHERE solution_id=? AND user_id=? 
+        """SELECT * FROM evaluations
+           WHERE solution_id=? AND user_id=?
            ORDER BY created_at DESC LIMIT 1""",
         (solution_id, user["id"]),
     ).fetchone()
     db.close()
-    
+
     if not row:
         raise HTTPException(status_code=404, detail="No evaluation found")
-    
+
     return {
         "data": _row_to_dict(row),
-        "message": "success", "code": 200,
+        "message": "success",
+        "code": 200,
     }

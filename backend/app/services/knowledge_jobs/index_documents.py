@@ -7,22 +7,22 @@ For files: uses file processor (sync local or async external with polling).
 For notes: extracts text from data.content/text, indexes via pipeline.index_item().
 For urls: fetches URL content via httpx, indexes via pipeline.index_item().
 """
+
 import json
 import logging
 import os
-from typing import Optional
 
 from app.algorithm.knowledge.pipeline import KnowledgePipeline
 from app.algorithm.knowledge.processors import file_processor_registry
 from app.database import get_db
+from app.services.knowledge_item_service import KnowledgeItemService
 from app.services.knowledge_job_manager import (
+    JOB_TYPE_CHECK_PROCESSING_RESULT,
     JobHandler,
     JobSignal,
-    JOB_TYPE_CHECK_PROCESSING_RESULT,
     knowledge_idempotency_key,
     knowledge_queue_name,
 )
-from app.services.knowledge_item_service import KnowledgeItemService
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,13 @@ class IndexDocumentsHandler(JobHandler):
                 # Enqueue polling job
                 await self.job_manager.enqueue(
                     JOB_TYPE_CHECK_PROCESSING_RESULT,
-                    {"baseId": base_id, "itemId": item_id, "taskId": task_id, "processorId": processor_id, "attempt": 0},
+                    {
+                        "baseId": base_id,
+                        "itemId": item_id,
+                        "taskId": task_id,
+                        "processorId": processor_id,
+                        "attempt": 0,
+                    },
                     queue=knowledge_queue_name(base_id),
                     idempotency_key=knowledge_idempotency_key("check-processing", base_id, item_id),
                 )
@@ -169,8 +175,8 @@ class IndexDocumentsHandler(JobHandler):
                 return
 
             # ── MarkDownload 融合管线：智能抓取 + 增强转换 ──
-            from app.algorithm.knowledge.url_fetcher import fetch_url
             from app.algorithm.knowledge.html_to_markdown import url_to_markdown
+            from app.algorithm.knowledge.url_fetcher import fetch_url
 
             try:
                 # Step 1: 智能抓取（httpx → Playwright → Node.js 三层降级）
@@ -183,7 +189,9 @@ class IndexDocumentsHandler(JobHandler):
 
                 logger.info(
                     "URL 抓取成功 [%s]: %s (%d bytes)",
-                    fetch_result.get("fetcher", "?"), final_url, len(raw),
+                    fetch_result.get("fetcher", "?"),
+                    final_url,
+                    len(raw),
                 )
 
                 # Step 2: 转换为 Markdown
@@ -191,14 +199,14 @@ class IndexDocumentsHandler(JobHandler):
                     content = raw  # Node.js 已转换完成
                 else:
                     import asyncio
+
                     loop = asyncio.get_running_loop()
-                    content = await loop.run_in_executor(
-                        None, lambda: url_to_markdown(raw, base_url=final_url)
-                    )
+                    content = await loop.run_in_executor(None, lambda: url_to_markdown(raw, base_url=final_url))
 
                 # 兜底：内容太少则做纯文本提取
                 if not content or len(content) < 20:
                     import re
+
                     logger.warning("转换内容过少，使用纯文本回退")
                     content = re.sub(r"<[^>]+>", " ", raw)
                     content = re.sub(r"\s+", " ", content).strip()
@@ -233,14 +241,14 @@ class IndexDocumentsHandler(JobHandler):
         await self._set_status_under_lock(base_id, user_id, item_id, "completed")
 
     async def _set_status_under_lock(
-        self, base_id: str, user_id: int, item_id: str, status: str, error: Optional[str] = None
+        self, base_id: str, user_id: int, item_id: str, status: str, error: str | None = None
     ) -> None:
         async def _update():
             KnowledgeItemService.update_status(user_id, item_id, status, error or "")
 
         await self.lock_manager.with_base_mutation_lock(base_id, _update)
 
-    async def on_settled(self, job_id: str, status: str, error: Optional[str]) -> None:
+    async def on_settled(self, job_id: str, status: str, error: str | None) -> None:
         if status != "failed":
             return
         _mark_item_failed(job_id, error)
@@ -249,9 +257,7 @@ class IndexDocumentsHandler(JobHandler):
 def _get_user_id_from_base(base_id: str) -> int:
     db = get_db()
     try:
-        row = db.execute(
-            "SELECT user_id FROM knowledge_bases WHERE id=?", (base_id,)
-        ).fetchone()
+        row = db.execute("SELECT user_id FROM knowledge_bases WHERE id=?", (base_id,)).fetchone()
         if not row:
             raise ValueError(f"Knowledge base not found: {base_id}")
         return row["user_id"]
@@ -259,12 +265,10 @@ def _get_user_id_from_base(base_id: str) -> int:
         db.close()
 
 
-def _mark_item_failed(job_id: str, error: Optional[str]) -> None:
+def _mark_item_failed(job_id: str, error: str | None) -> None:
     db = get_db()
     try:
-        row = db.execute(
-            "SELECT input_data FROM knowledge_jobs WHERE id=?", (job_id,)
-        ).fetchone()
+        row = db.execute("SELECT input_data FROM knowledge_jobs WHERE id=?", (job_id,)).fetchone()
         if not row:
             return
         input_data = json.loads(row["input_data"])

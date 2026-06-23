@@ -4,13 +4,14 @@ Admin settings API — 全局键值配置（模型分配、系统偏好等）
 借鉴 Cherry Studio Preference 层概念：
   settings = { "chat_model": "providerId::modelId", "embedding_model": "...", "rerank_model": "..." }
 """
-import json
+
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+
 from app.auth import require_admin
 from app.database import get_db
-from pydantic import BaseModel
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/settings", tags=["admin-settings"])
@@ -19,25 +20,34 @@ MODEL_KEYS = ["chat_model", "embedding_model", "rerank_model", "ocr_model", "ext
 
 
 class AssignedModelsInput(BaseModel):
-    chat_model: Optional[str] = None
-    embedding_model: Optional[str] = None
-    rerank_model: Optional[str] = None
-    ocr_model: Optional[str] = None
-    extract_model: Optional[str] = None
+    chat_model: str | None = None
+    embedding_model: str | None = None
+    rerank_model: str | None = None
+    ocr_model: str | None = None
+    extract_model: str | None = None
 
 
 class RagConfigInput(BaseModel):
-    chunk_size: Optional[int] = None
-    chunk_overlap: Optional[int] = None
-    search_mode: Optional[str] = None
-    hybrid_alpha: Optional[float] = None
-    threshold: Optional[float] = None
-    document_count: Optional[int] = None
-    file_processor: Optional[str] = None
-    rerank_model: Optional[str] = None
+    chunk_size: int | None = None
+    chunk_overlap: int | None = None
+    search_mode: str | None = None
+    hybrid_alpha: float | None = None
+    threshold: float | None = None
+    document_count: int | None = None
+    file_processor: str | None = None
+    rerank_model: str | None = None
 
 
-RAG_KEYS = ["chunk_size", "chunk_overlap", "search_mode", "hybrid_alpha", "threshold", "document_count", "file_processor", "rag_rerank_model"]
+RAG_KEYS = [
+    "chunk_size",
+    "chunk_overlap",
+    "search_mode",
+    "hybrid_alpha",
+    "threshold",
+    "document_count",
+    "file_processor",
+    "rag_rerank_model",
+]
 
 
 @router.get("/models/assigned")
@@ -50,7 +60,7 @@ def get_assigned_models(user: dict = Depends(require_admin)) -> dict:
         MODEL_KEYS,
     ).fetchall()
     db.close()
-    result = {k: None for k in MODEL_KEYS}
+    result = dict.fromkeys(MODEL_KEYS)
     for r in rows:
         result[r["key"]] = r["value"]
     return {"data": result}
@@ -92,7 +102,7 @@ def _get_settings(keys: list[str]) -> dict:
         keys,
     ).fetchall()
     db.close()
-    result = {k: None for k in keys}
+    result = dict.fromkeys(keys)
     for r in rows:
         result[r["key"]] = r["value"]
     return result
@@ -136,7 +146,13 @@ def get_available_models(user: dict = Depends(require_admin)) -> dict:
     }
     """
     from app.algorithm.model_service import model_service
-    from app.algorithm.providers_registry import get_model_id, get_model_capabilities, CAPABILITY_EMBEDDING, CAPABILITY_RERANK, CAPABILITY_VISION
+    from app.algorithm.providers_registry import (
+        CAPABILITY_EMBEDDING,
+        CAPABILITY_RERANK,
+        CAPABILITY_VISION,
+        get_model_capabilities,
+        get_model_id,
+    )
 
     providers = model_service.list_all()
     chat_models = []

@@ -1,66 +1,55 @@
+"""文件处理器注册表 — 管理文件处理器实例。
+
+默认注册 `local` 处理器，使用本地 file_parser 进行同步解析。
+可通过 `register()` 注册外部/异步处理器。
 """
-File Processor Registry — resolves file processors by fileProcessorId
-"""
-import logging
-from typing import Optional, Protocol
 
-logger = logging.getLogger(__name__)
+from app.algorithm.knowledge.processors.base import FileProcessor
+from app.algorithm.knowledge.processors.local import LOCAL_PROCESSOR_ID, LocalFileProcessor, local_processor
 
 
-class FileProcessor(Protocol):
-    """File processor interface"""
+class _FileProcessorRegistry:
+    """文件处理器注册表。
 
-    async def process(self, file_path: str, file_name: str) -> dict:
-        """Process a file synchronously — returns {content, title, type}"""
-        ...
-
-    async def submit(self, file_path: str) -> str:
-        """Submit file for async processing — returns task_id.
-        Only needed for async processors. Default raises NotImplementedError."""
-        ...
-
-    async def poll(self, task_id: str) -> Optional[dict]:
-        """Poll async processing status.
-        Returns None if still processing, dict {content, title} when done.
-        Only needed for async processors."""
-        ...
-
-    def is_async(self) -> bool:
-        """Whether this processor is async (needs polling)"""
-        ...
-
-
-class FileProcessorRegistry:
-    """Registry of file processors"""
+    特性：
+    - 按 processor_id 注册/查找处理器实例
+    - get(None) 或 get(unknown_id) 返回默认本地处理器
+    """
 
     def __init__(self):
-        self._processors: dict[str, "FileProcessor"] = {}
-        self._register_defaults()
+        self._processors: dict[str, FileProcessor] = {}
+        self._default: FileProcessor = local_processor
+        self._register(LOCAL_PROCESSOR_ID, LocalFileProcessor())
 
-    def _register_defaults(self):
-        from .default import DefaultFileProcessor
+    def _register(self, processor_id: str, processor: FileProcessor) -> None:
+        self._processors[processor_id] = processor
 
-        default = DefaultFileProcessor()
-        self.register("default", default)
-        self.register("", default)
-        self.register(None, default)
+    def register(self, processor_id: str, processor: FileProcessor) -> None:
+        """注册外部处理器。"""
+        self._processors[processor_id] = processor
 
-    def register(self, processor_id: Optional[str], processor: "FileProcessor") -> None:
-        self._processors[str(processor_id) if processor_id is not None else ""] = processor
+    def get(self, processor_id: str | None) -> FileProcessor:
+        """获取处理器实例。
 
-    def get(self, processor_id: Optional[str]) -> "FileProcessor":
-        pid = str(processor_id) if processor_id is not None else ""
-        if pid in self._processors:
-            return self._processors[pid]
-        # Try to create external processor
-        if pid and pid not in (None, "", "default"):
-            from .external import ExternalFileProcessor
+        Args:
+            processor_id: 处理器 ID。为 None 或未注册时返回默认本地处理器。
+        Returns:
+            FileProcessor 实例
+        """
+        if processor_id and processor_id in self._processors:
+            return self._processors[processor_id]
+        return self._default
 
-            ext = ExternalFileProcessor(pid)
-            self._processors[pid] = ext
-            return ext
-        return self._processors[""]  # fallback
+    def list_ids(self) -> list[str]:
+        return list(self._processors.keys())
 
 
-# Singleton
-file_processor_registry = FileProcessorRegistry()
+# 全局单例
+file_processor_registry = _FileProcessorRegistry()
+
+__all__ = [
+    "file_processor_registry",
+    "FileProcessor",
+    "LocalFileProcessor",
+    "LOCAL_PROCESSOR_ID",
+]

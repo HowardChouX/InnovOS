@@ -1,21 +1,24 @@
 import json
+
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
 from app.auth import get_current_user
 from app.database import get_db
-from pydantic import BaseModel
-from typing import Optional
 
 router = APIRouter(prefix="/api/solutions", tags=["solutions"])
 
 
 class UpdateSolutionInput(BaseModel):
-    rating: Optional[int] = None
+    rating: int | None = None
 
 
 def row_to_dict(r):
     return {
-        "id": str(r["id"]), "taskId": str(r["task_id"]),
-        "title": r["title"], "description": r["description"],
+        "id": str(r["id"]),
+        "taskId": str(r["task_id"]),
+        "title": r["title"],
+        "description": r["description"],
         "principles": json.loads(r["principles"]),
         "confidenceScore": r["confidence_score"],
         "patentReferences": json.loads(r["patent_references"]),
@@ -42,9 +45,7 @@ def get_solution_detail(task_id: int, solution_id: int, user: dict = Depends(get
     if not task:
         db.close()
         raise HTTPException(status_code=404, detail="Task not found")
-    row = db.execute(
-        "SELECT * FROM solutions WHERE id=? AND task_id=?", (solution_id, task_id)
-    ).fetchone()
+    row = db.execute("SELECT * FROM solutions WHERE id=? AND task_id=?", (solution_id, task_id)).fetchone()
     db.close()
     if not row:
         raise HTTPException(status_code=404, detail="Solution not found")
@@ -53,7 +54,8 @@ def get_solution_detail(task_id: int, solution_id: int, user: dict = Depends(get
 
 @router.put("/{task_id}/{solution_id}")
 def update_solution(
-    task_id: int, solution_id: int,
+    task_id: int,
+    solution_id: int,
     body: UpdateSolutionInput,
     user: dict = Depends(get_current_user),
 ):
@@ -62,9 +64,7 @@ def update_solution(
     if not task:
         db.close()
         raise HTTPException(status_code=404, detail="Task not found")
-    row = db.execute(
-        "SELECT * FROM solutions WHERE id=? AND task_id=?", (solution_id, task_id)
-    ).fetchone()
+    row = db.execute("SELECT * FROM solutions WHERE id=? AND task_id=?", (solution_id, task_id)).fetchone()
     if not row:
         db.close()
         raise HTTPException(status_code=404, detail="Solution not found")

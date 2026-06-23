@@ -1,7 +1,9 @@
 """问题建模 API — 功能分析、因果链、矛盾、裁剪、进化趋势"""
+
 from fastapi import APIRouter, Depends
-from app.auth import get_current_user
 from pydantic import BaseModel
+
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/modeling", tags=["problem-modeling"])
 

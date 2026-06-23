@@ -1,18 +1,19 @@
-"""统一供应商管理 API — 供应商 + Key 池融合"""
+"""统一供应商管理 API — 供应商管理（密钥来自环境变量）"""
+
 import json
+
 from fastapi import APIRouter, Depends, HTTPException
-from app.auth import require_admin
-from app.algorithm.model_service import model_service
-from app.algorithm.crypto import encrypt_key
-from app.algorithm.providers_registry import get_model_id
 from pydantic import BaseModel
-from typing import Optional, Union
+
+from app.algorithm.model_service import model_service
+from app.algorithm.providers_registry import get_model_id
+from app.auth import require_admin
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 
 
 # 模型条目：兼容旧格式字符串和新格式对象
-ModelEntry = Union[str, dict]
+ModelEntry = str | dict
 
 
 class AddProviderInput(BaseModel):
@@ -20,20 +21,20 @@ class AddProviderInput(BaseModel):
     name: str
     protocol: str = "openai"
     api_host: str
-    api_key: str = ""
+    # API 密钥来自环境变量 AI_{PROVIDER_ID}_API_KEY，不再通过界面输入
     api_model: str = ""
     models: list[ModelEntry] = []
     max_rpm: int = 60
 
 
 class UpdateProviderInput(BaseModel):
-    name: Optional[str] = None
-    api_host: Optional[str] = None
-    api_key: Optional[str] = None
-    api_model: Optional[str] = None
-    models: Optional[list[ModelEntry]] = None
-    is_enabled: Optional[bool] = None
-    max_rpm: Optional[int] = None
+    name: str | None = None
+    api_host: str | None = None
+    # API 密钥来自环境变量 AI_{PROVIDER_ID}_API_KEY，无法通过界面更新
+    api_model: str | None = None
+    models: list[ModelEntry] | None = None
+    is_enabled: bool | None = None
+    max_rpm: int | None = None
 
 
 @router.get("/builtin")
@@ -79,22 +80,21 @@ def toggle_provider(provider_id: str, user: dict = Depends(require_admin)):
 
 
 class CheckConnectionInput(BaseModel):
-    model: Optional[str] = None
+    model: str | None = None
+
 
 @router.post("/{provider_id}/check")
-async def check_connection(provider_id: str, body: CheckConnectionInput = CheckConnectionInput(), user: dict = Depends(require_admin)):
+async def check_connection(
+    provider_id: str, body: CheckConnectionInput = CheckConnectionInput(), user: dict = Depends(require_admin)
+):
     result = await model_service.check_connection(provider_id, body.model)
     return {"data": result, "message": result.get("status", "unknown")}
 
 
-class DetectModelsInput(BaseModel):
-    api_key: Optional[str] = None
-
-
 @router.post("/{provider_id}/detect-models")
-async def detect_models(provider_id: str, body: DetectModelsInput = DetectModelsInput(), user: dict = Depends(require_admin)):
-    """从供应商 API 获取可用模型列表"""
-    result = await model_service.detect_models(provider_id, body.api_key)
+async def detect_models(provider_id: str, user: dict = Depends(require_admin)):
+    """从供应商 API 获取可用模型列表（密钥来自环境变量）"""
+    result = await model_service.detect_models(provider_id)
     return {"data": result, "message": "success"}
 
 
@@ -125,6 +125,7 @@ def reconcile_apply(provider_id: str, body: ReconcileApplyInput, user: dict = De
 class BatchCheckInput(BaseModel):
     models: list[str]
 
+
 @router.post("/{provider_id}/models/check")
 async def batch_check_models(provider_id: str, body: BatchCheckInput, user: dict = Depends(require_admin)):
     """批量检查多个模型的连通性。"""
@@ -136,6 +137,7 @@ async def batch_check_models(provider_id: str, body: BatchCheckInput, user: dict
 def list_provider_models(provider_id: str, user: dict = Depends(require_admin)):
     """获取供应商的模型列表（从 models 表）。"""
     from app.algorithm.models_crud import ModelsCrudService
+
     crud = ModelsCrudService()
     models = crud.list_by_provider(provider_id)
     return {"data": models, "message": "success"}
@@ -143,11 +145,14 @@ def list_provider_models(provider_id: str, user: dict = Depends(require_admin)):
 
 @router.put("/{provider_id}/models/{model_id}")
 def update_provider_model(
-    provider_id: str, model_id: str,
-    body: dict, user: dict = Depends(require_admin),
+    provider_id: str,
+    model_id: str,
+    body: dict,
+    user: dict = Depends(require_admin),
 ):
     """更新单个模型的配置。"""
     from app.algorithm.models_crud import ModelsCrudService
+
     crud = ModelsCrudService()
     result = crud.update(provider_id, model_id, body)
     if not result:
@@ -157,19 +162,25 @@ def update_provider_model(
 
 @router.delete("/{provider_id}/models/{model_id}")
 def delete_provider_model(
-    provider_id: str, model_id: str,
-    body: dict, user: dict = Depends(require_admin),
+    provider_id: str,
+    model_id: str,
+    body: dict,
+    user: dict = Depends(require_admin),
 ):
     """删除单个模型。"""
     from app.algorithm.models_crud import ModelsCrudService
+
     crud = ModelsCrudService()
     crud.delete(provider_id, model_id)
     # Also remove from JSON column
     from app.database import get_db
+
     db = get_db()
     row = db.execute("SELECT models FROM model_providers WHERE provider_id=?", (provider_id,)).fetchone()
     if row:
-        stored = row["models"] if isinstance(row["models"], list) else (json.loads(row["models"]) if row["models"] else [])
+        stored = (
+            row["models"] if isinstance(row["models"], list) else (json.loads(row["models"]) if row["models"] else [])
+        )
         filtered = [m for m in stored if get_model_id(m) != model_id]
         db.execute("UPDATE model_providers SET models=? WHERE provider_id=?", (json.dumps(filtered), provider_id))
         db.commit()

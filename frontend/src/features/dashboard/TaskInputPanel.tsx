@@ -11,8 +11,9 @@ export function TaskInputPanel() {
   const [bases, setBases] = useState<KnowledgeBaseListItem[]>([]);
   const [selectedBaseIds, setSelectedBaseIds] = useState<Set<string>>(new Set());
   const [showKbSelector, setShowKbSelector] = useState(false);
-  const [loadingBases, setLoadingBases] = useState(false);
+  const [loadingBases, setLoadingBases] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [submitError, setSubmitError] = useState('');
   const selectorRef = useRef<HTMLDivElement>(null);
 
   const createTask = useTaskStore((s) => s.createTask);
@@ -22,9 +23,8 @@ export function TaskInputPanel() {
 
   // 加载知识库列表
   useEffect(() => {
-    setLoadingBases(true);
-    setLoadError('');
-    knowledgeApi.listBases(1, 100)
+    knowledgeApi
+      .listBases(1, 100)
       .then((res) => {
         const items = res.data?.items ?? [];
         setBases(items);
@@ -54,15 +54,18 @@ export function TaskInputPanel() {
 
   // 根据工作流状态更新分析按钮
   useEffect(() => {
-    if (!workflow) {
-      setIsAnalyzing(false);
-      return;
-    }
-    if (workflow.status === 'running') {
-      setIsAnalyzing(true);
-    } else if (workflow.status === 'completed' || workflow.status === 'failed') {
-      setIsAnalyzing(false);
-    }
+    const id = setTimeout(() => {
+      if (!workflow) {
+        setIsAnalyzing(false);
+        return;
+      }
+      if (workflow.status === 'running') {
+        setIsAnalyzing(true);
+      } else if (workflow.status === 'completed' || workflow.status === 'failed') {
+        setIsAnalyzing(false);
+      }
+    }, 0);
+    return () => clearTimeout(id);
   }, [workflow]);
 
   const toggleBase = (id: string) => {
@@ -79,11 +82,13 @@ export function TaskInputPanel() {
   const handleSubmit = async () => {
     if (!description.trim()) return;
 
+    setSubmitError('');
     setIsAnalyzing(true);
 
     try {
       const task = await createTask({ title: description.slice(0, 50), description, tags: [] });
       if (!task) {
+        setSubmitError('创建任务失败，请检查登录状态或重试');
         setIsAnalyzing(false);
         return;
       }
@@ -93,6 +98,7 @@ export function TaskInputPanel() {
       await triggerAnalysis(task.id, kbIds.length > 0 ? kbIds : undefined);
     } catch (error) {
       console.error('Failed to start analysis:', error);
+      setSubmitError(error instanceof Error ? error.message : '启动分析失败');
       setIsAnalyzing(false);
     }
   };
@@ -105,57 +111,106 @@ export function TaskInputPanel() {
   return (
     <div className="card">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 12,
+        }}
+      >
         <div className="card-title">创新分析</div>
 
         <div style={{ position: 'relative' }} ref={selectorRef}>
           <button
             onClick={() => setShowKbSelector(!showKbSelector)}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              fontSize: 11, padding: '5px 12px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              fontSize: 11,
+              padding: '5px 12px',
               background: selectedBaseIds.size > 0 ? 'rgba(59,130,246,0.12)' : 'transparent',
               color: selectedBaseIds.size > 0 ? 'var(--accent)' : 'var(--text-secondary)',
               border: `1px solid ${selectedBaseIds.size > 0 ? 'var(--accent)' : 'var(--border)'}`,
-              borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
+              borderRadius: 6,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
               transition: 'all 0.15s',
             }}
           >
             <i className="fa-solid fa-database" style={{ fontSize: 11 }} />
             导入知识库
             {selectedBaseIds.size > 0 && (
-              <span style={{
-                background: 'var(--accent)', color: '#fff',
-                borderRadius: 10, padding: '0 6px',
-                fontSize: 10, lineHeight: '16px',
-              }}>
+              <span
+                style={{
+                  background: 'var(--accent)',
+                  color: '#fff',
+                  borderRadius: 10,
+                  padding: '0 6px',
+                  fontSize: 10,
+                  lineHeight: '16px',
+                }}
+              >
                 {selectedBaseIds.size}
               </span>
             )}
-            <i className="fa-solid fa-chevron-down" style={{
-              fontSize: 8, marginLeft: 2,
-              transform: showKbSelector ? 'rotate(180deg)' : 'none',
-              transition: 'transform 0.15s',
-            }} />
+            <i
+              className="fa-solid fa-chevron-down"
+              style={{
+                fontSize: 8,
+                marginLeft: 2,
+                transform: showKbSelector ? 'rotate(180deg)' : 'none',
+                transition: 'transform 0.15s',
+              }}
+            />
           </button>
 
           {/* 知识库选择器下拉 */}
           {showKbSelector && (
-            <div style={{
-              position: 'absolute', top: '100%', right: 0, marginTop: 4,
-              width: 280, maxHeight: 300, overflowY: 'auto',
-              background: 'var(--bg-card)', border: '1px solid var(--border)',
-              borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-              zIndex: 100, padding: 4,
-            }}>
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: 4,
+                width: 280,
+                maxHeight: 300,
+                overflowY: 'auto',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                zIndex: 100,
+                padding: 4,
+              }}
+            >
               {loadingBases ? (
-                <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>
-                  <i className="fa-solid fa-circle-notch fa-spin" style={{ display: 'block', fontSize: 20, marginBottom: 8 }} />
+                <div
+                  style={{
+                    padding: 20,
+                    textAlign: 'center',
+                    color: 'var(--text-tertiary)',
+                    fontSize: 12,
+                  }}
+                >
+                  <i
+                    className="fa-solid fa-circle-notch fa-spin"
+                    style={{ display: 'block', fontSize: 20, marginBottom: 8 }}
+                  />
                   加载知识库...
                 </div>
               ) : bases.length === 0 ? (
                 <div style={{ padding: 20, textAlign: 'center' }}>
-                  <i className="fa-solid fa-database" style={{ display: 'block', fontSize: 24, color: 'var(--text-tertiary)', marginBottom: 8 }} />
+                  <i
+                    className="fa-solid fa-database"
+                    style={{
+                      display: 'block',
+                      fontSize: 24,
+                      color: 'var(--text-tertiary)',
+                      marginBottom: 8,
+                    }}
+                  />
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
                     {loadError || '暂无知识库'}
                   </div>
@@ -175,16 +230,24 @@ export function TaskInputPanel() {
                         key={base.id}
                         onClick={() => toggleBase(base.id)}
                         style={{
-                          display: 'flex', alignItems: 'center', gap: 8,
-                          padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '8px 10px',
+                          borderRadius: 6,
+                          cursor: 'pointer',
                           background: active ? 'rgba(59,130,246,0.1)' : 'transparent',
                           color: active ? 'var(--accent)' : 'var(--text-primary)',
-                          fontSize: 13, transition: 'all 0.1s',
+                          fontSize: 13,
+                          transition: 'all 0.1s',
                         }}
                       >
                         <i
                           className={`fa-solid ${active ? 'fa-check-circle' : 'fa-circle'}`}
-                          style={{ fontSize: 14, color: active ? 'var(--accent)' : 'var(--text-tertiary)' }}
+                          style={{
+                            fontSize: 14,
+                            color: active ? 'var(--accent)' : 'var(--text-tertiary)',
+                          }}
                         />
                         <span style={{ flex: 1 }}>{base.name}</span>
                         <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
@@ -207,9 +270,14 @@ export function TaskInputPanel() {
             <span
               key={base.id}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '3px 10px 3px 8px', borderRadius: 14, fontSize: 12,
-                background: 'var(--accent)', color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '3px 10px 3px 8px',
+                borderRadius: 14,
+                fontSize: 12,
+                background: 'var(--accent)',
+                color: '#fff',
                 userSelect: 'none',
               }}
             >
@@ -221,24 +289,66 @@ export function TaskInputPanel() {
               <i
                 className="fa-solid fa-xmark"
                 style={{ fontSize: 11, cursor: 'pointer', opacity: 0.7, marginLeft: 2 }}
-                onClick={(e) => { e.stopPropagation(); toggleBase(base.id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleBase(base.id);
+                }}
               />
             </span>
           ))}
         </div>
       )}
 
+      {/* Error message */}
+      {submitError && (
+        <div
+          className="card-enter"
+          style={{
+            background: 'rgba(248,113,113,0.08)',
+            border: '1px solid rgba(248,113,113,0.25)',
+            borderRadius: 8,
+            padding: '8px 12px',
+            marginBottom: 12,
+            fontSize: 13,
+            color: 'var(--accent-red)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <i className="fa-solid fa-circle-exclamation" style={{ fontSize: 14 }} />
+          {submitError}
+          <span
+            style={{ marginLeft: 'auto', cursor: 'pointer', opacity: 0.6 }}
+            onClick={() => setSubmitError('')}
+          >
+            <i className="fa-solid fa-xmark" style={{ fontSize: 12 }} />
+          </span>
+        </div>
+      )}
+
       {/* Textarea */}
       <textarea
         value={description}
-        onChange={(e) => setDescription(e.target.value)}
+        onChange={(e) => {
+          setDescription(e.target.value);
+          setSubmitError('');
+        }}
         placeholder="输入文字，点击开始进行分析"
         disabled={isAnalyzing}
         style={{
-          width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)',
-          borderRadius: 8, padding: 12, marginBottom: 12, minHeight: 60,
-          fontSize: 14, color: 'var(--text-primary)',
-          resize: 'vertical', outline: 'none', fontFamily: 'inherit',
+          width: '100%',
+          background: 'rgba(0,0,0,0.3)',
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          padding: 12,
+          marginBottom: 12,
+          minHeight: 60,
+          fontSize: 14,
+          color: 'var(--text-primary)',
+          resize: 'vertical',
+          outline: 'none',
+          fontFamily: 'inherit',
           opacity: isAnalyzing ? 0.6 : 1,
         }}
       />
@@ -249,10 +359,17 @@ export function TaskInputPanel() {
           <button
             onClick={handleCancel}
             style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: 'var(--accent-red)', border: 'none',
-              color: '#fff', padding: '8px 20px', borderRadius: 6,
-              cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'var(--accent-red)',
+              border: 'none',
+              color: '#fff',
+              padding: '8px 20px',
+              borderRadius: 6,
+              cursor: 'pointer',
+              fontSize: 13,
+              fontFamily: 'inherit',
             }}
           >
             <i className="fa-solid fa-stop" style={{ fontSize: 11 }} />
@@ -263,11 +380,17 @@ export function TaskInputPanel() {
           onClick={handleSubmit}
           disabled={isAnalyzing || !description.trim()}
           style={{
-            display: 'flex', alignItems: 'center', gap: 6,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
             background: isAnalyzing ? 'var(--text-tertiary)' : 'var(--accent)',
             border: 'none',
-            color: '#fff', padding: '8px 20px', borderRadius: 6,
-            cursor: isAnalyzing ? 'not-allowed' : 'pointer', fontSize: 13, fontFamily: 'inherit',
+            color: '#fff',
+            padding: '8px 20px',
+            borderRadius: 6,
+            cursor: isAnalyzing ? 'not-allowed' : 'pointer',
+            fontSize: 13,
+            fontFamily: 'inherit',
           }}
         >
           {isAnalyzing ? (

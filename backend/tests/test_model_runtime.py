@@ -42,18 +42,17 @@ class TestResolveEmbedding:
 
         mock_row = {
             "api_host": "https://api.openai.com",
-            "api_key_encrypted": "key_openai",
         }
         mock_conn = MagicMock()
         cursor = MagicMock()
         cursor.fetchone.return_value = mock_row
         mock_conn.execute.return_value = cursor
         monkeypatch.setattr("app.database.get_db", lambda: mock_conn)
-        monkeypatch.setattr("app.algorithm.crypto.decrypt_key", lambda x: f"decrypted_{x}")
+        monkeypatch.setattr("app.algorithm.model_service._get_provider_api_key", lambda pid: "env_key_openai")
 
         result = ModelRuntime.resolve_embedding("openai:text-embedding-3-small")
         assert result is not None
-        assert result.api_key == "decrypted_key_openai"
+        assert result.api_key == "env_key_openai"
         assert result.model == "text-embedding-3-small"
         assert result.provider_id == "openai"
 
@@ -73,7 +72,6 @@ class TestResolveFirstEmbedding:
         cursor.fetchall.return_value = sample_provider_rows
         mock_conn.execute.return_value = cursor
         monkeypatch.setattr("app.database.get_db", lambda: mock_conn)
-        monkeypatch.setattr("app.algorithm.crypto.decrypt_key", lambda x: f"decrypted_{x}")
 
         result = ModelRuntime.resolve_first_embedding()
         assert result is not None
@@ -103,7 +101,6 @@ class TestResolveFirstRerank:
             {
                 "provider_id": "test_provider",
                 "api_host": "https://api.test.com",
-                "api_key_encrypted": "key_test",
                 "models": '[{"id": "rerank-model", "capabilities": ["rerank"]}]',
                 "is_enabled": 1,
                 "priority": 1,
@@ -114,7 +111,6 @@ class TestResolveFirstRerank:
         cursor.fetchall.return_value = rows
         mock_conn.execute.return_value = cursor
         monkeypatch.setattr("app.database.get_db", lambda: mock_conn)
-        monkeypatch.setattr("app.algorithm.crypto.decrypt_key", lambda x: f"decrypted_{x}")
 
         result = ModelRuntime.resolve_first_rerank()
         assert result is not None
@@ -132,7 +128,7 @@ class TestTestConnection:
         mock_conn.execute.return_value = cursor
         monkeypatch.setattr("app.database.get_db", lambda: mock_conn)
 
-        result = ModelRuntime.test_connection("nonexistent", "gpt-4")
+        result = ModelRuntime.test_connection("nonexistent", "gpt-4", api_key_override="test_key")
         assert result["status"] == "error"
 
     def test_routes_to_embedding_by_capability(self, monkeypatch):
@@ -141,7 +137,6 @@ class TestTestConnection:
 
         row = {
             "api_host": "https://api.openai.com",
-            "api_key_encrypted": "key_openai",
             "models": '[{"id": "text-embedding-3-small", "capabilities": ["embedding"]}]',
         }
         mock_conn = MagicMock()
@@ -149,13 +144,12 @@ class TestTestConnection:
         cursor.fetchone.return_value = row
         mock_conn.execute.return_value = cursor
         monkeypatch.setattr("app.database.get_db", lambda: mock_conn)
-        monkeypatch.setattr("app.algorithm.crypto.decrypt_key", lambda x: f"decrypted_{x}")
         # mock _test_embedding to avoid real API call
         monkeypatch.setattr(ModelRuntime, "_test_embedding", lambda ak, ah, m: {
             "status": "ok", "model": m, "type": "embedding", "dimension": 384
         })
 
-        result = ModelRuntime.test_connection("test", "text-embedding-3-small")
+        result = ModelRuntime.test_connection("test", "text-embedding-3-small", api_key_override="key_openai")
         assert result["status"] == "ok"
         assert result["type"] == "embedding"
 
@@ -165,7 +159,6 @@ class TestTestConnection:
 
         row = {
             "api_host": "https://api.test.com",
-            "api_key_encrypted": "key_test",
             "models": '[{"id": "rerank-model", "capabilities": ["rerank"]}]',
         }
         mock_conn = MagicMock()
@@ -173,12 +166,11 @@ class TestTestConnection:
         cursor.fetchone.return_value = row
         mock_conn.execute.return_value = cursor
         monkeypatch.setattr("app.database.get_db", lambda: mock_conn)
-        monkeypatch.setattr("app.algorithm.crypto.decrypt_key", lambda x: f"decrypted_{x}")
         monkeypatch.setattr(ModelRuntime, "_test_rerank", lambda ak, ah, m: {
             "status": "ok", "model": m, "type": "rerank"
         })
 
-        result = ModelRuntime.test_connection("test", "rerank-model")
+        result = ModelRuntime.test_connection("test", "rerank-model", api_key_override="key_test")
         assert result["status"] == "ok"
         assert result["type"] == "rerank"
 
@@ -188,7 +180,6 @@ class TestTestConnection:
 
         row = {
             "api_host": "https://api.test.com",
-            "api_key_encrypted": "key_test",
             "models": '[{"id": "gpt-4o", "capabilities": ["chat"]}]',
         }
         mock_conn = MagicMock()
@@ -196,12 +187,11 @@ class TestTestConnection:
         cursor.fetchone.return_value = row
         mock_conn.execute.return_value = cursor
         monkeypatch.setattr("app.database.get_db", lambda: mock_conn)
-        monkeypatch.setattr("app.algorithm.crypto.decrypt_key", lambda x: f"decrypted_{x}")
         monkeypatch.setattr(ModelRuntime, "_test_chat", lambda ak, ah, m: {
             "status": "ok", "model": m, "type": "chat"
         })
 
-        result = ModelRuntime.test_connection("test", "gpt-4o")
+        result = ModelRuntime.test_connection("test", "gpt-4o", api_key_override="key_test")
         assert result["status"] == "ok"
         assert result["type"] == "chat"
 
@@ -211,7 +201,6 @@ class TestTestConnection:
 
         row = {
             "api_host": "https://api.test.com",
-            "api_key_encrypted": "key_test",
             "models": '[]',  # empty models list
         }
         mock_conn = MagicMock()
@@ -219,13 +208,12 @@ class TestTestConnection:
         cursor.fetchone.return_value = row
         mock_conn.execute.return_value = cursor
         monkeypatch.setattr("app.database.get_db", lambda: mock_conn)
-        monkeypatch.setattr("app.algorithm.crypto.decrypt_key", lambda x: f"decrypted_{x}")
         monkeypatch.setattr(ModelRuntime, "_test_embedding", lambda ak, ah, m: {
             "status": "ok", "model": m, "type": "embedding"
         })
 
         # text-embedding-3-small is known to registry as embedding
-        result = ModelRuntime.test_connection("test", "text-embedding-3-small")
+        result = ModelRuntime.test_connection("test", "text-embedding-3-small", api_key_override="key_test")
         assert result["status"] == "ok"
 
     def test_infer_capabilities_fallback(self, monkeypatch):
@@ -234,7 +222,6 @@ class TestTestConnection:
 
         row = {
             "api_host": "https://api.test.com",
-            "api_key_encrypted": "key_test",
             "models": '[]',
         }
         mock_conn = MagicMock()
@@ -242,13 +229,12 @@ class TestTestConnection:
         cursor.fetchone.return_value = row
         mock_conn.execute.return_value = cursor
         monkeypatch.setattr("app.database.get_db", lambda: mock_conn)
-        monkeypatch.setattr("app.algorithm.crypto.decrypt_key", lambda x: f"decrypted_{x}")
         monkeypatch.setattr(ModelRuntime, "_test_chat", lambda ak, ah, m: {
             "status": "ok", "model": m, "type": "chat"
         })
 
         # 未知但显然不是 embedding/rerank 的模型 → chat
-        result = ModelRuntime.test_connection("test", "some-unknown-chat-model")
+        result = ModelRuntime.test_connection("test", "some-unknown-chat-model", api_key_override="key_test")
         assert result["status"] == "ok"
         assert result["type"] == "chat"
 
@@ -258,7 +244,6 @@ class TestTestConnection:
 
         row = {
             "api_host": "https://api.test.com",
-            "api_key_encrypted": "key_test",
             "models": '[{"id": "chat-model", "capabilities": ["chat"]}]',
         }
         mock_conn = MagicMock()
@@ -266,13 +251,12 @@ class TestTestConnection:
         cursor.fetchone.return_value = row
         mock_conn.execute.return_value = cursor
         monkeypatch.setattr("app.database.get_db", lambda: mock_conn)
-        monkeypatch.setattr("app.algorithm.crypto.decrypt_key", lambda x: f"decrypted_{x}")
 
         def failing_test(*a, **kw):
             raise RuntimeError("API connection refused")
 
         monkeypatch.setattr(ModelRuntime, "_test_chat", failing_test)
-        result = ModelRuntime.test_connection("test", "chat-model")
+        result = ModelRuntime.test_connection("test", "chat-model", api_key_override="key_test")
         assert result["status"] == "error"
         assert "API connection refused" in result["message"]
 
@@ -288,7 +272,6 @@ class TestResolve:
         cursor.fetchone.return_value = sample_provider_rows[0]
         mock_conn.execute.return_value = cursor
         monkeypatch.setattr("app.database.get_db", lambda: mock_conn)
-        monkeypatch.setattr("app.algorithm.crypto.decrypt_key", lambda x: f"decrypted_{x}")
 
         result = ModelRuntime._resolve("", "BAAI/bge-large-zh-v1.5")
         assert result is not None

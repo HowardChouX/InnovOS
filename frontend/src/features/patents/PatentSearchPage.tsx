@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { patentsApi } from '../../api/patents';
 import type { Patent } from '../../types/patent';
 
@@ -6,69 +6,129 @@ function PatentDetailModal({ patent, onClose }: { patent: Patent; onClose: () =>
   if (!patent) return null;
 
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.6)', zIndex: 100,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }} onClick={onClose}>
-      <div style={{
-        background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)',
-        width: 600, maxHeight: '80vh', overflow: 'auto', padding: 24,
-      }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0,0,0,0.6)',
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'var(--bg-card)',
+          borderRadius: 12,
+          border: '1px solid var(--border)',
+          width: 600,
+          maxHeight: '80vh',
+          overflow: 'auto',
+          padding: 24,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16,
+          }}
+        >
           <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
             专利详情
           </h3>
-          <button onClick={onClose} style={{
-            background: 'none', border: 'none', color: 'var(--text-tertiary)',
-            cursor: 'pointer', fontSize: 16,
-          }}>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-tertiary)',
+              cursor: 'pointer',
+              fontSize: 16,
+            }}
+          >
             <i className="fa-solid fa-xmark" />
           </button>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>专利名称</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+              专利名称
+            </div>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                lineHeight: 1.5,
+              }}
+            >
               {patent.title}
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>专利号</div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{patent.patentNumber}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                专利号
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                {patent.patentNumber}
+              </div>
             </div>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>申请日</div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{patent.filingDate?.slice(0, 10)}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                申请日
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                {patent.filingDate?.slice(0, 10)}
+              </div>
             </div>
           </div>
 
           <div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>申请人</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+              申请人
+            </div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
               {(patent.applicants || []).join('、')}
             </div>
           </div>
 
           <div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>发明人</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+              发明人
+            </div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
               {(patent.inventors || []).join('、')}
             </div>
           </div>
 
           <div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>IPC分类号</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+              IPC分类号
+            </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {(patent.ipcCodes || []).map((code) => (
-                <span key={code} style={{
-                  fontSize: 11, padding: '3px 8px', borderRadius: 4,
-                  background: 'rgba(59,130,246,0.1)', color: 'var(--accent-blue)',
-                  border: '1px solid rgba(59,130,246,0.2)',
-                }}>
+                <span
+                  key={code}
+                  style={{
+                    fontSize: 11,
+                    padding: '3px 8px',
+                    borderRadius: 4,
+                    background: 'rgba(59,130,246,0.1)',
+                    color: 'var(--accent-blue)',
+                    border: '1px solid rgba(59,130,246,0.2)',
+                  }}
+                >
                   {code}
                 </span>
               ))}
@@ -76,7 +136,9 @@ function PatentDetailModal({ patent, onClose }: { patent: Patent; onClose: () =>
           </div>
 
           <div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>相关度</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+              相关度
+            </div>
             <div style={{ fontSize: 13, color: 'var(--accent-green)', fontWeight: 600 }}>
               {patent.relevanceScore}%
             </div>
@@ -110,33 +172,36 @@ export function PatentSearchPage() {
 
   const totalPages = Math.ceil(total / pageSize);
 
-  const fetchPatents = async (pageNum = 1) => {
-    setLoading(true);
-    try {
-      const res = await patentsApi.search({
-        q: query,
-        page: pageNum,
-        page_size: pageSize,
-        ...(ipcCode ? { ipc_code: ipcCode } : {}),
-        ...(applicant ? { applicant } : {}),
-        sort_by: sortBy,
-      });
-      setPatents(res.data);
-      setTotal(res.total);
-      setPage(pageNum);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchPatents = useCallback(
+    async (pageNum = 1) => {
+      setLoading(true);
+      try {
+        const res = await patentsApi.search({
+          q: query,
+          page: pageNum,
+          page_size: pageSize,
+          ...(ipcCode ? { ipc_code: ipcCode } : {}),
+          ...(applicant ? { applicant } : {}),
+          sort_by: sortBy,
+        });
+        setPatents(res.data);
+        setTotal(res.total);
+        setPage(pageNum);
+      } catch {
+        // ignore
+      } finally {
+        setLoading(false);
+      }
+    },
+    [query, ipcCode, applicant, sortBy, pageSize],
+  );
 
   useEffect(() => {
     if (!initialized.current) {
       initialized.current = true;
       fetchPatents(1);
     }
-  }, []);
+  }, [fetchPatents]);
 
   const handleSearch = () => {
     fetchPatents(1);
@@ -155,10 +220,19 @@ export function PatentSearchPage() {
   };
 
   return (
-    <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div
+      className="card"
+      style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}
+    >
+      <div
+        className="card-title"
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+      >
         <div>
-          <i className="fa-solid fa-file-lines" style={{ marginRight: 8, color: 'var(--accent-cyan)' }} />
+          <i
+            className="fa-solid fa-file-lines"
+            style={{ marginRight: 8, color: 'var(--accent-cyan)' }}
+          />
           专利检索
         </div>
         <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
@@ -170,30 +244,46 @@ export function PatentSearchPage() {
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
           <div style={{ position: 'relative', flex: 1 }}>
-            <i className="fa-solid fa-magnifying-glass" style={{
-              position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
-              fontSize: 12, color: 'var(--text-tertiary)',
-            }} />
+            <i
+              className="fa-solid fa-magnifying-glass"
+              style={{
+                position: 'absolute',
+                left: 10,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                fontSize: 12,
+                color: 'var(--text-tertiary)',
+              }}
+            />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="搜索专利标题或摘要..."
               style={{
-                width: '100%', padding: '8px 10px 8px 32px', borderRadius: 6,
-                background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)',
-                color: 'var(--text-primary)', fontSize: 13, outline: 'none', fontFamily: 'inherit',
+                width: '100%',
+                padding: '8px 10px 8px 32px',
+                borderRadius: 6,
+                background: 'rgba(0,0,0,0.2)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-primary)',
+                fontSize: 13,
+                outline: 'none',
+                fontFamily: 'inherit',
               }}
             />
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
             style={{
-              padding: '8px 14px', borderRadius: 6,
+              padding: '8px 14px',
+              borderRadius: 6,
               background: showFilters ? 'rgba(59,130,246,0.15)' : 'rgba(0,0,0,0.2)',
               border: '1px solid var(--border)',
               color: showFilters ? 'var(--accent-blue)' : 'var(--text-secondary)',
-              cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+              cursor: 'pointer',
+              fontSize: 13,
+              fontFamily: 'inherit',
             }}
           >
             <i className="fa-solid fa-filter" style={{ marginRight: 4 }} />
@@ -202,57 +292,92 @@ export function PatentSearchPage() {
           <button
             onClick={handleSearch}
             style={{
-              padding: '8px 20px', borderRadius: 6,
-              background: 'var(--accent)', border: 'none',
-              color: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+              padding: '8px 20px',
+              borderRadius: 6,
+              background: 'var(--accent)',
+              border: 'none',
+              color: '#fff',
+              cursor: 'pointer',
+              fontSize: 13,
+              fontFamily: 'inherit',
             }}
           >
-          搜索
-            </button>
+            搜索
+          </button>
         </div>
 
         {/* 高级筛选 */}
         {showFilters && (
-          <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8,
-            padding: 12, background: 'rgba(0,0,0,0.15)', borderRadius: 6,
-            border: '1px solid var(--border-light)',
-          }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr 1fr',
+              gap: 8,
+              padding: 12,
+              background: 'rgba(0,0,0,0.15)',
+              borderRadius: 6,
+              border: '1px solid var(--border-light)',
+            }}
+          >
             <div>
-              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>IPC分类号</div>
+              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                IPC分类号
+              </div>
               <input
                 value={ipcCode}
                 onChange={(e) => setIpcCode(e.target.value)}
                 placeholder="如: H01M"
                 style={{
-                  width: '100%', padding: '6px 10px', borderRadius: 4,
-                  background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-light)',
-                  color: 'var(--text-primary)', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+                  width: '100%',
+                  padding: '6px 10px',
+                  borderRadius: 4,
+                  background: 'rgba(0,0,0,0.2)',
+                  border: '1px solid var(--border-light)',
+                  color: 'var(--text-primary)',
+                  fontSize: 12,
+                  outline: 'none',
+                  fontFamily: 'inherit',
                 }}
               />
             </div>
             <div>
-              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>申请人</div>
+              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                申请人
+              </div>
               <input
                 value={applicant}
                 onChange={(e) => setApplicant(e.target.value)}
                 placeholder="申请人名称"
                 style={{
-                  width: '100%', padding: '6px 10px', borderRadius: 4,
-                  background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-light)',
-                  color: 'var(--text-primary)', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+                  width: '100%',
+                  padding: '6px 10px',
+                  borderRadius: 4,
+                  background: 'rgba(0,0,0,0.2)',
+                  border: '1px solid var(--border-light)',
+                  color: 'var(--text-primary)',
+                  fontSize: 12,
+                  outline: 'none',
+                  fontFamily: 'inherit',
                 }}
               />
             </div>
             <div>
-              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>排序方式</div>
+              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                排序方式
+              </div>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
                 style={{
-                  width: '100%', padding: '6px 10px', borderRadius: 4,
-                  background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-light)',
-                  color: 'var(--text-primary)', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+                  width: '100%',
+                  padding: '6px 10px',
+                  borderRadius: 4,
+                  background: 'rgba(0,0,0,0.2)',
+                  border: '1px solid var(--border-light)',
+                  color: 'var(--text-primary)',
+                  fontSize: 12,
+                  outline: 'none',
+                  fontFamily: 'inherit',
                 }}
               >
                 <option value="relevance">按相关度</option>
@@ -268,12 +393,27 @@ export function PatentSearchPage() {
       <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
         {loading ? (
           <div style={{ padding: '40px 0', textAlign: 'center' }}>
-            <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 24, color: 'var(--accent-blue)' }} />
-            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>加载中...</div>
+            <i
+              className="fa-solid fa-circle-notch fa-spin"
+              style={{ fontSize: 24, color: 'var(--accent-blue)' }}
+            />
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>
+              加载中...
+            </div>
           </div>
         ) : patents.length === 0 ? (
-          <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
-            <i className="fa-solid fa-inbox" style={{ fontSize: 32, marginBottom: 12, display: 'block', opacity: 0.3 }} />
+          <div
+            style={{
+              padding: '40px 0',
+              textAlign: 'center',
+              color: 'var(--text-tertiary)',
+              fontSize: 13,
+            }}
+          >
+            <i
+              className="fa-solid fa-inbox"
+              style={{ fontSize: 32, marginBottom: 12, display: 'block', opacity: 0.3 }}
+            />
             暂无专利数据
           </div>
         ) : (
@@ -283,10 +423,15 @@ export function PatentSearchPage() {
                 key={patent.id}
                 onClick={() => setSelectedPatent(patent)}
                 style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 12,
-                  padding: '12px 14px', borderRadius: 8,
-                  background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border-light)',
-                  cursor: 'pointer', transition: 'all 0.15s',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 12,
+                  padding: '12px 14px',
+                  borderRadius: 8,
+                  background: 'rgba(0,0,0,0.15)',
+                  border: '1px solid var(--border-light)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
                 }}
                 onMouseOver={(e) => {
                   e.currentTarget.style.background = 'rgba(0,0,0,0.25)';
@@ -297,36 +442,73 @@ export function PatentSearchPage() {
                   e.currentTarget.style.borderColor = 'var(--border-light)';
                 }}
               >
-                <span style={{
-                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                  background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 600, color: 'var(--accent-blue)',
-                }}>
+                <span
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    flexShrink: 0,
+                    background: 'rgba(59,130,246,0.15)',
+                    border: '1px solid rgba(59,130,246,0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: 'var(--accent-blue)',
+                  }}
+                >
                   {(page - 1) * pageSize + index + 1}
                 </span>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: 13, fontWeight: 600, color: 'var(--text-primary)',
-                    marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 4,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {patent.title}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4, lineHeight: 1.5 }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: 'var(--text-secondary)',
+                      marginBottom: 4,
+                      lineHeight: 1.5,
+                    }}
+                  >
                     {patent.abstract?.slice(0, 120) || '暂无摘要'}
                     {patent.abstract?.length > 120 ? '...' : ''}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 10, color: 'var(--text-tertiary)' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      fontSize: 10,
+                      color: 'var(--text-tertiary)',
+                    }}
+                  >
                     <span>申请号: {patent.patentNumber}</span>
                     <span>申请日: {patent.filingDate?.slice(0, 10)}</span>
                     <div style={{ display: 'flex', gap: 4 }}>
                       {(patent.ipcCodes || []).slice(0, 3).map((code) => (
-                        <span key={code} style={{
-                          padding: '1px 6px', borderRadius: 3,
-                          background: 'rgba(59,130,246,0.1)', color: 'var(--accent-blue)',
-                          border: '1px solid rgba(59,130,246,0.2)',
-                        }}>
+                        <span
+                          key={code}
+                          style={{
+                            padding: '1px 6px',
+                            borderRadius: 3,
+                            background: 'rgba(59,130,246,0.1)',
+                            color: 'var(--accent-blue)',
+                            border: '1px solid rgba(59,130,246,0.2)',
+                          }}
+                        >
                           {code}
                         </span>
                       ))}
@@ -334,7 +516,15 @@ export function PatentSearchPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-end',
+                    gap: 4,
+                    flexShrink: 0,
+                  }}
+                >
                   {patent.relevanceScore > 0 && (
                     <>
                       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-green)' }}>
@@ -352,18 +542,29 @@ export function PatentSearchPage() {
 
       {/* 分页 */}
       {totalPages > 1 && (
-        <div style={{
-          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8,
-          marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border-light)',
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: 8,
+            marginTop: 16,
+            paddingTop: 12,
+            borderTop: '1px solid var(--border-light)',
+          }}
+        >
           <button
             onClick={() => handlePageChange(page - 1)}
             disabled={page <= 1}
             style={{
-              padding: '4px 10px', borderRadius: 4,
-              background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-light)',
+              padding: '4px 10px',
+              borderRadius: 4,
+              background: 'rgba(0,0,0,0.2)',
+              border: '1px solid var(--border-light)',
               color: page <= 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)',
-              cursor: page <= 1 ? 'not-allowed' : 'pointer', fontSize: 11, fontFamily: 'inherit',
+              cursor: page <= 1 ? 'not-allowed' : 'pointer',
+              fontSize: 11,
+              fontFamily: 'inherit',
             }}
           >
             <i className="fa-solid fa-chevron-left" />
@@ -377,11 +578,15 @@ export function PatentSearchPage() {
                   key={pageNum}
                   onClick={() => handlePageChange(pageNum)}
                   style={{
-                    width: 28, height: 28, borderRadius: 4,
+                    width: 28,
+                    height: 28,
+                    borderRadius: 4,
                     background: pageNum === page ? 'var(--accent)' : 'rgba(0,0,0,0.2)',
                     border: '1px solid var(--border-light)',
                     color: pageNum === page ? '#fff' : 'var(--text-secondary)',
-                    cursor: 'pointer', fontSize: 11, fontFamily: 'inherit',
+                    cursor: 'pointer',
+                    fontSize: 11,
+                    fontFamily: 'inherit',
                   }}
                 >
                   {pageNum}
@@ -394,10 +599,14 @@ export function PatentSearchPage() {
             onClick={() => handlePageChange(page + 1)}
             disabled={page >= totalPages}
             style={{
-              padding: '4px 10px', borderRadius: 4,
-              background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-light)',
+              padding: '4px 10px',
+              borderRadius: 4,
+              background: 'rgba(0,0,0,0.2)',
+              border: '1px solid var(--border-light)',
               color: page >= totalPages ? 'var(--text-tertiary)' : 'var(--text-secondary)',
-              cursor: page >= totalPages ? 'not-allowed' : 'pointer', fontSize: 11, fontFamily: 'inherit',
+              cursor: page >= totalPages ? 'not-allowed' : 'pointer',
+              fontSize: 11,
+              fontFamily: 'inherit',
             }}
           >
             <i className="fa-solid fa-chevron-right" />

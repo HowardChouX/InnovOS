@@ -37,13 +37,26 @@ const SCORE_COLORS: Record<keyof EvaluationScore, string> = {
 
 function ScoreCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div style={{
-      background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 10,
-      border: '1px solid var(--border-light)', textAlign: 'center',
-    }}>
+    <div
+      style={{
+        background: 'rgba(0,0,0,0.2)',
+        borderRadius: 8,
+        padding: 10,
+        border: '1px solid var(--border-light)',
+        textAlign: 'center',
+      }}
+    >
       <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 18, fontWeight: 700, color, marginBottom: 6 }}>{value}</div>
-      <div style={{ width: '100%', height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.3)', overflow: 'hidden' }}>
+      <div
+        style={{
+          width: '100%',
+          height: 4,
+          borderRadius: 2,
+          background: 'rgba(0,0,0,0.3)',
+          overflow: 'hidden',
+        }}
+      >
         <div style={{ width: `${value}%`, height: '100%', background: color, borderRadius: 2 }} />
       </div>
     </div>
@@ -51,15 +64,25 @@ function ScoreCard({ label, value, color }: { label: string; value: number; colo
 }
 
 function OverallBadge({ overall }: { overall: number }) {
-  const color = overall >= 80 ? 'var(--accent-green)' : overall >= 60 ? 'var(--accent-yellow)' : 'var(--accent-red)';
+  const color =
+    overall >= 80
+      ? 'var(--accent-green)'
+      : overall >= 60
+        ? 'var(--accent-yellow)'
+        : 'var(--accent-red)';
   const label = overall >= 80 ? '优秀' : overall >= 60 ? '良好' : '待改进';
   return (
-    <div style={{
-      display: 'inline-flex', alignItems: 'center', gap: 6,
-      padding: '4px 12px', borderRadius: 6,
-      background: `color-mix(in srgb, ${color} 15%, transparent)`,
-      border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
-    }}>
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '4px 12px',
+        borderRadius: 6,
+        background: `color-mix(in srgb, ${color} 15%, transparent)`,
+        border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
+      }}
+    >
       <span style={{ fontSize: 13, fontWeight: 700, color }}>{overall}</span>
       <span style={{ fontSize: 11, color }}>{label}</span>
     </div>
@@ -78,19 +101,39 @@ export function EvaluationView({ output }: { output: EvaluationItem[] | null }) 
   // 只要 submit 完成就立刻显示，直到组件因 phase 切换而卸载
   if (submitted) {
     return (
-      <div className="card" style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        flex: 1, minHeight: 0, gap: 16,
-      }}>
-        <div style={{
-          width: 48, height: 48, borderRadius: '50%',
-          background: 'rgba(251,191,36,0.15)', border: '2px solid rgba(251,191,36,0.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 20, color: 'var(--accent-yellow)' }} />
+      <div
+        className="card"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: 1,
+          minHeight: 0,
+          gap: 16,
+        }}
+      >
+        <div
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            background: 'rgba(251,191,36,0.15)',
+            border: '2px solid rgba(251,191,36,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <i
+            className="fa-solid fa-circle-notch fa-spin"
+            style={{ fontSize: 20, color: 'var(--accent-yellow)' }}
+          />
         </div>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+          <div
+            style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}
+          >
             正在执行成果转化...
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
@@ -103,7 +146,16 @@ export function EvaluationView({ output }: { output: EvaluationItem[] | null }) 
 
   if (!output || !Array.isArray(output) || output.length === 0) {
     return (
-      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 0 }}>
+      <div
+        className="card"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
         <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>暂无评估数据</span>
       </div>
     );
@@ -127,7 +179,10 @@ export function EvaluationView({ output }: { output: EvaluationItem[] | null }) 
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="card-title">
-        <i className="fa-solid fa-chart-line" style={{ marginRight: 8, color: 'var(--accent-yellow)' }} />
+        <i
+          className="fa-solid fa-chart-line"
+          style={{ marginRight: 8, color: 'var(--accent-yellow)' }}
+        />
         方案评估
       </div>
 
@@ -142,45 +197,128 @@ export function EvaluationView({ output }: { output: EvaluationItem[] | null }) 
           const keys = Object.keys(scores) as (keyof EvaluationScore)[];
 
           return (
-            <div key={i} style={{
-              background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 14,
-              border: '1px solid var(--border-light)',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{item.solution_title}</div>
+            <div
+              key={i}
+              style={{
+                background: 'rgba(0,0,0,0.2)',
+                borderRadius: 8,
+                padding: 14,
+                border: '1px solid var(--border-light)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 12,
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {item.solution_title}
+                </div>
                 <OverallBadge overall={overall} />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(4, 1fr)',
+                  gap: 8,
+                  marginBottom: 12,
+                }}
+              >
                 {keys.map((key) => (
-                  <ScoreCard key={key} label={SCORE_LABELS[key]} value={scores[key]} color={SCORE_COLORS[key]} />
+                  <ScoreCard
+                    key={key}
+                    label={SCORE_LABELS[key]}
+                    value={scores[key]}
+                    color={SCORE_COLORS[key]}
+                  />
                 ))}
               </div>
 
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 {strengths.length > 0 && (
                   <div style={{ flex: 1, minWidth: 160 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-green)', marginBottom: 4 }}>优势</div>
-                    <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
-                      {strengths.map((s, j) => <li key={j}>{s}</li>)}
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: 'var(--accent-green)',
+                        marginBottom: 4,
+                      }}
+                    >
+                      优势
+                    </div>
+                    <ul
+                      style={{
+                        margin: 0,
+                        paddingLeft: 16,
+                        fontSize: 11,
+                        color: 'var(--text-secondary)',
+                        lineHeight: 1.8,
+                      }}
+                    >
+                      {strengths.map((s, j) => (
+                        <li key={j}>{s}</li>
+                      ))}
                     </ul>
                   </div>
                 )}
                 {weaknesses.length > 0 && (
                   <div style={{ flex: 1, minWidth: 160 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-red)', marginBottom: 4 }}>不足</div>
-                    <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
-                      {weaknesses.map((w, j) => <li key={j}>{w}</li>)}
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: 'var(--accent-red)',
+                        marginBottom: 4,
+                      }}
+                    >
+                      不足
+                    </div>
+                    <ul
+                      style={{
+                        margin: 0,
+                        paddingLeft: 16,
+                        fontSize: 11,
+                        color: 'var(--text-secondary)',
+                        lineHeight: 1.8,
+                      }}
+                    >
+                      {weaknesses.map((w, j) => (
+                        <li key={j}>{w}</li>
+                      ))}
                     </ul>
                   </div>
                 )}
               </div>
 
               {recommendations.length > 0 && (
-                <div style={{ marginTop: 8, padding: 8, borderRadius: 6, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)' }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-blue)', marginBottom: 4 }}>建议</div>
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: 8,
+                    borderRadius: 6,
+                    background: 'rgba(59,130,246,0.08)',
+                    border: '1px solid rgba(59,130,246,0.15)',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: 'var(--accent-blue)',
+                      marginBottom: 4,
+                    }}
+                  >
+                    建议
+                  </div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                    {recommendations.map((r, j) => <div key={j}>- {r}</div>)}
+                    {recommendations.map((r, j) => (
+                      <div key={j}>- {r}</div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -190,30 +328,56 @@ export function EvaluationView({ output }: { output: EvaluationItem[] | null }) 
       </div>
 
       {submitError && (
-        <div style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--accent-red)', fontSize: 12, marginTop: 8 }}>
+        <div
+          style={{
+            padding: '8px 12px',
+            borderRadius: 6,
+            background: 'rgba(248,113,113,0.1)',
+            border: '1px solid rgba(248,113,113,0.3)',
+            color: 'var(--accent-red)',
+            fontSize: 12,
+            marginTop: 8,
+          }}
+        >
           {submitError}
         </div>
       )}
-      {workflow?.status === 'awaiting_rating' && (
+      {(workflow?.status as string) === 'awaiting_rating' && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
           <button
             onClick={handleSubmit}
             disabled={submitting || submitted}
             style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 20px', borderRadius: 6, fontSize: 13,
-              background: submitting ? 'var(--text-tertiary)' : submitted ? 'var(--accent-green)' : 'var(--accent)',
-              border: 'none', color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 20px',
+              borderRadius: 6,
+              fontSize: 13,
+              background: submitting
+                ? 'var(--text-tertiary)'
+                : submitted
+                  ? 'var(--accent-green)'
+                  : 'var(--accent)',
+              border: 'none',
+              color: '#fff',
               cursor: submitting ? 'not-allowed' : 'pointer',
-              fontFamily: 'inherit', transition: 'all 0.15s',
+              fontFamily: 'inherit',
+              transition: 'all 0.15s',
             }}
           >
             {submitting ? (
-              <><i className="fa-solid fa-circle-notch fa-spin" /> 提交中...</>
+              <>
+                <i className="fa-solid fa-circle-notch fa-spin" /> 提交中...
+              </>
             ) : submitted ? (
-              <><i className="fa-solid fa-check" /> 已确认</>
+              <>
+                <i className="fa-solid fa-check" /> 已确认
+              </>
             ) : (
-              <><i className="fa-solid fa-arrow-right" /> 确认并进入成果转化</>
+              <>
+                <i className="fa-solid fa-arrow-right" /> 确认并进入成果转化
+              </>
             )}
           </button>
         </div>

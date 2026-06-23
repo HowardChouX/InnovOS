@@ -1,16 +1,16 @@
-import '../types.js'
+import '../types.js';
 
-import { mergeAttributes, Node } from '@tiptap/core'
+import { mergeAttributes, Node } from '@tiptap/core';
 
 export interface TableHeaderOptions {
-  HTMLAttributes: Record<string, any>
+  HTMLAttributes: Record<string, unknown>;
 }
 
 export const TableHeader = Node.create<TableHeaderOptions>({
   name: 'tableHeader',
 
   addOptions() {
-    return { HTMLAttributes: {} }
+    return { HTMLAttributes: {} };
   },
 
   content: 'paragraph+',
@@ -22,22 +22,22 @@ export const TableHeader = Node.create<TableHeaderOptions>({
       colwidth: {
         default: null,
         parseHTML: (element) => {
-          const colwidth = element.getAttribute('colwidth')
-          const value = colwidth ? colwidth.split(',').map((width) => parseInt(width, 10)) : null
-          return value
-        }
-      }
-    }
+          const colwidth = element.getAttribute('colwidth');
+          const value = colwidth ? colwidth.split(',').map((width) => parseInt(width, 10)) : null;
+          return value;
+        },
+      },
+    };
   },
 
   tableRole: 'header_cell',
   isolating: true,
 
   parseHTML() {
-    return [{ tag: 'th' }]
+    return [{ tag: 'th' }];
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ['th', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0]
-  }
-})
+    return ['th', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+  },
+});

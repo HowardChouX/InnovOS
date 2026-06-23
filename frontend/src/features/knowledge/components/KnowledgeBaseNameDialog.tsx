@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface KnowledgeBaseNameDialogProps {
@@ -16,17 +16,26 @@ const KnowledgeBaseNameDialog = ({
   onSubmit,
   onOpenChange,
 }: KnowledgeBaseNameDialogProps) => {
+  if (!open) return null;
+
+  return (
+    <KnowledgeBaseNameForm
+      initialName={initialName}
+      isSubmitting={isSubmitting}
+      onSubmit={onSubmit}
+      onOpenChange={onOpenChange}
+    />
+  );
+};
+
+function KnowledgeBaseNameForm({
+  initialName,
+  isSubmitting,
+  onSubmit,
+  onOpenChange,
+}: Omit<KnowledgeBaseNameDialogProps, 'open'>) {
   const [name, setName] = useState(initialName);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (open) {
-      setName(initialName);
-      setError('');
-    }
-  }, [initialName, open]);
-
-  if (!open) return null;
 
   const handleSubmit = async () => {
     const trimmed = name.trim();
@@ -37,8 +46,8 @@ const KnowledgeBaseNameDialog = ({
     try {
       await onSubmit(trimmed);
       onOpenChange(false);
-    } catch (e: any) {
-      setError(e?.message || '重命名失败');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '重命名失败');
     }
   };
 
@@ -49,7 +58,7 @@ const KnowledgeBaseNameDialog = ({
     >
       <div
         className="flex w-[400px] flex-col overflow-hidden rounded-xl border border-border bg-card"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border-light px-4 py-3.5">
@@ -67,14 +76,17 @@ const KnowledgeBaseNameDialog = ({
           <input
             autoFocus
             value={name}
-            onChange={e => { setName(e.target.value); setError(''); }}
-            onKeyDown={e => { if (e.key === 'Enter' && !isSubmitting) handleSubmit(); }}
+            onChange={(e) => {
+              setName(e.target.value);
+              setError('');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !isSubmitting) handleSubmit();
+            }}
             placeholder="名称"
             className="w-full rounded-md border border-border bg-background-muted px-3 py-2 text-sm text-foreground outline-none placeholder:text-foreground-muted/50 focus:ring-1 focus:ring-ring"
           />
-          {error && (
-            <div className="mt-2 text-xs text-accent-danger">{error}</div>
-          )}
+          {error && <div className="mt-2 text-xs text-accent-danger">{error}</div>}
         </div>
 
         {/* Footer */}
@@ -95,8 +107,8 @@ const KnowledgeBaseNameDialog = ({
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
-};
+}
 
 export default KnowledgeBaseNameDialog;

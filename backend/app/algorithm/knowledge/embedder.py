@@ -3,7 +3,9 @@
 
 与 CherryStudio 行为一致：模型失败 → 异常冒泡 → job 重试 → 标记 failed
 """
+
 from __future__ import annotations
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -68,7 +70,7 @@ class Embedder:
 
         all_embeddings: list[list[float]] = []
         for i in range(0, len(texts), BATCH_SIZE):
-            batch = texts[i:i + BATCH_SIZE]
+            batch = texts[i : i + BATCH_SIZE]
             batch_embeddings = await _embed_batch(batch)
             all_embeddings.extend(batch_embeddings)
 

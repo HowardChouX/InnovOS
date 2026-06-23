@@ -1,5 +1,5 @@
-import type { Editor } from '@tiptap/core'
-import type { LucideIcon } from 'lucide-react'
+import type { Editor, Range } from '@tiptap/core';
+import type { LucideIcon } from 'lucide-react';
 import {
   Bold,
   Calculator,
@@ -23,112 +23,112 @@ import {
   Type,
   Underline,
   Undo,
-  X
-} from 'lucide-react'
+  X,
+} from 'lucide-react';
 
-const logger = {
-  info: (...args: any[]) => console.log('[RichEditor.Command]', ...args),
-  warn: (...args: any[]) => console.warn('[RichEditor.Command]', ...args),
-  error: (...args: any[]) => console.error('[RichEditor.Command]', ...args),
-}
+// logger removed - was unused
 
 export interface Command {
-  id: string
-  title: string
-  description: string
-  category: CommandCategory
-  icon: LucideIcon
-  keywords: string[]
-  handler: (editor: Editor) => void
-  isAvailable?: (editor: Editor) => boolean
+  id: string;
+  title: string;
+  description: string;
+  category: CommandCategory;
+  icon: LucideIcon;
+  keywords: string[];
+  handler: (editor: Editor) => void;
+  isAvailable?: (editor: Editor) => boolean;
   // Toolbar support
-  showInToolbar?: boolean
-  toolbarGroup?: 'text' | 'formatting' | 'blocks' | 'media' | 'structure' | 'history'
-  formattingCommand?: string // Maps to FormattingCommand for state checking
+  showInToolbar?: boolean;
+  toolbarGroup?: 'text' | 'formatting' | 'blocks' | 'media' | 'structure' | 'history';
+  formattingCommand?: string; // Maps to FormattingCommand for state checking
 }
 
-export enum CommandCategory {
-  TEXT = 'text',
-  LISTS = 'lists',
-  BLOCKS = 'blocks',
-  MEDIA = 'media',
-  STRUCTURE = 'structure',
-  SPECIAL = 'special'
-}
+export const CommandCategory = {
+  TEXT: 'text',
+  LISTS: 'lists',
+  BLOCKS: 'blocks',
+  MEDIA: 'media',
+  STRUCTURE: 'structure',
+  SPECIAL: 'special',
+} as const;
+export type CommandCategory = (typeof CommandCategory)[keyof typeof CommandCategory];
 
 export interface CommandSuggestion {
-  query: string
-  range: any
-  clientRect?: () => DOMRect | null
+  query: string;
+  range: Range;
+  clientRect?: () => DOMRect | null;
 }
 
 // Internal dynamic command registry
-const commandRegistry = new Map<string, Command>()
+const commandRegistry = new Map<string, Command>();
 
 export function registerCommand(cmd: Command): void {
-  commandRegistry.set(cmd.id, cmd)
+  commandRegistry.set(cmd.id, cmd);
 }
 
 export function unregisterCommand(id: string): void {
-  commandRegistry.delete(id)
+  commandRegistry.delete(id);
 }
 
 export function getCommand(id: string): Command | undefined {
-  return commandRegistry.get(id)
+  return commandRegistry.get(id);
 }
 
 export function getAllCommands(): Command[] {
-  return Array.from(commandRegistry.values())
+  return Array.from(commandRegistry.values());
 }
 
 export function getToolbarCommands(): Command[] {
-  return getAllCommands().filter((cmd) => cmd.showInToolbar)
+  return getAllCommands().filter((cmd) => cmd.showInToolbar);
 }
 
 export function getCommandsByGroup(group: string): Command[] {
-  return getAllCommands().filter((cmd) => cmd.toolbarGroup === group)
+  return getAllCommands().filter((cmd) => cmd.toolbarGroup === group);
 }
 
 // Dynamic toolbar management
 export function registerToolbarCommand(cmd: Command): void {
   if (!cmd.showInToolbar) {
-    cmd.showInToolbar = true
+    cmd.showInToolbar = true;
   }
-  registerCommand(cmd)
+  registerCommand(cmd);
 }
 
 export function unregisterToolbarCommand(id: string): void {
-  const cmd = getCommand(id)
+  const cmd = getCommand(id);
   if (cmd) {
-    cmd.showInToolbar = false
+    cmd.showInToolbar = false;
     // Keep command for slash menu, just hide from toolbar
   }
 }
 
 export function setCommandAvailability(id: string, isAvailable: (editor: Editor) => boolean): void {
-  const cmd = getCommand(id)
+  const cmd = getCommand(id);
   if (cmd) {
-    cmd.isAvailable = isAvailable
+    cmd.isAvailable = isAvailable;
   }
 }
 
 // Convenience functions for common scenarios
-export function disableCommandsWhen(commandIds: string[], condition: (editor: Editor) => boolean): void {
+export function disableCommandsWhen(
+  commandIds: string[],
+  condition: (editor: Editor) => boolean,
+): void {
   commandIds.forEach((id) => {
-    setCommandAvailability(id, (editor) => !condition(editor))
-  })
+    setCommandAvailability(id, (editor) => !condition(editor));
+  });
 }
 
 export function hideToolbarCommandsWhen(commandIds: string[], condition: () => boolean): void {
   if (condition()) {
-    commandIds.forEach((id) => unregisterToolbarCommand(id))
+    commandIds.forEach((id) => unregisterToolbarCommand(id));
   } else {
     commandIds.forEach((id) => {
-      const cmd = getCommand(id)
+      const cmd = getCommand(id);
       if (cmd) {
-        cmd.showInToolbar = true
+        cmd.showInToolbar = true;
       }
-    })
+    });
   }
 }
 
@@ -142,11 +142,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Bold,
     keywords: ['bold', 'strong', 'b'],
     handler: (editor: Editor) => {
-      editor.chain().focus().toggleBold().run()
+      editor.chain().focus().toggleBold().run();
     },
     showInToolbar: true,
     toolbarGroup: 'formatting',
-    formattingCommand: 'bold'
+    formattingCommand: 'bold',
   },
   {
     id: 'italic',
@@ -156,11 +156,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Italic,
     keywords: ['italic', 'emphasis', 'i'],
     handler: (editor: Editor) => {
-      editor.chain().focus().toggleItalic().run()
+      editor.chain().focus().toggleItalic().run();
     },
     showInToolbar: true,
     toolbarGroup: 'formatting',
-    formattingCommand: 'italic'
+    formattingCommand: 'italic',
   },
   {
     id: 'underline',
@@ -170,11 +170,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Underline,
     keywords: ['underline', 'u'],
     handler: (editor: Editor) => {
-      editor.chain().focus().toggleUnderline().run()
+      editor.chain().focus().toggleUnderline().run();
     },
     showInToolbar: true,
     toolbarGroup: 'formatting',
-    formattingCommand: 'underline'
+    formattingCommand: 'underline',
   },
   {
     id: 'strike',
@@ -184,11 +184,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Strikethrough,
     keywords: ['strikethrough', 'strike', 's'],
     handler: (editor: Editor) => {
-      editor.chain().focus().toggleStrike().run()
+      editor.chain().focus().toggleStrike().run();
     },
     showInToolbar: true,
     toolbarGroup: 'formatting',
-    formattingCommand: 'strike'
+    formattingCommand: 'strike',
   },
   {
     id: 'inlineCode',
@@ -198,11 +198,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Code,
     keywords: ['code', 'inline', 'monospace'],
     handler: (editor: Editor) => {
-      editor.chain().focus().toggleCode().run()
+      editor.chain().focus().toggleCode().run();
     },
     showInToolbar: true,
     toolbarGroup: 'formatting',
-    formattingCommand: 'code'
+    formattingCommand: 'code',
   },
   {
     id: 'paragraph',
@@ -212,11 +212,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Type,
     keywords: ['text', 'paragraph', 'p'],
     handler: (editor: Editor) => {
-      editor.chain().focus().setParagraph().run()
+      editor.chain().focus().setParagraph().run();
     },
     showInToolbar: true,
     toolbarGroup: 'text',
-    formattingCommand: 'paragraph'
+    formattingCommand: 'paragraph',
   },
   {
     id: 'heading1',
@@ -226,11 +226,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Heading1,
     keywords: ['heading', 'h1', 'title', 'big'],
     handler: (editor: Editor) => {
-      editor.chain().focus().toggleHeading({ level: 1 }).run()
+      editor.chain().focus().toggleHeading({ level: 1 }).run();
     },
     showInToolbar: true,
     toolbarGroup: 'text',
-    formattingCommand: 'heading1'
+    formattingCommand: 'heading1',
   },
   {
     id: 'heading2',
@@ -240,11 +240,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Heading2,
     keywords: ['heading', 'h2', 'subtitle', 'medium'],
     handler: (editor: Editor) => {
-      editor.chain().focus().toggleHeading({ level: 2 }).run()
+      editor.chain().focus().toggleHeading({ level: 2 }).run();
     },
     showInToolbar: true,
     toolbarGroup: 'text',
-    formattingCommand: 'heading2'
+    formattingCommand: 'heading2',
   },
   {
     id: 'heading3',
@@ -254,11 +254,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Heading3,
     keywords: ['heading', 'h3', 'small'],
     handler: (editor: Editor) => {
-      editor.chain().focus().toggleHeading({ level: 3 }).run()
+      editor.chain().focus().toggleHeading({ level: 3 }).run();
     },
     showInToolbar: true,
     toolbarGroup: 'text',
-    formattingCommand: 'heading3'
+    formattingCommand: 'heading3',
   },
   {
     id: 'bulletList',
@@ -268,11 +268,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: List,
     keywords: ['bullet', 'list', 'ul', 'unordered'],
     handler: (editor: Editor) => {
-      editor.chain().focus().toggleBulletList().run()
+      editor.chain().focus().toggleBulletList().run();
     },
     showInToolbar: true,
     toolbarGroup: 'blocks',
-    formattingCommand: 'bulletList'
+    formattingCommand: 'bulletList',
   },
   {
     id: 'orderedList',
@@ -282,11 +282,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: ListOrdered,
     keywords: ['number', 'list', 'ol', 'ordered'],
     handler: (editor: Editor) => {
-      editor.chain().focus().toggleOrderedList().run()
+      editor.chain().focus().toggleOrderedList().run();
     },
     showInToolbar: true,
     toolbarGroup: 'blocks',
-    formattingCommand: 'orderedList'
+    formattingCommand: 'orderedList',
   },
   {
     id: 'codeBlock',
@@ -296,11 +296,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: FileCode,
     keywords: ['code', 'block', 'snippet', 'programming'],
     handler: (editor: Editor) => {
-      editor.chain().focus().toggleCodeBlock().run()
+      editor.chain().focus().toggleCodeBlock().run();
     },
     showInToolbar: true,
     toolbarGroup: 'blocks',
-    formattingCommand: 'codeBlock'
+    formattingCommand: 'codeBlock',
   },
   {
     id: 'blockquote',
@@ -310,11 +310,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Quote,
     keywords: ['quote', 'blockquote', 'citation'],
     handler: (editor: Editor) => {
-      editor.chain().focus().toggleBlockquote().run()
+      editor.chain().focus().toggleBlockquote().run();
     },
     showInToolbar: true,
     toolbarGroup: 'blocks',
-    formattingCommand: 'blockquote'
+    formattingCommand: 'blockquote',
   },
   {
     id: 'divider',
@@ -324,8 +324,8 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Minus,
     keywords: ['divider', 'hr', 'line', 'separator'],
     handler: (editor: Editor) => {
-      editor.chain().focus().setHorizontalRule().run()
-    }
+      editor.chain().focus().setHorizontalRule().run();
+    },
   },
   {
     id: 'image',
@@ -335,26 +335,26 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Image,
     keywords: ['image', 'img', 'picture', 'photo'],
     handler: (editor: Editor) => {
-      const input = document.createElement('input')
-      input.type = 'file'
-      input.accept = 'image/*'
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
       input.onchange = () => {
-        const file = input.files?.[0]
-        if (!file) return
-        const reader = new FileReader()
+        const file = input.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
         reader.onload = (e) => {
-          const dataUrl = e.target?.result as string
+          const dataUrl = e.target?.result as string;
           if (dataUrl) {
-            editor.chain().focus().setImage({ src: dataUrl }).run()
+            editor.chain().focus().setImage({ src: dataUrl }).run();
           }
-        }
-        reader.readAsDataURL(file)
-      }
-      input.click()
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
     },
     showInToolbar: true,
     toolbarGroup: 'media',
-    formattingCommand: 'image'
+    formattingCommand: 'image',
   },
   {
     id: 'link',
@@ -364,11 +364,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Link,
     keywords: ['link', 'url', 'href'],
     handler: (editor: Editor) => {
-      editor.chain().focus().setEnhancedLink({ href: '' }).run()
+      editor.chain().focus().setEnhancedLink({ href: '' }).run();
     },
     showInToolbar: true,
     toolbarGroup: 'media',
-    formattingCommand: 'link'
+    formattingCommand: 'link',
   },
   {
     id: 'table',
@@ -378,11 +378,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Table,
     keywords: ['table', 'grid', 'rows', 'columns'],
     handler: (editor: Editor) => {
-      editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+      editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
     },
     showInToolbar: true,
     toolbarGroup: 'structure',
-    formattingCommand: 'table'
+    formattingCommand: 'table',
   },
   // Additional commands for slash menu only
   {
@@ -393,11 +393,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: CheckCircle,
     keywords: ['task', 'todo', 'checklist', 'checkbox'],
     handler: (editor: Editor) => {
-      editor.chain().focus().toggleTaskList().run()
+      editor.chain().focus().toggleTaskList().run();
     },
     showInToolbar: true,
     toolbarGroup: 'blocks',
-    formattingCommand: 'taskList'
+    formattingCommand: 'taskList',
   },
   {
     id: 'hardBreak',
@@ -407,8 +407,8 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: X,
     keywords: ['break', 'br', 'newline'],
     handler: (editor: Editor) => {
-      editor.chain().focus().setHardBreak().run()
-    }
+      editor.chain().focus().setHardBreak().run();
+    },
   },
   {
     id: 'inlineMath',
@@ -418,14 +418,14 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Omega,
     keywords: ['inline', 'math', 'formula', 'equation', 'latex'],
     handler: (editor: Editor) => {
-      const latex = prompt('输入 LaTeX 行内公式:', 'E = mc^2')
+      const latex = prompt('输入 LaTeX 行内公式:', 'E = mc^2');
       if (latex != null) {
-        editor.chain().focus().insertContent(`\\(${latex}\\)`).run()
+        editor.chain().focus().insertContent(`\\(${latex}\\)`).run();
       }
     },
     showInToolbar: true,
     toolbarGroup: 'blocks',
-    formattingCommand: 'inlineMath'
+    formattingCommand: 'inlineMath',
   },
   {
     id: 'blockMath',
@@ -435,14 +435,14 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Calculator,
     keywords: ['math', 'formula', 'equation', 'latex'],
     handler: (editor: Editor) => {
-      const latex = prompt('输入 LaTeX 块级公式:', 'E = mc^2')
+      const latex = prompt('输入 LaTeX 块级公式:', 'E = mc^2');
       if (latex != null) {
-        editor.chain().focus().insertContent(`\`\`\`math\n${latex}\n\`\`\``).run()
+        editor.chain().focus().insertContent(`\`\`\`math\n${latex}\n\`\`\``).run();
       }
     },
     showInToolbar: true,
     toolbarGroup: 'blocks',
-    formattingCommand: 'blockMath'
+    formattingCommand: 'blockMath',
   },
   // History commands
   {
@@ -453,11 +453,11 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Undo,
     keywords: ['undo', 'revert'],
     handler: (editor: Editor) => {
-      editor.chain().focus().undo().run()
+      editor.chain().focus().undo().run();
     },
     showInToolbar: true,
     toolbarGroup: 'history',
-    formattingCommand: 'undo'
+    formattingCommand: 'undo',
   },
   {
     id: 'redo',
@@ -467,60 +467,60 @@ const DEFAULT_COMMANDS: Command[] = [
     icon: Redo,
     keywords: ['redo', 'repeat'],
     handler: (editor: Editor) => {
-      editor.chain().focus().redo().run()
+      editor.chain().focus().redo().run();
     },
     showInToolbar: true,
     toolbarGroup: 'history',
-    formattingCommand: 'redo'
-  }
-]
+    formattingCommand: 'redo',
+  },
+];
 
 export interface CommandFilterOptions {
-  query?: string
-  category?: CommandCategory
-  maxResults?: number
+  query?: string;
+  category?: CommandCategory;
+  maxResults?: number;
 }
 
 // Filter commands based on search query and category
 export function filterCommands(options: CommandFilterOptions = {}): Command[] {
-  const { query = '', category } = options
+  const { query = '', category } = options;
 
-  let filtered = getAllCommands()
+  let filtered = getAllCommands();
 
   // Filter by category if specified
   if (category) {
-    filtered = filtered.filter((cmd) => cmd.category === category)
+    filtered = filtered.filter((cmd) => cmd.category === category);
   }
 
   // Filter by search query
   if (query) {
-    const searchTerm = query.toLowerCase().trim()
+    const searchTerm = query.toLowerCase().trim();
     filtered = filtered.filter((cmd) => {
-      const searchableText = [cmd.title, cmd.description, ...cmd.keywords].join(' ').toLowerCase()
+      const searchableText = [cmd.title, cmd.description, ...cmd.keywords].join(' ').toLowerCase();
 
-      return searchableText.includes(searchTerm)
-    })
+      return searchableText.includes(searchTerm);
+    });
 
     // Sort by relevance (exact matches first, then title matches, then keyword matches)
     filtered.sort((a, b) => {
-      const aTitle = a.title.toLowerCase()
-      const bTitle = b.title.toLowerCase()
-      const aExactMatch = aTitle === searchTerm
-      const bExactMatch = bTitle === searchTerm
-      const aTitleMatch = aTitle.includes(searchTerm)
-      const bTitleMatch = bTitle.includes(searchTerm)
+      const aTitle = a.title.toLowerCase();
+      const bTitle = b.title.toLowerCase();
+      const aExactMatch = aTitle === searchTerm;
+      const bExactMatch = bTitle === searchTerm;
+      const aTitleMatch = aTitle.includes(searchTerm);
+      const bTitleMatch = bTitle.includes(searchTerm);
 
-      if (aExactMatch && !bExactMatch) return -1
-      if (bExactMatch && !aExactMatch) return 1
-      if (aTitleMatch && !bTitleMatch) return -1
-      if (bTitleMatch && !aTitleMatch) return 1
+      if (aExactMatch && !bExactMatch) return -1;
+      if (bExactMatch && !aExactMatch) return 1;
+      if (aTitleMatch && !bTitleMatch) return -1;
+      if (bTitleMatch && !aTitleMatch) return 1;
 
-      return a.title.localeCompare(b.title)
-    })
+      return a.title.localeCompare(b.title);
+    });
   }
 
-  return filtered
+  return filtered;
 }
 
 // Register default commands into the dynamic registry
-DEFAULT_COMMANDS.forEach(registerCommand)
+DEFAULT_COMMANDS.forEach(registerCommand);

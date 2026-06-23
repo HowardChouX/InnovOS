@@ -1,19 +1,19 @@
-import { MARKDOWN_SOURCE_LINE_ATTR } from './constants'
-import type { FormattingState } from './types'
-import type { Editor } from '@tiptap/core'
-import { Extension } from '@tiptap/core'
-import { TaskItem, TaskList } from '@tiptap/extension-list'
-import Typography from '@tiptap/extension-typography'
-import { useEditor, useEditorState } from '@tiptap/react'
-import { StarterKit } from '@tiptap/starter-kit'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { MARKDOWN_SOURCE_LINE_ATTR } from './constants';
+import type { FormattingState } from './types';
+import type { Editor } from '@tiptap/core';
+import { Extension } from '@tiptap/core';
+import { TaskItem, TaskList } from '@tiptap/extension-list';
+import Typography from '@tiptap/extension-typography';
+import { useEditor, useEditorState } from '@tiptap/react';
+import { StarterKit } from '@tiptap/starter-kit';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import Placeholder from '@tiptap/extension-placeholder'
-import { EnhancedLink } from './extensions/enhancedLink'
-import { EnhancedImage } from './extensions/enhancedImage'
-import { EnhancedMath } from './extensions/enhancedMath'
+import Placeholder from '@tiptap/extension-placeholder';
+import { EnhancedLink } from './extensions/enhancedLink';
+import { EnhancedImage } from './extensions/enhancedImage';
+import { EnhancedMath } from './extensions/enhancedMath';
 
-import { TableKit } from '../../lib/extension-table-plus'
+import { TableKit } from '../../lib/extension-table-plus';
 
 // Create extension to preserve data-source-line attribute
 const SourceLineAttribute = Extension.create({
@@ -21,45 +21,53 @@ const SourceLineAttribute = Extension.create({
   addGlobalAttributes() {
     return [
       {
-        types: ['paragraph', 'heading', 'blockquote', 'bulletList', 'orderedList', 'listItem', 'horizontalRule'],
+        types: [
+          'paragraph',
+          'heading',
+          'blockquote',
+          'bulletList',
+          'orderedList',
+          'listItem',
+          'horizontalRule',
+        ],
         attributes: {
           dataSourceLine: {
             default: null,
             parseHTML: (element) => {
-              const value = element.getAttribute(MARKDOWN_SOURCE_LINE_ATTR)
-              return value
+              const value = element.getAttribute(MARKDOWN_SOURCE_LINE_ATTR);
+              return value;
             },
             renderHTML: (attributes) => {
-              if (!attributes.dataSourceLine) return {}
-              return { [MARKDOWN_SOURCE_LINE_ATTR]: attributes.dataSourceLine }
-            }
-          }
-        }
-      }
-    ]
-  }
-})
+              if (!attributes.dataSourceLine) return {};
+              return { [MARKDOWN_SOURCE_LINE_ATTR]: attributes.dataSourceLine };
+            },
+          },
+        },
+      },
+    ];
+  },
+});
 
 export interface UseRichEditorOptions {
-  initialContent?: string
-  onChange?: (markdown: string) => void
-  onHtmlChange?: (html: string) => void
-  onContentChange?: (content: string) => void
-  onBlur?: () => void
-  placeholder?: string
-  editable?: boolean
-  enableSpellCheck?: boolean
-  scrollParent?: () => HTMLElement | null
+  initialContent?: string;
+  onChange?: (markdown: string) => void;
+  onHtmlChange?: (html: string) => void;
+  onContentChange?: (content: string) => void;
+  onBlur?: () => void;
+  placeholder?: string;
+  editable?: boolean;
+  enableSpellCheck?: boolean;
+  scrollParent?: () => HTMLElement | null;
 }
 
 export interface UseRichEditorReturn {
-  editor: Editor
-  markdown: string
-  html: string
-  formattingState: FormattingState
-  setMarkdown: (content: string) => void
-  setHtml: (html: string) => void
-  clear: () => void
+  editor: Editor;
+  markdown: string;
+  html: string;
+  formattingState: FormattingState;
+  setMarkdown: (content: string) => void;
+  setHtml: (html: string) => void;
+  clear: () => void;
 }
 
 /**
@@ -75,49 +83,49 @@ export const useRichEditor = (options: UseRichEditorOptions = {}): UseRichEditor
     placeholder = '',
     editable = true,
     enableSpellCheck = false,
-    scrollParent,
-  } = options
+    // scrollParent: unused, kept for API compat
+  } = options;
 
-  const [markdown, setMarkdownState] = useState<string>(initialContent)
+  const [markdown, setMarkdownState] = useState<string>(initialContent);
 
   const html = useMemo(() => {
-    if (!markdown) return ''
-    return markdown
-  }, [markdown])
+    if (!markdown) return '';
+    return markdown;
+  }, [markdown]);
 
-  // Link editor state
-  const [linkEditorState, setLinkEditorState] = useState<{
-    show: boolean
-    position: { x: number; y: number }
-    link: { href: string; text: string; title?: string }
-    linkRange?: { from: number; to: number }
+  // setLinkEditorState is used by handleLinkHover, reserved for LinkEditor integration
+  const [, setLinkEditorState] = useState<{
+    show: boolean;
+    position: { x: number; y: number };
+    link: { href: string; text: string; title?: string };
+    linkRange?: { from: number; to: number };
   }>({
     show: false,
     position: { x: 0, y: 0 },
-    link: { href: '', text: '' }
-  })
+    link: { href: '', text: '' },
+  });
 
   const handleLinkHover = useCallback(
     (
       attrs: { href: string; text: string; title?: string },
       position: DOMRect,
       _element: HTMLElement,
-      linkRange?: { from: number; to: number }
+      linkRange?: { from: number; to: number },
     ) => {
-      if (!editable) return
-      const linkPosition = { x: position.left, y: position.top }
-      const effectiveHref = attrs.href || attrs.text || ''
+      if (!editable) return;
+      const linkPosition = { x: position.left, y: position.top };
+      const effectiveHref = attrs.href || attrs.text || '';
       setLinkEditorState({
         show: true,
         position: linkPosition,
         link: { ...attrs, href: effectiveHref },
-        linkRange
-      })
+        linkRange,
+      });
     },
-    [editable]
-  )
+    [editable],
+  );
 
-  const handleLinkHoverEnd = useCallback(() => {}, [])
+  const handleLinkHoverEnd = useCallback(() => {}, []);
 
   // TipTap editor extensions
   const extensions = useMemo(
@@ -128,32 +136,32 @@ export const useRichEditor = (options: UseRichEditorOptions = {}): UseRichEditor
       }),
       StarterKit.configure({
         heading: {
-          levels: [1, 2, 3, 4, 5, 6]
+          levels: [1, 2, 3, 4, 5, 6],
         },
         codeBlock: false,
-        link: false
+        link: false,
       }),
       EnhancedLink.configure({
         onLinkHover: handleLinkHover,
         onLinkHoverEnd: handleLinkHoverEnd,
-        editable: editable
+        editable: editable,
       }),
       Typography,
       TaskList,
       TaskItem.configure({
-        nested: true
+        nested: true,
       }),
       TableKit.configure({
         table: { resizable: true, allowTableNodeSelection: true },
         tableRow: {},
         tableHeader: {},
-        tableCell: { allowNestedNodes: false }
+        tableCell: { allowNestedNodes: false },
       }),
       EnhancedImage,
-      EnhancedMath.configure({ katexOptions: {} })
+      EnhancedMath.configure({ katexOptions: {} } as Record<string, unknown>),
     ],
-    [handleLinkHover, handleLinkHoverEnd]
-  )
+    [handleLinkHover, handleLinkHoverEnd, editable, placeholder],
+  );
 
   const editor = useEditor({
     shouldRerenderOnTransaction: true,
@@ -165,103 +173,85 @@ export const useRichEditor = (options: UseRichEditorOptions = {}): UseRichEditor
         style: editable
           ? 'padding: 16px 20px; min-height: 160px;'
           : 'padding: 16px 20px; min-height: 160px; user-select: text; -webkit-user-select: text;',
-        spellcheck: enableSpellCheck ? 'true' : 'false'
-      }
+        spellcheck: enableSpellCheck ? 'true' : 'false',
+      },
     },
     onUpdate: ({ editor: currentEditor, transaction }) => {
-      if (!editable || !transaction.docChanged) return
-      const htmlContent = currentEditor.getHTML()
-      setMarkdownState(htmlContent)
-      onChange?.(htmlContent)
-      onHtmlChange?.(htmlContent)
-      onContentChange?.(currentEditor.getText())
+      if (!editable || !transaction.docChanged) return;
+      const htmlContent = currentEditor.getHTML();
+      setMarkdownState(htmlContent);
+      onChange?.(htmlContent);
+      onHtmlChange?.(htmlContent);
+      onContentChange?.(currentEditor.getText());
     },
     onBlur: () => {
-      onBlur?.()
+      onBlur?.();
     },
     onCreate: ({ editor: currentEditor }) => {
       try {
-        currentEditor.commands.focus('end')
-      } catch (e) {
+        currentEditor.commands.focus('end');
+      } catch {
         // ignore
       }
-    }
-  })
+    },
+  });
 
   useEffect(() => {
     if (editor && !editor.isDestroyed) {
-      editor.setEditable(editable)
+      editor.setEditable(editable);
     }
-  }, [editor, editable])
+  }, [editor, editable]);
 
-  // Link editor callbacks
-  const handleLinkSave = useCallback(
-    (href: string, text: string) => {
-      if (!editor || editor.isDestroyed) return
-      const { linkRange } = linkEditorState
-      if (linkRange) {
-        editor
-          .chain()
-          .focus()
-          .setTextSelection({ from: linkRange.from, to: linkRange.to })
-          .insertContent(text)
-          .setTextSelection({ from: linkRange.from, to: linkRange.from + text.length })
-          .setEnhancedLink({ href })
-          .run()
-      }
-      setLinkEditorState({ show: false, position: { x: 0, y: 0 }, link: { href: '', text: '' } })
-    },
-    [editor, linkEditorState]
-  )
-
-  const handleLinkRemove = useCallback(() => {
-    if (!editor || editor.isDestroyed) return
-    const { linkRange } = linkEditorState
-    if (linkRange) {
-      const tr = editor.state.tr
-      tr.removeMark(linkRange.from, linkRange.to, editor.schema.marks.enhancedLink || editor.schema.marks.link)
-      editor.view.dispatch(tr)
-    } else {
-      editor.chain().focus().extendMarkRange('enhancedLink').unsetEnhancedLink().run()
-    }
-    setLinkEditorState({ show: false, position: { x: 0, y: 0 }, link: { href: '', text: '' } })
-  }, [editor, linkEditorState])
-
-  const handleLinkCancel = useCallback(() => {
-    setLinkEditorState({ show: false, position: { x: 0, y: 0 }, link: { href: '', text: '' } })
-  }, [])
+  // Link editor callbacks (reserved for future LinkEditor integration)
 
   useEffect(() => {
     return () => {
       if (editor && !editor.isDestroyed) {
-        editor.destroy()
+        editor.destroy();
       }
-    }
-  }, [editor])
+    };
+  }, [editor]);
 
   const formattingState = useEditorState({
     editor,
     selector: ({ editor: ed }) => {
       if (!ed || ed.isDestroyed) {
         return {
-          isBold: false, canBold: false,
-          isItalic: false, canItalic: false,
-          isUnderline: false, canUnderline: false,
-          isStrike: false, canStrike: false,
-          isCode: false, canCode: false,
+          isBold: false,
+          canBold: false,
+          isItalic: false,
+          canItalic: false,
+          isUnderline: false,
+          canUnderline: false,
+          isStrike: false,
+          canStrike: false,
+          isCode: false,
+          canCode: false,
           canClearMarks: false,
           isParagraph: false,
-          isHeading1: false, isHeading2: false, isHeading3: false,
-          isHeading4: false, isHeading5: false, isHeading6: false,
-          isBulletList: false, isOrderedList: false,
-          isCodeBlock: false, isBlockquote: false,
-          isLink: false, canLink: false, canUnlink: false,
-          canUndo: false, canRedo: false,
-          isTable: false, canTable: false,
+          isHeading1: false,
+          isHeading2: false,
+          isHeading3: false,
+          isHeading4: false,
+          isHeading5: false,
+          isHeading6: false,
+          isBulletList: false,
+          isOrderedList: false,
+          isCodeBlock: false,
+          isBlockquote: false,
+          isLink: false,
+          canLink: false,
+          canUnlink: false,
+          canUndo: false,
+          canRedo: false,
+          isTable: false,
+          canTable: false,
           canImage: false,
-          isMath: false, isInlineMath: false, canMath: false,
+          isMath: false,
+          isInlineMath: false,
+          canMath: false,
           isTaskList: false,
-        }
+        };
       }
       return {
         isBold: ed.isActive('bold') ?? false,
@@ -292,47 +282,50 @@ export const useRichEditor = (options: UseRichEditorOptions = {}): UseRichEditor
         canUndo: ed.can().chain().undo().run() ?? false,
         canRedo: ed.can().chain().redo().run() ?? false,
         isTable: ed.isActive('table') ?? false,
-        canTable: ed.can().chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() ?? false,
+        canTable:
+          ed.can().chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() ?? false,
         canImage: ed.can().chain().setImage({ src: '' }).run() ?? false,
-        isMath: false, isInlineMath: false, canMath: true,
+        isMath: false,
+        isInlineMath: false,
+        canMath: true,
         isTaskList: ed.isActive('taskList') ?? false,
-      }
-    }
-  })
+      };
+    },
+  });
 
   const setMarkdown = useCallback(
     (content: string) => {
       try {
-        setMarkdownState(content)
-        onChange?.(content)
-        editor.commands.setContent(content)
-        onHtmlChange?.(content)
+        setMarkdownState(content);
+        onChange?.(content);
+        editor.commands.setContent(content);
+        onHtmlChange?.(content);
       } catch (e) {
-        console.error('Error setting markdown content:', e)
+        console.error('Error setting markdown content:', e);
       }
     },
-    [editor.commands, onChange, onHtmlChange]
-  )
+    [editor.commands, onChange, onHtmlChange],
+  );
 
   const setHtml = useCallback(
     (htmlContent: string) => {
       try {
-        setMarkdownState(htmlContent)
-        onChange?.(htmlContent)
-        editor.commands.setContent(htmlContent)
-        onHtmlChange?.(htmlContent)
+        setMarkdownState(htmlContent);
+        onChange?.(htmlContent);
+        editor.commands.setContent(htmlContent);
+        onHtmlChange?.(htmlContent);
       } catch (e) {
-        console.error('Error setting HTML content:', e)
+        console.error('Error setting HTML content:', e);
       }
     },
-    [editor.commands, onChange, onHtmlChange]
-  )
+    [editor.commands, onChange, onHtmlChange],
+  );
 
   const clear = useCallback(() => {
-    setMarkdownState('')
-    onChange?.('')
-    onHtmlChange?.('')
-  }, [onChange, onHtmlChange])
+    setMarkdownState('');
+    onChange?.('');
+    onHtmlChange?.('');
+  }, [onChange, onHtmlChange]);
 
   return {
     editor,
@@ -342,5 +335,5 @@ export const useRichEditor = (options: UseRichEditorOptions = {}): UseRichEditor
     setMarkdown,
     setHtml,
     clear,
-  }
-}
+  };
+};

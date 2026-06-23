@@ -1,6 +1,7 @@
 """
 九屏幕法分析器 — 从 RootSeek 迁移
 """
+
 from typing import Any
 
 from app.algorithm.base import AIAnalyzer, AIBase

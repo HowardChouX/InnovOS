@@ -1,29 +1,24 @@
-import os
-import time
 import platform
+import time as _time_module
 from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends
-from app.auth import get_current_user, require_admin
+
+from app.api.deps import CurrentUser, SuperUserDep
+from app.core.config import settings
 from app.database import get_db
 
 router = APIRouter(prefix="/monitor", tags=["monitor"])
 
-_start_time = time.time()
-
-
-def _get_user_filter(user: dict) -> str:
-    """根据用户角色返回 SQL 过滤条件"""
-    if user["role"] == "admin":
-        return "", ()
-    return "AND t.user_id = ?", (user["id"],)
+_start_time = _time_module.monotonic()
 
 
 @router.get("/overview")
-def get_overview(user: dict = Depends(get_current_user)):
+def get_overview(current_user: CurrentUser):
     """总览数据（数据隔离：普通用户只看自己的）"""
     db = get_db()
 
-    if user["role"] == "admin":
+    if current_user.role == "admin":
         total_tasks = db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
         completed = db.execute("SELECT COUNT(*) FROM tasks WHERE status='completed'").fetchone()[0]
         failed = db.execute("SELECT COUNT(*) FROM tasks WHERE status='failed'").fetchone()[0]
@@ -31,21 +26,27 @@ def get_overview(user: dict = Depends(get_current_user)):
         total_solutions = db.execute("SELECT COUNT(*) FROM solutions").fetchone()[0]
         avg_rating = db.execute("SELECT AVG(rating) FROM solutions WHERE rating > 0").fetchone()[0] or 0
     else:
-        total_tasks = db.execute("SELECT COUNT(*) FROM tasks WHERE user_id=?", (user["id"],)).fetchone()[0]
-        completed = db.execute("SELECT COUNT(*) FROM tasks WHERE user_id=? AND status='completed'", (user["id"],)).fetchone()[0]
-        failed = db.execute("SELECT COUNT(*) FROM tasks WHERE user_id=? AND status='failed'", (user["id"],)).fetchone()[0]
+        uid = current_user.id
+        total_tasks = db.execute("SELECT COUNT(*) FROM tasks WHERE user_id=?", (uid,)).fetchone()[0]
+        completed = db.execute(
+            "SELECT COUNT(*) FROM tasks WHERE user_id=? AND status='completed'", (uid,)
+        ).fetchone()[0]
+        failed = db.execute("SELECT COUNT(*) FROM tasks WHERE user_id=? AND status='failed'", (uid,)).fetchone()[
+            0
+        ]
         total_analyses = db.execute(
-            "SELECT COUNT(*) FROM analyses a JOIN tasks t ON a.task_id=t.id WHERE t.user_id=?",
-            (user["id"],)
+            "SELECT COUNT(*) FROM analyses a JOIN tasks t ON a.task_id=t.id WHERE t.user_id=?", (uid,)
         ).fetchone()[0]
         total_solutions = db.execute(
-            "SELECT COUNT(*) FROM solutions s JOIN tasks t ON s.task_id=t.id WHERE t.user_id=?",
-            (user["id"],)
+            "SELECT COUNT(*) FROM solutions s JOIN tasks t ON s.task_id=t.id WHERE t.user_id=?", (uid,)
         ).fetchone()[0]
-        avg_rating = db.execute(
-            "SELECT AVG(s.rating) FROM solutions s JOIN tasks t ON s.task_id=t.id WHERE t.user_id=? AND s.rating > 0",
-            (user["id"],)
-        ).fetchone()[0] or 0
+        avg_rating = (
+            db.execute(
+                "SELECT AVG(s.rating) FROM solutions s JOIN tasks t ON s.task_id=t.id WHERE t.user_id=? AND s.rating > 0",
+                (uid,),
+            ).fetchone()[0]
+            or 0
+        )
 
     db.close()
 
@@ -66,29 +67,27 @@ def get_overview(user: dict = Depends(get_current_user)):
 
 
 @router.get("/tasks")
-def get_task_stats(user: dict = Depends(get_current_user)):
+def get_task_stats(current_user: CurrentUser):
     """任务统计（数据隔离）"""
     db = get_db()
     cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
 
-    if user["role"] == "admin":
-        by_status = db.execute(
-            "SELECT status, COUNT(*) as cnt FROM tasks GROUP BY status"
-        ).fetchall()
+    if current_user.role == "admin":
+        by_status = db.execute("SELECT status, COUNT(*) as cnt FROM tasks GROUP BY status").fetchall()
         recent = db.execute(
             "SELECT date(created_at) as d, COUNT(*) as cnt FROM tasks "
             "WHERE created_at >= ? GROUP BY date(created_at) ORDER BY d",
-            (cutoff,)
+            (cutoff,),
         ).fetchall()
     else:
+        uid = current_user.id
         by_status = db.execute(
-            "SELECT status, COUNT(*) as cnt FROM tasks WHERE user_id=? GROUP BY status",
-            (user["id"],)
+            "SELECT status, COUNT(*) as cnt FROM tasks WHERE user_id=? GROUP BY status", (uid,)
         ).fetchall()
         recent = db.execute(
             "SELECT date(created_at) as d, COUNT(*) as cnt FROM tasks "
             "WHERE user_id=? AND created_at >= ? GROUP BY date(created_at) ORDER BY d",
-            (user["id"], cutoff)
+            (uid, cutoff),
         ).fetchall()
 
     db.close()
@@ -103,7 +102,7 @@ def get_task_stats(user: dict = Depends(get_current_user)):
 
 
 @router.get("/keys")
-def get_key_stats(user: dict = Depends(require_admin)):
+def get_key_stats(_admin: SuperUserDep):
     """Key 使用统计（仅管理员）"""
     db = get_db()
 
@@ -139,42 +138,34 @@ def get_key_stats(user: dict = Depends(require_admin)):
 
 
 @router.get("/system")
-def get_system_status(user: dict = Depends(require_admin)):
+def get_system_status(_admin: SuperUserDep):
     """系统状态（仅管理员）"""
     db = get_db()
 
     # 运行时间
-    uptime_secs = int(time.time() - _start_time)
+    uptime_secs = int(_time_module.monotonic() - _start_time)
     days = uptime_secs // 86400
     hours = (uptime_secs % 86400) // 3600
     mins = (uptime_secs % 3600) // 60
     uptime_str = f"{days}d {hours}h {mins}m"
 
     # 数据库大小
-    from app.database import get_db, is_postgres, get_sqlite_path
-    db = get_db()
     try:
-        if is_postgres():
-            row = db.execute("SELECT pg_database_size(current_database()) AS size").fetchone()
-            db_size = row["size"] if row else 0
-        else:
-            db_path = get_sqlite_path()
-            if not os.path.isabs(db_path):
-                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", db_path)
-            db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+        row = db.execute("SELECT pg_database_size(current_database()) AS size").fetchone()
+        db_size = row["size"] if row else 0
         if db_size > 1024 * 1024:
             db_size_str = f"{db_size / 1024 / 1024:.1f} MB"
         elif db_size > 1024:
             db_size_str = f"{db_size / 1024:.1f} KB"
         else:
             db_size_str = f"{db_size} B"
-    finally:
-        db.close()
+    except Exception:
+        db_size_str = "N/A"
 
-    # 内存使用（Linux /proc/meminfo）
+    # 内存使用（Linux /proc/meminfo，非 Linux 返回默认值）
     memory_info = {"total": 0, "used": 0, "percent": 0}
     try:
-        with open("/proc/meminfo", "r") as f:
+        with open("/proc/meminfo") as f:
             mem = {}
             for line in f:
                 parts = line.split()
@@ -195,9 +186,10 @@ def get_system_status(user: dict = Depends(require_admin)):
     cpu_info = {"cores": 0, "usage": 0}
     try:
         import multiprocessing
+
         cpu_info["cores"] = multiprocessing.cpu_count()
         # 简易 CPU 使用率（读取 /proc/stat）
-        with open("/proc/stat", "r") as f:
+        with open("/proc/stat") as f:
             line = f.readline()
             parts = line.split()
             idle = int(parts[4])
@@ -214,7 +206,7 @@ def get_system_status(user: dict = Depends(require_admin)):
         total_tasks = db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
         completed_tasks = db.execute("SELECT COUNT(*) FROM tasks WHERE status='completed'").fetchone()[0]
         failed_tasks = db.execute("SELECT COUNT(*) FROM tasks WHERE status='failed'").fetchone()[0]
-        
+
         ai_stats = {
             "totalCalls": total_analyses + total_solutions,
             "successCalls": completed_tasks,
@@ -235,7 +227,7 @@ def get_system_status(user: dict = Depends(require_admin)):
     return {
         "data": {
             "uptime": uptime_str,
-            "version": "1.0.0",
+            "version": getattr(settings, "APP_VERSION", "0.3.0"),
             "pythonVersion": platform.python_version(),
             "platform": platform.system(),
             # 数据库

@@ -9,7 +9,7 @@ export const DEFAULT_KNOWLEDGE_THRESHOLD = 0.0;
  * Extract RAG config form values from a KnowledgeBase object.
  */
 export const createKnowledgeRagConfigFormValues = (
-  base: KnowledgeBase
+  base: KnowledgeBase,
 ): KnowledgeRagConfigFormValues => ({
   fileProcessorId: base.fileProcessorId ?? null,
   chunkSize: String(base.chunkSize),
@@ -28,9 +28,9 @@ export const createKnowledgeRagConfigFormValues = (
  */
 export const buildKnowledgeRagConfigPatch = (
   initialValues: KnowledgeRagConfigFormValues,
-  currentValues: KnowledgeRagConfigFormValues
-): Record<string, any> => {
-  const patch: Record<string, any> = {};
+  currentValues: KnowledgeRagConfigFormValues,
+): Record<string, unknown> => {
+  const patch: Record<string, unknown> = {};
 
   if (currentValues.fileProcessorId !== initialValues.fileProcessorId) {
     patch.fileProcessorId = currentValues.fileProcessorId;

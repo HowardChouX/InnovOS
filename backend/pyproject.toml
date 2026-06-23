@@ -5,6 +5,7 @@ description = "InnovOS 创新智能操作系统后端"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.0",
+    "sqlmodel>=0.0.22",
     "uvicorn[standard]>=0.30.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
@@ -21,15 +22,14 @@ dependencies = [
     "PyPDF2>=3.0.0",
     "pdfminer.six>=20221105",
     "python-docx>=1.1.0",
-    "trafilatura>=2.1.0",
     "readability-lxml>=0.8.0",
     "html2text>=2024.0.0",
     "lxml>=5.0.0",
-    "pytesseract>=0.3.13",
     "pdf2image>=1.17.0",
     "pillow>=12.2.0",
-    "paddleocr>=2.10.0",
-    "paddlepaddle>=3.3.1",
+    "pdf2image>=1.17.0",
+    "pillow>=12.2.0",
+    "alembic>=1.18.4",
 ]
 
 [project.optional-dependencies]
@@ -54,13 +54,9 @@ start = "uvicorn app.main:app"
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
-    "PyPDF2>=3.0.0",
-    "pdfminer.six>=20221105",
-    "python-docx>=1.1.0",
     "ruff>=0.11.0",
     "mypy>=1.15.0",
     "black>=25.0.0",
@@ -70,6 +66,11 @@ dev = [
     "safety>=3.0.0",
 ]
 
+# ── Cloud Deployment ──────────────────────────────────────
+# For minimal production image, install only core deps:
+#   pip install innovos-backend
+# For OCR support, add: pip install innovos-backend[ocr]
+
 # ── Ruff ──────────────────────────────────────────────
 [tool.ruff]
 target-version = "py310"
@@ -77,6 +78,11 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "SIM", "ARG", "C4", "PT"]
+ignore = ["B008", "E501", "N802", "N803", "N806", "N815", "ARG", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["E402", "F401"]
+"tests/*" = ["ARG"]
 
 [tool.ruff.format]
 quote-style = "double"

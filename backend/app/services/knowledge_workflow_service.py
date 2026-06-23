@@ -7,18 +7,19 @@ Knowledge Workflow Service — 完全复现 CherryStudio KnowledgeWorkflowServic
 - 通过 JobManager 调度作业
 - 目录导入：处理上传的文件列表
 """
+
 import logging
 
 from app.services.knowledge_base_service import KnowledgeBaseService
 from app.services.knowledge_item_service import KnowledgeItemService
 from app.services.knowledge_job_manager import (
-    KnowledgeJobManager,
-    JOB_TYPE_PREPARE_ROOT,
-    JOB_TYPE_INDEX_DOCUMENTS,
     JOB_TYPE_DELETE_SUBTREE,
+    JOB_TYPE_INDEX_DOCUMENTS,
+    JOB_TYPE_PREPARE_ROOT,
     JOB_TYPE_REINDEX_SUBTREE,
-    knowledge_queue_name,
+    KnowledgeJobManager,
     knowledge_idempotency_key,
+    knowledge_queue_name,
 )
 from app.services.knowledge_lock_manager import KnowledgeLockManager
 
@@ -63,7 +64,7 @@ class KnowledgeWorkflowService:
 
         try:
             await self.lock_manager.with_base_mutation_lock(base_id, _create_items)
-        except Exception as e:
+        except Exception:
             # 回滚已接受的项
             for item in accepted_items:
                 try:

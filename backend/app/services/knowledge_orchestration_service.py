@@ -7,6 +7,7 @@ Knowledge Orchestration Service — 完全复现 CherryStudio KnowledgeOrchestra
 - 协调 DataApi 服务、向量存储和工作流
 - 崩溃恢复
 """
+
 import json
 import logging
 import re
@@ -15,16 +16,15 @@ from app.database import get_db
 from app.services.knowledge_base_service import KnowledgeBaseService
 from app.services.knowledge_item_service import KnowledgeItemService
 from app.services.knowledge_job_manager import (
-    KnowledgeJobManager,
-    JOB_TYPE_PREPARE_ROOT,
-    JOB_TYPE_INDEX_DOCUMENTS,
-    JOB_TYPE_DELETE_SUBTREE,
-    JOB_TYPE_REINDEX_SUBTREE,
     JOB_TYPE_CHECK_PROCESSING_RESULT,
+    JOB_TYPE_DELETE_SUBTREE,
+    JOB_TYPE_INDEX_DOCUMENTS,
+    JOB_TYPE_PREPARE_ROOT,
+    JOB_TYPE_REINDEX_SUBTREE,
+    KnowledgeJobManager,
 )
 from app.services.knowledge_lock_manager import KnowledgeLockManager
 from app.services.knowledge_workflow_service import KnowledgeWorkflowService
-from app.utils import utc_iso
 
 logger = logging.getLogger(__name__)
 SEARCH_TOKEN_PATTERN = re.compile(r"\w+", re.UNICODE)
@@ -40,9 +40,9 @@ class KnowledgeOrchestrationService:
         self.workflow_service = KnowledgeWorkflowService(self.lock_manager, self.job_manager)
 
         # ─── 注册作业处理器 ──────────────────────────────────────
-        from app.services.knowledge_jobs.prepare_root import PrepareRootHandler
-        from app.services.knowledge_jobs.index_documents import IndexDocumentsHandler
         from app.services.knowledge_jobs.delete_subtree import DeleteSubtreeHandler
+        from app.services.knowledge_jobs.index_documents import IndexDocumentsHandler
+        from app.services.knowledge_jobs.prepare_root import PrepareRootHandler
         from app.services.knowledge_jobs.reindex_subtree import ReindexSubtreeHandler
 
         prepare_root = PrepareRootHandler(self.job_manager)
@@ -69,9 +69,7 @@ class KnowledgeOrchestrationService:
         # 对所有有知识库的用户恢复正在删除的项
         db = get_db()
         try:
-            user_rows = db.execute(
-                "SELECT DISTINCT user_id FROM knowledge_bases"
-            ).fetchall()
+            user_rows = db.execute("SELECT DISTINCT user_id FROM knowledge_bases").fetchall()
             for row in user_rows:
                 uid = row["user_id"]
                 await self.job_manager.recover_deleting_items(uid, self.workflow_service)
@@ -91,9 +89,7 @@ class KnowledgeOrchestrationService:
         # 取消所有活跃作业
         self.job_manager.cancel_jobs_for_base(base_id, reason="base-deleted")
 
-        await self.lock_manager.with_base_mutation_lock(
-            base_id, lambda: KnowledgeBaseService.delete(user_id, base_id)
-        )
+        await self.lock_manager.with_base_mutation_lock(base_id, lambda: KnowledgeBaseService.delete(user_id, base_id))
         logger.info(f"Deleted knowledge base: {base_id}")
 
     async def add_items(self, user_id: int, base_id: str, items: list[dict]) -> None:
@@ -145,7 +141,7 @@ class KnowledgeOrchestrationService:
         if not item:
             raise ValueError(f"Knowledge item not found: {item_id}")
         if item["status"] != "completed":
-            raise ValueError(f"Knowledge item must be completed before listing chunks")
+            raise ValueError("Knowledge item must be completed before listing chunks")
 
         # 从 item.data 中提取 fileEntryId（对应 knowledge_docs.id）
         data = json.loads(item["data"]) if isinstance(item["data"], str) else item.get("data", {})
@@ -214,7 +210,9 @@ class KnowledgeOrchestrationService:
 
         if blocking_counts:
             summary = ", ".join(f"{s}={c}" for s, c in sorted(blocking_counts.items()))
-            raise ValueError(f"Cannot reindex knowledge item until the entire subtree is completed or failed: {summary}")
+            raise ValueError(
+                f"Cannot reindex knowledge item until the entire subtree is completed or failed: {summary}"
+            )
 
 
 # 全局实例

@@ -1,7 +1,9 @@
 """需求画像 API — 需求列表、用户评分"""
+
 from fastapi import APIRouter, Depends
-from app.auth import get_current_user
 from pydantic import BaseModel
+
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/demand", tags=["demand-portrait"])
 

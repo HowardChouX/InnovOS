@@ -1,26 +1,26 @@
-import '../types.js'
+import '../types.js';
 
-import { mergeAttributes, Node } from '@tiptap/core'
+import { mergeAttributes, Node } from '@tiptap/core';
 
 export interface TableRowOptions {
-  HTMLAttributes: Record<string, any>
+  HTMLAttributes: Record<string, unknown>;
 }
 
 export const TableRow = Node.create<TableRowOptions>({
   name: 'tableRow',
 
   addOptions() {
-    return { HTMLAttributes: {} }
+    return { HTMLAttributes: {} };
   },
 
   content: '(tableCell | tableHeader)*',
   tableRole: 'row',
 
   parseHTML() {
-    return [{ tag: 'tr' }]
+    return [{ tag: 'tr' }];
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ['tr', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0]
-  }
-})
+    return ['tr', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+  },
+});

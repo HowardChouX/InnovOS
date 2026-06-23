@@ -6,10 +6,10 @@ interface ConflictGraphProps {
 }
 
 const POSITIONS: Array<{ cx: number; cy: number }> = [
-  { cx: 200, cy: 40 },   // top
-  { cx: 370, cy: 120 },  // right
-  { cx: 200, cy: 200 },  // bottom
-  { cx: 30, cy: 120 },   // left
+  { cx: 200, cy: 40 }, // top
+  { cx: 370, cy: 120 }, // right
+  { cx: 200, cy: 200 }, // bottom
+  { cx: 30, cy: 120 }, // left
 ];
 
 const CENTER = { cx: 200, cy: 120 };
@@ -20,27 +20,28 @@ export function ConflictGraph({ centerConflict, nodes }: ConflictGraphProps) {
 
   return (
     <div style={{ width: '100%', margin: '8px 0' }}>
-      <svg
-        viewBox="0 0 400 240"
-        width="100%"
-        height="240"
-        style={{ display: 'block' }}
-      >
+      <svg viewBox="0 0 400 240" width="100%" height="240" style={{ display: 'block' }}>
         {/* 虚线圆 */}
         <circle
-          cx={CENTER.cx} cy={CENTER.cy} r={80}
-          stroke="rgba(59,130,246,0.15)" strokeWidth="1" fill="none"
+          cx={CENTER.cx}
+          cy={CENTER.cy}
+          r={80}
+          stroke="rgba(59,130,246,0.15)"
+          strokeWidth="1"
+          fill="none"
           strokeDasharray="4 4"
         />
 
         {/* 连线 */}
-        {satelliteNodes.map((node, i) => {
+        {satelliteNodes.map((_node, i) => {
           const pos = POSITIONS[i % POSITIONS.length];
           return (
             <line
               key={i}
-              x1={pos.cx} y1={pos.cy}
-              x2={CENTER.cx} y2={CENTER.cy}
+              x1={pos.cx}
+              y1={pos.cy}
+              x2={CENTER.cx}
+              y2={CENTER.cy}
               stroke={COLORS[i % COLORS.length]}
               strokeWidth={1}
               strokeDasharray="4 2"
@@ -51,21 +52,28 @@ export function ConflictGraph({ centerConflict, nodes }: ConflictGraphProps) {
 
         {/* 中心节点 */}
         <circle
-          cx={CENTER.cx} cy={CENTER.cy} r={44}
+          cx={CENTER.cx}
+          cy={CENTER.cy}
+          r={44}
           fill="rgba(59,130,246,0.12)"
           stroke="rgba(59,130,246,0.35)"
           strokeWidth={2}
         />
         <foreignObject x={CENTER.cx - 40} y={CENTER.cy - 20} width={80} height={40}>
           <div
-            xmlns="http://www.w3.org/1999/xhtml"
             style={{
-              fontSize: 12, fontWeight: 600, color: '#60a5fa',
-              textAlign: 'center', lineHeight: 1.4,
-              wordBreak: 'break-all', overflow: 'hidden',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#60a5fa',
+              textAlign: 'center',
+              lineHeight: 1.4,
+              wordBreak: 'break-all',
+              overflow: 'hidden',
             }}
           >
-            {centerConflict.length > 12 ? centerConflict.slice(0, 12) + '...' : (centerConflict || '核心冲突')}
+            {centerConflict.length > 12
+              ? centerConflict.slice(0, 12) + '...'
+              : centerConflict || '核心冲突'}
           </div>
         </foreignObject>
 
@@ -76,8 +84,10 @@ export function ConflictGraph({ centerConflict, nodes }: ConflictGraphProps) {
           return (
             <g key={i}>
               <rect
-                x={pos.cx - 62} y={pos.cy - 26}
-                width={124} height={52}
+                x={pos.cx - 62}
+                y={pos.cy - 26}
+                width={124}
+                height={52}
                 rx={8}
                 fill={`${color}15`}
                 stroke={`${color}40`}
@@ -85,16 +95,23 @@ export function ConflictGraph({ centerConflict, nodes }: ConflictGraphProps) {
               />
               <foreignObject x={pos.cx - 58} y={pos.cy - 24} width={116} height={48}>
                 <div
-                  xmlns="http://www.w3.org/1999/xhtml"
                   style={{
-                    textAlign: 'center', overflow: 'hidden',
+                    textAlign: 'center',
+                    overflow: 'hidden',
                   }}
                 >
                   <div style={{ fontSize: 11, fontWeight: 600, color, lineHeight: '16px' }}>
                     {node.label}
                   </div>
                   {(node.sublabel || node.description) && (
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: '13px', marginTop: 2 }}>
+                    <div
+                      style={{
+                        fontSize: 9,
+                        color: 'rgba(255,255,255,0.5)',
+                        lineHeight: '13px',
+                        marginTop: 2,
+                      }}
+                    >
                       {(node.sublabel || node.description || '').slice(0, 18)}
                     </div>
                   )}

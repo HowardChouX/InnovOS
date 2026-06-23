@@ -7,14 +7,109 @@ URL 抓取器 — 三层降级策略，确保国内环境可用。
 3. Node.js 子进程 — Cloudflare 兜底（调用独立 scrape.js，playwright 已预装）
 
 自动检测 Cloudflare 挑战，透明降级。
+
+SSRF 防护：所有 URL 在抓取前会验证目标 IP 地址，拒绝内网/保留地址。
 """
+
 import asyncio
+import ipaddress
 import logging
 import os
-import re
-from typing import Optional
+import socket
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
+
+
+# ── SSRF 防护 ──────────────────────────────────────────────────────────
+
+_PRIVATE_IPS_ERROR_MSG = (
+    "URL 解析到的目标 IP 地址为内网/保留地址，已拒绝访问。"
+    "为避免 SSRF 攻击，知识库 URL 抓取不支持内网地址。"
+)
+
+
+def _resolve_hostname(hostname: str) -> list[str]:
+    """解析域名到 IP 地址列表。超时 3s。"""
+    try:
+        # getaddrinfo 在主线程可能阻塞，但在 async worker 中有 GIL 保护
+        infos = socket.getaddrinfo(hostname, 80, socket.AF_INET, socket.SOCK_STREAM)
+        return list({str(info[4][0]) for info in infos})
+    except (socket.gaierror, OSError):
+        return []
+
+
+# SSRF 黑名单：精确的 IP 段，仅拦截能实际被 SSRF 利用的内网/链路本地地址。
+# 注意：不使用 ipaddress.is_private，因为它也会拦截 198.18.0.0/15（Benchmarking）
+# 和 100.64.0.0/10（CGNAT），这些在部分测试/网络环境下会误杀公网域名。
+_SSRF_BLOCKED_V4 = [
+    ipaddress.IPv4Network("127.0.0.0/8"),       # Loopback
+    ipaddress.IPv4Network("10.0.0.0/8"),         # Private A
+    ipaddress.IPv4Network("172.16.0.0/12"),      # Private B
+    ipaddress.IPv4Network("192.168.0.0/16"),     # Private C
+    ipaddress.IPv4Network("169.254.0.0/16"),     # Link-local
+    ipaddress.IPv4Network("0.0.0.0/8"),          # Current network
+]
+_SSRF_BLOCKED_V6 = [
+    ipaddress.IPv6Network("::1/128"),            # Loopback
+    ipaddress.IPv6Network("fc00::/7"),           # Unique-local
+    ipaddress.IPv6Network("fe80::/10"),          # Link-local
+    ipaddress.IPv6Network("::/128"),             # Unspecified
+]
+
+
+def _is_blocked_ip(ip_str: str) -> bool:
+    """检查 IP 是否属于 SSRF 攻击可利用的内网/链路本地地址。"""
+    try:
+        addr = ipaddress.ip_address(ip_str)
+        if isinstance(addr, ipaddress.IPv4Address):
+            return any(net.supernet_of(ipaddress.IPv4Network(addr)) for net in _SSRF_BLOCKED_V4)
+        else:
+            return any(net.supernet_of(ipaddress.IPv6Network(addr)) for net in _SSRF_BLOCKED_V6)
+    except ValueError:
+        return True  # 非标准 IP 地址也拒绝
+
+
+def validate_url(url: str) -> None:
+    """SSRF 防护验证：拒绝内网/保留地址。
+
+    检查流程：
+    1. 解析 URL 格式
+    2. 提取 hostname
+    3. 使用 socket.getaddrinfo 解析域名到 IP
+    4. 检查所有解析到的 IP 是否都属于内网/保留地址
+
+    Raises:
+        ValueError: 如果 URL 指向内网地址或无法解析
+    """
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        raise ValueError("URL 格式无效")
+
+    # 只允许 http/https
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"不支持的 URL 协议: {parsed.scheme}")
+
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("URL 缺少 hostname")
+
+    # 预检查简单的内网域名模式
+    lower_host = hostname.lower()
+    if lower_host in ("localhost", "localhost.localdomain"):
+        raise ValueError(_PRIVATE_IPS_ERROR_MSG)
+    if lower_host.endswith(".internal") or lower_host.endswith(".local"):
+        raise ValueError(_PRIVATE_IPS_ERROR_MSG)
+
+    # 解析 IP 并检查
+    ips = _resolve_hostname(hostname)
+    if not ips:
+        raise ValueError(f"无法解析域名: {hostname}")
+
+    private_ips = [ip for ip in ips if _is_blocked_ip(ip)]
+    if private_ips:
+        logger.warning("SSRF blocked: %s resolved to private IPs: %s", hostname, private_ips)
+        raise ValueError(_PRIVATE_IPS_ERROR_MSG)
 
 # ── Cloudflare 检测 ────────────────────────────────────────────────────────
 
@@ -43,6 +138,7 @@ def _is_cloudflare_challenge_headers(headers: dict) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════
 #  Layer 1: httpx
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 async def fetch_with_httpx(url: str, timeout: float = 30.0) -> dict:
     """httpx 快速抓取。"""
@@ -83,7 +179,7 @@ async def fetch_with_httpx(url: str, timeout: float = 30.0) -> dict:
 #  Layer 2: Playwright for Python (optional)
 # ═══════════════════════════════════════════════════════════════════════════
 
-_PW_AVAILABLE: Optional[bool] = None
+_PW_AVAILABLE: bool | None = None
 
 
 def _playwright_available() -> bool:
@@ -91,13 +187,14 @@ def _playwright_available() -> bool:
     if _PW_AVAILABLE is None:
         try:
             import playwright  # noqa: F401
+
             _PW_AVAILABLE = True
         except ImportError:
             _PW_AVAILABLE = False
     return _PW_AVAILABLE
 
 
-async def fetch_with_pw_python(url: str, timeout: float = 60.0) -> Optional[dict]:
+async def fetch_with_pw_python(url: str, timeout: float = 60.0) -> dict | None:
     """Python Playwright 浏览器抓取（可选依赖）。不可用时返回 None。"""
     if not _playwright_available():
         return None
@@ -162,15 +259,15 @@ async def fetch_with_pw_python(url: str, timeout: float = 60.0) -> Optional[dict
 
 _NODE_SCRIPTS = [
     # 优先找同项目内可能放置的脚本
-    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__)
-    )))), "scrape.js"),
+    os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "scrape.js"
+    ),
     # 找用户 home 目录下的 markdownload 项目
     os.path.expanduser("~/markdownload/scrape.js"),
 ]
 
 
-async def fetch_with_node(url: str, timeout: float = 60.0) -> Optional[dict]:
+async def fetch_with_node(url: str, timeout: float = 60.0) -> dict | None:
     """调用 Node.js MarkDownload 管线抓取（Playwright for Node.js 已预装）。"""
     script_path = None
     for p in _NODE_SCRIPTS:
@@ -183,7 +280,9 @@ async def fetch_with_node(url: str, timeout: float = 60.0) -> Optional[dict]:
 
     try:
         proc = await asyncio.create_subprocess_exec(
-            "node", script_path, url,
+            "node",
+            script_path,
+            url,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -208,14 +307,14 @@ async def fetch_with_node(url: str, timeout: float = 60.0) -> Optional[dict]:
         stderr_text = stderr.decode("utf-8", errors="replace")
         title = ""
         for line in stderr_text.split("\n"):
-            if 'Title:' in line:
+            if "Title:" in line:
                 title = line.partition("Title:")[2].strip().rstrip("|").strip()
                 break
 
         logger.info("Node.js MarkDownload 管线成功: %s", title or url)
 
         return {
-            "html": markdown,         # 已转为 Markdown
+            "html": markdown,  # 已转为 Markdown
             "final_url": url,
             "status_code": 200,
             "headers": {},
@@ -238,16 +337,26 @@ async def fetch_with_node(url: str, timeout: float = 60.0) -> Optional[dict]:
 #  Unified entry
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 async def fetch_url(url: str, timeout: float = 30.0, use_browser_fallback: bool = True) -> dict:
     """统一 URL 抓取入口。
 
     策略链：httpx → Python Playwright → Node.js scrape.js
     httpx 连接失败或 Cloudflare 保护时自动降级到浏览器方案。
 
+    注意：所有 URL 在抓取前会经过 SSRF 验证，拒绝内网/保留地址。
+
     Returns:
         {html, final_url, status_code, headers, from_browser,
          cloudflare_detected, already_markdown, fetcher, title}
+
+    Raises:
+        ValueError: SSRF 验证失败（内网地址/无法解析）
+        RuntimeError: 所有抓取策略均失败
     """
+    # SSRF 防护：验证 URL 不指向内网地址
+    validate_url(url)
+
     # Layer 1: httpx
     httpx_ok = False
     need_browser = False

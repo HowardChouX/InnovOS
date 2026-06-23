@@ -19,12 +19,14 @@ API 发现模型 (model IDs)
     → 返回完整 ModelEntry[] 对象
 ```
 """
+
 from __future__ import annotations
+
 import json
 import logging
 import os
-from typing import Optional
-from app.algorithm.providers_registry import infer_capabilities, CAPABILITY_CHAT
+
+from app.algorithm.providers_registry import infer_capabilities
 
 logger = logging.getLogger(__name__)
 
@@ -39,15 +41,15 @@ class ModelRegistry:
     参考 CherryStudio ProviderRegistryService + mergePresetModel
     """
 
-    _instance: Optional["ModelRegistry"] = None
+    _instance: ModelRegistry | None = None
 
     def __init__(self):
-        self._models: dict[str, dict] = {}          # model_id → model entry
-        self._overrides: dict[str, list[dict]] = {} # provider_id → [overrides]
+        self._models: dict[str, dict] = {}  # model_id → model entry
+        self._overrides: dict[str, list[dict]] = {}  # provider_id → [overrides]
         self._loaded = False
 
     @classmethod
-    def get_instance(cls) -> "ModelRegistry":
+    def get_instance(cls) -> ModelRegistry:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
@@ -59,10 +61,7 @@ class ModelRegistry:
         self._load_models()
         self._load_provider_models()
         self._loaded = True
-        logger.info(
-            f"模型注册表已加载: {len(self._models)} 个模型, "
-            f"{len(self._overrides)} 个供应商覆盖"
-        )
+        logger.info(f"模型注册表已加载: {len(self._models)} 个模型, {len(self._overrides)} 个供应商覆盖")
 
     def _load_models(self):
         """加载 models.json。"""
@@ -90,21 +89,26 @@ class ModelRegistry:
                 self._overrides.setdefault(pid, []).append(entry)
         logger.info(f"  加载 {sum(len(v) for v in self._overrides.values())} 个供应商覆盖条目")
 
-    # ── 查询 ──
+    # ── 惰性加载守卫 ──
 
-    def lookup(self, model_id: str) -> Optional[dict]:
-        """在注册表中查找模型（精确 ID 匹配）。"""
+    def _ensure_loaded(self):
+        """确保注册表已加载（惰性加载守卫）。"""
         if not self._loaded:
             self.load()
+
+    # ── 查询 ──
+
+    def lookup(self, model_id: str) -> dict | None:
+        """在注册表中查找模型（精确 ID 匹配）。"""
+        self._ensure_loaded()
         return self._models.get(model_id)
 
     def get_provider_overrides(self, provider_id: str) -> list[dict]:
         """获取供应商的覆盖配置。"""
-        if not self._loaded:
-            self.load()
+        self._ensure_loaded()
         return self._overrides.get(provider_id, [])
 
-    def get_provider_model(self, provider_id: str, model_id: str) -> Optional[dict]:
+    def get_provider_model(self, provider_id: str, model_id: str) -> dict | None:
         """获取特定供应商下某模型的覆盖配置。"""
         for override in self.get_provider_overrides(provider_id):
             if override.get("modelId") == model_id:
@@ -113,7 +117,7 @@ class ModelRegistry:
 
     # ── 能力解析（核心） ──
 
-    def get_capabilities(self, model_id: str, provider_id: str | None = None) -> Optional[list[str]]:
+    def get_capabilities(self, model_id: str, provider_id: str | None = None) -> list[str] | None:
         """获取模型的最终能力列表。
 
         匹配 CherryStudio resolveCapabilities() 逻辑：
@@ -122,8 +126,7 @@ class ModelRegistry:
         3. 模型不在 registry 但 override 有 force → 用 force
         4. 都未找到则返回 None（调用方使用 infer_capabilities 兜底）
         """
-        if not self._loaded:
-            self.load()
+        self._ensure_loaded()
 
         # 1. 基础能力
         entry = self._models.get(model_id)
@@ -155,8 +158,7 @@ class ModelRegistry:
 
     def get_model_info(self, model_id: str, provider_id: str | None = None) -> dict:
         """获取完整模型信息（合并注册表 + 供应商覆盖）。"""
-        if not self._loaded:
-            self.load()
+        self._ensure_loaded()
 
         entry = self._models.get(model_id)
         base: dict = dict(entry) if entry else {"id": model_id}
@@ -180,9 +182,7 @@ class ModelRegistry:
 
     # ── 批量 enrichment（API 发现后调用） ──
 
-    def enrich_models(
-        self, provider_id: str, model_ids: list[str]
-    ) -> list[dict]:
+    def enrich_models(self, provider_id: str, model_ids: list[str]) -> list[dict]:
         """对 API 发现的模型列表做 enrichment。
 
         匹配 CherryStudio enrichFetchedModels() + mergePresetModel()。
@@ -191,15 +191,17 @@ class ModelRegistry:
         result = []
         for mid in model_ids:
             info = self.get_model_info(mid, provider_id)
-            result.append({
-                "id": info["id"],
-                "capabilities": info.get("capabilities", infer_capabilities(mid)),
-                "name": info.get("name"),
-                "contextWindow": info.get("contextWindow"),
-                "maxOutputTokens": info.get("maxOutputTokens"),
-                "pricing": info.get("pricing"),
-                "endpointTypes": info.get("endpointTypes"),
-            })
+            result.append(
+                {
+                    "id": info["id"],
+                    "capabilities": info.get("capabilities", infer_capabilities(mid)),
+                    "name": info.get("name"),
+                    "contextWindow": info.get("contextWindow"),
+                    "maxOutputTokens": info.get("maxOutputTokens"),
+                    "pricing": info.get("pricing"),
+                    "endpointTypes": info.get("endpointTypes"),
+                }
+            )
         return result
 
 

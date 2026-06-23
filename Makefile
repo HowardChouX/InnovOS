@@ -86,6 +86,52 @@ security:
 # ──────────────────────────────────────────────
 #  Pre-commit 安装
 # ──────────────────────────────────────────────
+
+# ──────────────────────────────────────────────
+#  Docker 部署
+# ──────────────────────────────────────────────
+docker-build:
+	docker compose build --parallel
+
+docker-up:
+	docker compose up -d
+
+docker-down:
+	docker compose down
+
+docker-logs:
+	docker compose logs -f
+
+docker-clean:
+	docker compose down -v --remove-orphans
+
+# ──────────────────────────────────────────────
+#  数据库备份
+# ──────────────────────────────────────────────
+db-backup:
+	@bash backend/scripts/backup_db.sh
+
+db-restore:
+	@if [ -z "$(file)" ]; then echo "Usage: make db-restore file=backup.sql.gz"; exit 1; fi
+	@gunzip -c $(file) | psql "$$DATABASE_URL"
+	@echo "Restored from $(file)"
+
+# ──────────────────────────────────────────────
+#  安全扫描
+# ──────────────────────────────────────────────
+security-scan-all:
+	cd backend && uv run bandit -c pyproject.toml -r app/
+	cd backend && uv run safety check --full-report
+
+# ──────────────────────────────────────────────
+#  生产构建
+# ──────────────────────────────────────────────
+build-all: docker-build
+	@echo "All Docker images built"
+
+# ──────────────────────────────────────────────
+#  Pre-commit 安装
+# ──────────────────────────────────────────────
 setup-hooks:
 	@echo "=== Installing pre-commit hooks ==="
 	cd backend && uv run pre-commit install

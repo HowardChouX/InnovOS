@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
   const loading = useAuthStore((s) => s.loading);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (loading) return;
-    if (!token) navigate('/login', { replace: true });
-  }, [loading, token, navigate]);
+    if (!user) navigate('/login', { replace: true });
+  }, [loading, user, navigate]);
 
   if (loading) {
     return (
@@ -20,7 +20,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!token) return null;
+  if (!user) return null;
 
   return <>{children}</>;
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
+
 import { NAV_ITEMS } from '../../utils/constants';
 import { useAuthStore } from '../../store/useAuthStore';
 import { sidebarApi, type SidebarStats } from '../../api/sidebar';
@@ -10,31 +11,63 @@ export function Sidebar() {
   const [stats, setStats] = useState<SidebarStats | null>(null);
 
   useEffect(() => {
-    sidebarApi.getStats().then(setStats).catch(() => {});
+    sidebarApi
+      .getStats()
+      .then(setStats)
+      .catch(() => {});
   }, []);
 
   const items = [...NAV_ITEMS];
 
   return (
-    <aside style={{
-      width: 180, background: 'var(--bg-panel)', borderRight: '1px solid var(--border-light)',
-      display: 'flex', flexDirection: 'column', flexShrink: 0,
-    }}>
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '10px 8px', flex: 1 }}>
+    <aside
+      style={{
+        width: 180,
+        background: 'var(--bg-panel)',
+        borderRight: '1px solid var(--border-light)',
+        display: 'flex',
+        flexDirection: 'column',
+        flexShrink: 0,
+      }}
+    >
+      <nav
+        style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '10px 8px', flex: 1 }}
+      >
         {items.map((item) => {
           const active = location.pathname === item.path;
           return (
-            <Link key={item.path} to={item.path} style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
-              borderRadius: 8, textDecoration: 'none', fontSize: 13,
-              color: active ? '#fff' : 'var(--text-secondary)',
-              background: active ? 'var(--accent)' : 'transparent',
-              transition: 'all 0.15s',
-            }}
-              onMouseOver={(e) => { if (!active) { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.color = 'var(--text-primary)'; } }}
-              onMouseOut={(e) => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; } }}
+            <Link
+              key={item.path}
+              to={item.path}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '9px 12px',
+                borderRadius: 8,
+                textDecoration: 'none',
+                fontSize: 13,
+                color: active ? '#fff' : 'var(--text-secondary)',
+                background: active ? 'var(--accent)' : 'transparent',
+                transition: 'all 0.15s',
+              }}
+              onMouseOver={(e) => {
+                if (!active) {
+                  e.currentTarget.style.background = 'var(--bg-card)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!active) {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
+                }
+              }}
             >
-              <i className={`fa-solid ${item.icon}`} style={{ width: 16, textAlign: 'center', fontSize: 12 }} />
+              <i
+                className={`fa-solid ${item.icon}`}
+                style={{ width: 16, textAlign: 'center', fontSize: 12 }}
+              />
               <span>{item.label}</span>
             </Link>
           );
@@ -43,24 +76,42 @@ export function Sidebar() {
         {/* 管理员模块 */}
         {isAdmin && (
           <div style={{ marginTop: 8, borderTop: '1px solid var(--border-light)', paddingTop: 8 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6, fontWeight: 600 }}>
+            <div
+              style={{
+                fontSize: 10,
+                color: 'var(--text-tertiary)',
+                marginBottom: 6,
+                fontWeight: 600,
+              }}
+            >
               管理员
             </div>
             {[
               { label: '模型服务', path: '/admin/keys', icon: 'fa-server' },
               { label: '用户管理', path: '/admin/users', icon: 'fa-users' },
-              { label: '数据监控', path: '/monitor', icon: 'fa-chart-line' },
               { label: '专利数据库', path: '/admin/patents', icon: 'fa-database' },
             ].map((item) => {
               const active = location.pathname === item.path;
               return (
-                <Link key={item.path} to={item.path} style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px',
-                  borderRadius: 8, textDecoration: 'none', fontSize: 12,
-                  color: active ? '#fff' : 'var(--text-secondary)',
-                  background: active ? 'var(--accent)' : 'transparent',
-                }}>
-                  <i className={`fa-solid ${item.icon}`} style={{ width: 14, textAlign: 'center', fontSize: 11 }} />
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '7px 12px',
+                    borderRadius: 8,
+                    textDecoration: 'none',
+                    fontSize: 12,
+                    color: active ? '#fff' : 'var(--text-secondary)',
+                    background: active ? 'var(--accent)' : 'transparent',
+                  }}
+                >
+                  <i
+                    className={`fa-solid ${item.icon}`}
+                    style={{ width: 14, textAlign: 'center', fontSize: 11 }}
+                  />
                   <span>{item.label}</span>
                 </Link>
               );
@@ -70,17 +121,40 @@ export function Sidebar() {
       </nav>
 
       {/* System Status */}
-      <div style={{
-        padding: '12px', borderTop: '1px solid var(--border-light)',
-        fontSize: 11,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, color: 'var(--text-secondary)' }}>
+      <div
+        style={{
+          padding: '12px',
+          borderTop: '1px solid var(--border-light)',
+          fontSize: 11,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            marginBottom: 10,
+            color: 'var(--text-secondary)',
+          }}
+        >
           <span style={{ fontWeight: 600 }}>系统状态</span>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            color: 'var(--accent-green)', fontSize: 10,
-          }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-green)' }} />
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              color: 'var(--accent-green)',
+              fontSize: 10,
+            }}
+          >
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: 'var(--accent-green)',
+              }}
+            />
             运行正常
           </span>
         </div>
@@ -90,15 +164,30 @@ export function Sidebar() {
             { label: '已完成', value: stats?.completedTasks ?? '-' },
             { label: '进行中', value: stats?.analyzingTasks ?? '-' },
           ].map((item) => (
-            <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-tertiary)' }}>
+            <div
+              key={item.label}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                color: 'var(--text-tertiary)',
+              }}
+            >
               <span>{item.label}</span>
               <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{item.value}</span>
             </div>
           ))}
           <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 6, marginTop: 2 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-tertiary)' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                color: 'var(--text-tertiary)',
+              }}
+            >
               <span>专利数据量</span>
-              <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{stats?.patentCount?.toLocaleString() ?? '-'}</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                {stats?.patentCount?.toLocaleString() ?? '-'}
+              </span>
             </div>
           </div>
         </div>

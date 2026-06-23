@@ -2,10 +2,12 @@
 
 import json
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException
+
+from app.algorithm.ai_client import chat_completion
 from app.auth import get_current_user
 from app.database import get_db
-from app.algorithm.ai_client import chat_completion
 
 logger = logging.getLogger(__name__)
 
@@ -83,17 +85,13 @@ async def get_conversion_data(task_id: int, user: dict = Depends(get_current_use
     db = get_db()
 
     # 验证任务归属
-    task = db.execute(
-        "SELECT * FROM tasks WHERE id=? AND user_id=?", (task_id, user["id"])
-    ).fetchone()
+    task = db.execute("SELECT * FROM tasks WHERE id=? AND user_id=?", (task_id, user["id"])).fetchone()
     if not task:
         db.close()
         raise HTTPException(status_code=404, detail="任务不存在")
 
     # 获取方案
-    solutions = db.execute(
-        "SELECT * FROM solutions WHERE task_id=?", (task_id,)
-    ).fetchall()
+    solutions = db.execute("SELECT * FROM solutions WHERE task_id=?", (task_id,)).fetchall()
 
     # 获取评估数据
     eval_rows = db.execute(
@@ -139,17 +137,19 @@ async def get_conversion_data(task_id: int, user: dict = Depends(get_current_use
                     ref_patents.append(pd)
                     break
 
-        solution_list.append({
-            "id": str(s["id"]),
-            "title": s["title"],
-            "description": s["description"],
-            "principles": json.loads(s["principles"]),
-            "confidenceScore": s["confidence_score"],
-            "patentReferences": patent_refs,
-            "refPatents": ref_patents,
-            "rating": s["rating"],
-            "evaluation": solution_eval,
-        })
+        solution_list.append(
+            {
+                "id": str(s["id"]),
+                "title": s["title"],
+                "description": s["description"],
+                "principles": json.loads(s["principles"]),
+                "confidenceScore": s["confidence_score"],
+                "patentReferences": patent_refs,
+                "refPatents": ref_patents,
+                "rating": s["rating"],
+                "evaluation": solution_eval,
+            }
+        )
 
     return {
         "data": {
@@ -204,8 +204,8 @@ async def check_infringement(solution_id: int, user: dict = Depends(get_current_
         )
 
     user_prompt = f"""【解决方案】
-标题：{sol['title']}
-描述：{sol['description'] or '无详细描述'}
+标题：{sol["title"]}
+描述：{sol["description"] or "无详细描述"}
 
 【参考专利】
 {chr(10).join(patent_context_parts)}

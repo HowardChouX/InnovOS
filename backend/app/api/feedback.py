@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
+
 from app.auth import get_current_user
 from app.database import get_db
-from app.utils import utc_iso
 from app.models.feedback import FeedbackCreate
+from app.utils import utc_iso
 
 router = APIRouter(prefix="/api/feedback", tags=["feedback"])
 
@@ -26,9 +27,7 @@ def create_feedback(body: FeedbackCreate, user: dict = Depends(get_current_user)
         (user["id"], body.solution_id, body.rating, body.feedback_type, body.comments),
     )
     db.commit()
-    row = db.execute(
-        "SELECT * FROM feedbacks WHERE id = last_insert_rowid()"
-    ).fetchone()
+    row = db.execute("SELECT * FROM feedbacks WHERE id = last_insert_rowid()").fetchone()
     db.close()
     return {
         "data": {
@@ -39,7 +38,8 @@ def create_feedback(body: FeedbackCreate, user: dict = Depends(get_current_user)
             "comments": row["comments"],
             "createdAt": utc_iso(row["created_at"]),
         },
-        "message": "success", "code": 200,
+        "message": "success",
+        "code": 200,
     }
 
 
@@ -63,5 +63,6 @@ def get_feedback(solution_id: int, user: dict = Depends(get_current_user)):
             }
             for r in rows
         ],
-        "message": "success", "code": 200,
+        "message": "success",
+        "code": 200,
     }

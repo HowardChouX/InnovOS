@@ -17,6 +17,7 @@
 - "reasoning" — 推理模型
 - "image-generation" — 图像生成
 """
+
 import re
 
 # ── 能力常量 ──

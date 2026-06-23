@@ -4,57 +4,54 @@ import { authApi } from '../api/auth';
 interface User {
   id: number;
   username: string;
+  email: string;
   role: string;
   created_at: string;
 }
 
 interface AuthStore {
   user: User | null;
-  token: string | null;
   loading: boolean;
   isAdmin: boolean;
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   init: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
-  token: localStorage.getItem('token'),
   loading: true,
   isAdmin: false,
 
   init: async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      set({ loading: false });
-      return;
-    }
     try {
-      const user = await authApi.me(token);
-      set({ user, token, isAdmin: user.role === 'admin', loading: false });
+      // httpOnly cookie is sent automatically by the browser
+      const user = await authApi.me();
+      set({ user, isAdmin: user.role === 'admin', loading: false });
     } catch (e) {
       console.error('[useAuthStore] init failed:', e);
-      localStorage.removeItem('token');
-      set({ user: null, token: null, isAdmin: false, loading: false });
+      set({ user: null, isAdmin: false, loading: false });
     }
   },
 
   login: async (username, password) => {
     const res = await authApi.login(username, password);
-    localStorage.setItem('token', res.access_token);
-    set({ user: res.user, token: res.access_token, isAdmin: res.user.role === 'admin' });
+    // httpOnly cookie is managed by the browser
+    set({ user: res.user, isAdmin: res.user.role === 'admin' });
   },
 
   register: async (username, password) => {
     const res = await authApi.register(username, password);
-    localStorage.setItem('token', res.access_token);
-    set({ user: res.user, token: res.access_token, isAdmin: res.user.role === 'admin' });
+    set({ user: res.user, isAdmin: res.user.role === 'admin' });
   },
 
-  logout: () => {
-    localStorage.removeItem('token');
-    set({ user: null, token: null, isAdmin: false });
+  logout: async () => {
+    try {
+      await authApi.logout();
+    } catch (e) {
+      console.error('[useAuthStore] logout failed:', e);
+    }
+    set({ user: null, isAdmin: false });
   },
 }));

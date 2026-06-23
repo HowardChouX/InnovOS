@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { X } from 'lucide-react';
 
 interface ModalProps {
   open: boolean;
@@ -26,7 +27,7 @@ export function Modal({ open, onClose, children, title }: ModalProps) {
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
             <h3 className="text-white font-bold">{title}</h3>
             <button onClick={onClose} className="text-slate-400 hover:text-white">
-              <i className="fa-solid fa-xmark" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         )}

@@ -11,9 +11,10 @@
 - DashScope (百炼): 独立 URL 格式
 - TEI (Text Embedding Inference): POST /rerank
 """
+
 from __future__ import annotations
+
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +56,7 @@ class Reranker:
 
         # 降级：返回原始顺序，score 设为 0
         logger.warning("重排降级：无有效 API 配置，返回原始顺序")
-        return [
-            {"index": i, "relevance_score": 0.0, "text": doc}
-            for i, doc in enumerate(documents[:top_n])
-        ]
+        return [{"index": i, "relevance_score": 0.0, "text": doc} for i, doc in enumerate(documents[:top_n])]
 
     async def _remote_rerank(
         self,
@@ -133,11 +131,13 @@ class Reranker:
             text = item.get("text", "")
             if not text and idx < len(documents):
                 text = documents[idx]
-            parsed.append({
-                "index": idx,
-                "relevance_score": score,
-                "text": text,
-            })
+            parsed.append(
+                {
+                    "index": idx,
+                    "relevance_score": score,
+                    "text": text,
+                }
+            )
 
         # 按分数降序
         parsed.sort(key=lambda x: x["relevance_score"], reverse=True)
@@ -184,11 +184,13 @@ class Reranker:
         for item in results:
             idx = item.get("index", len(parsed))
             score = item.get("relevance_score", 0.0)
-            parsed.append({
-                "index": idx,
-                "relevance_score": score,
-                "text": documents[idx] if idx < len(documents) else "",
-            })
+            parsed.append(
+                {
+                    "index": idx,
+                    "relevance_score": score,
+                    "text": documents[idx] if idx < len(documents) else "",
+                }
+            )
 
         parsed.sort(key=lambda x: x["relevance_score"], reverse=True)
         return parsed
@@ -234,11 +236,13 @@ class Reranker:
             idx = item.get("index", len(parsed))
             score = item.get("score", item.get("relevance_score", 0.0))
             text = item.get("text", documents[idx] if idx < len(documents) else "")
-            parsed.append({
-                "index": idx,
-                "relevance_score": score,
-                "text": text,
-            })
+            parsed.append(
+                {
+                    "index": idx,
+                    "relevance_score": score,
+                    "text": text,
+                }
+            )
 
         parsed.sort(key=lambda x: x["relevance_score"], reverse=True)
         return parsed
