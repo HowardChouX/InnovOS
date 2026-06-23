@@ -116,21 +116,20 @@ backend/app/
 - 6-Agent pipeline with async job processing
 - All SQL parameterized with `?` placeholders; dynamic column names whitelisted
 
-### Multi-Agent Architecture (ZR-MoA)
+### Pipeline Architecture
 
 ```
-User Input → 知识库RAG检索 → 需求洞察Agent → 问题建模Agent
-            → 专利分析Agent → 方案生成Agent → 方案评估Agent → 成果转化Agent
+User Input → 知识库RAG检索 → 需求洞察 → 问题建模 → 专利检索 → 方案生成 → 评估 → 转化
 ```
 
-**Core Algorithm:** ZR-IPM (智融创新问题映射) — 87.4% accuracy for problem identification
+**Core Algorithm:** ZR-IPM (智融创新问题映射) — AI 驱动的创新问题建模引擎
 
 **Four-Dimension Evaluation Engine:**
 
-- Innovation Assessment (patent similarity, tech evolution)
-- Feasibility Assessment (constraint reasoning, rule validation)
-- Completeness Assessment (reasoning chain verification, cross-validation)
-- Achievement Transformation Assessment (patent applicability, industry scenario matching)
+- Innovation Assessment
+- Feasibility Assessment
+- Completeness Assessment
+- Achievement Transformation Assessment
 
 ### Database Schema (PostgreSQL, 15+ tables)
 

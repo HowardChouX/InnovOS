@@ -24,7 +24,7 @@ make dev       # 启动开发环境（前端 :5173 + 后端 :8000）
 | 前端     | React 19 + TypeScript + Vite 8 + Zustand 5 + TailwindCSS 4         |
 | 后端     | FastAPI + PostgreSQL (pgvector)                                    |
 | AI       | 多模型架构（DeepSeek / Qwen / 千问 / BGE-M3 等，2600+ 模型注册表） |
-| 核心算法 | ZR-IPM 智融创新问题映射（6-Agent 协同管线）                        |
+| 核心算法 | ZR-IPM 智融创新问题映射（AI 分析管线）                             |
 
 ## 许可证
 
