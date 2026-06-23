@@ -71,9 +71,9 @@ build:
 # ── 安全扫描 ─────────────────────────────────
 security:
 	@echo "=== Bandit ==="
-	cd backend && uv run bandit -c pyproject.toml -r app/ -q || true
+	cd backend && uv run bandit -c pyproject.toml -r app/ -q
 	@echo "=== npm audit ==="
-	cd frontend && npm audit --audit-level=high 2>/dev/null; true
+	cd frontend && npm audit --audit-level=high 2>/dev/null
 
 # ══════════════════════════════════════════════
 #  格式化
@@ -147,7 +147,7 @@ setup-hooks:
 ci-local:
 	@$(MAKE) lint
 	@$(MAKE) typecheck
-	@cd backend && uv run pytest tests/ -v --cov=app --cov-report=xml
+	@cd backend && uv run pytest tests/ -v --cov=app --cov-report=xml --cov-fail-under=60
 	@cd frontend && npm test -- --coverage
 	@cd backend && uv run bandit -c pyproject.toml -r app/
 	@$(MAKE) build

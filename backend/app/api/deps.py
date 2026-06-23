@@ -1,26 +1,24 @@
 """
-FastAPI dependencies — SQLModel-based auth & DB injection.
+FastAPI dependencies — psycopg2-based auth & DB injection.
 
-Aligns with full-stack-fastapi-template pattern:
-  SessionDep    = Annotated[Session, Depends(get_db)]
+  SessionDep    = Annotated[Any, Depends(get_db_dep)]
   CurrentUser   = Annotated[User, Depends(get_current_user)]
   SuperUserDep  = Annotated[User, Depends(get_current_superuser)]
 """
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pydantic import ValidationError
-from sqlmodel import Session
 
 from app.core.config import settings
-from app.core.db import get_db
 from app.core.security import ALGORITHM
+from app.database import get_db_dep
 from app.models.user import TokenPayload, User
 
-SessionDep = Annotated[Session, Depends(get_db)]
+SessionDep = Annotated[Any, Depends(get_db_dep)]
 
 reusable_oauth2 = HTTPBearer(auto_error=False)
 
@@ -37,7 +35,7 @@ def _extract_token(
 
 
 def get_current_user(
-    session: SessionDep,
+    db: SessionDep,
     request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(reusable_oauth2)],
 ) -> User:
@@ -45,7 +43,7 @@ def get_current_user(
 
     Supports both `Authorization: Bearer <token>` header and the httpOnly `token` cookie.
     Admin users (user_id=0, env-based) are returned as a light User object.
-    Regular users are fetched from the `users` table via SQLModel.
+    Regular users are fetched from the `users` table via raw SQL.
     """
     token = _extract_token(credentials, request)
     if not token:
@@ -67,6 +65,7 @@ def get_current_user(
         return User(
             id=0,
             username=payload.get("username", "admin"),
+            password_hash="",
             role="admin",
             created_at="",
         )
@@ -75,9 +74,10 @@ def get_current_user(
     user_id_str: str | None = token_data.sub or payload.get("user_id")
     if user_id_str is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的令牌")
-    user = session.get(User, int(user_id_str))
-    if not user:
+    row = db.execute("SELECT * FROM users WHERE id=?", (int(user_id_str),)).fetchone()
+    if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+    user = User(**row)
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="用户已被禁用")
     return user

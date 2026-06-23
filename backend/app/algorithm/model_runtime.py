@@ -104,10 +104,12 @@ class ModelRuntime:
         from app.database import get_db
 
         db = get_db()
-        rows = db.execute(
-            "SELECT provider_id, api_host, models FROM model_providers WHERE is_enabled=1 ORDER BY id ASC"
-        ).fetchall()
-        db.close()
+        try:
+            rows = db.execute(
+                "SELECT provider_id, api_host, models FROM model_providers WHERE is_enabled=1 ORDER BY id ASC"
+            ).fetchall()
+        finally:
+            db.close()
 
         for r in rows:
             models_raw = (
@@ -136,10 +138,12 @@ class ModelRuntime:
         from app.database import get_db
 
         db = get_db()
-        rows = db.execute(
-            "SELECT provider_id, api_host, models FROM model_providers WHERE is_enabled=1 ORDER BY id ASC"
-        ).fetchall()
-        db.close()
+        try:
+            rows = db.execute(
+                "SELECT provider_id, api_host, models FROM model_providers WHERE is_enabled=1 ORDER BY id ASC"
+            ).fetchall()
+        finally:
+            db.close()
 
         for r in rows:
             models_raw = (
@@ -187,11 +191,13 @@ class ModelRuntime:
             return {"status": "error", "message": "供应商未配置或未启用"}
 
         db = get_db()
-        row = db.execute(
-            "SELECT api_host, models FROM model_providers WHERE provider_id=? AND is_enabled=1",
-            (provider_id,),
-        ).fetchone()
-        db.close()
+        try:
+            row = db.execute(
+                "SELECT api_host, models FROM model_providers WHERE provider_id=? AND is_enabled=1",
+                (provider_id,),
+            ).fetchone()
+        finally:
+            db.close()
 
         if not row:
             return {"status": "error", "message": "供应商不存在或未启用"}
@@ -325,31 +331,31 @@ class ModelRuntime:
         from app.database import get_db
 
         db = get_db()
+        try:
+            if provider_id:
+                row = db.execute(
+                    "SELECT api_host FROM model_providers WHERE provider_id=? AND is_enabled=1",
+                    (provider_id,),
+                ).fetchone()
+                if not row:
+                    logger.warning(f"resolve: provider '{provider_id}' 不存在或未启用")
+                    return None
+                api_key = _get_provider_api_key(provider_id)
+                if not api_key:
+                    logger.warning(f"resolve: provider '{provider_id}' 未配置 API Key")
+                    return None
+                return ModelConfig(
+                    api_key=api_key,
+                    api_host=row["api_host"],
+                    model=model,
+                    provider_id=provider_id,
+                )
 
-        if provider_id:
-            row = db.execute(
-                "SELECT api_host FROM model_providers WHERE provider_id=? AND is_enabled=1",
-                (provider_id,),
-            ).fetchone()
+            rows = db.execute(
+                "SELECT provider_id, api_host, models FROM model_providers WHERE is_enabled=1 ORDER BY id ASC"
+            ).fetchall()
+        finally:
             db.close()
-            if not row:
-                logger.warning(f"resolve: provider '{provider_id}' 不存在或未启用")
-                return None
-            api_key = _get_provider_api_key(provider_id)
-            if not api_key:
-                logger.warning(f"resolve: provider '{provider_id}' 未配置 API Key")
-                return None
-            return ModelConfig(
-                api_key=api_key,
-                api_host=row["api_host"],
-                model=model,
-                provider_id=provider_id,
-            )
-
-        rows = db.execute(
-            "SELECT provider_id, api_host, models FROM model_providers WHERE is_enabled=1 ORDER BY id ASC"
-        ).fetchall()
-        db.close()
 
         for r in rows:
             models_raw = (

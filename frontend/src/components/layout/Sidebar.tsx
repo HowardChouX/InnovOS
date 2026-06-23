@@ -9,12 +9,18 @@ export function Sidebar() {
   const location = useLocation();
   const isAdmin = useAuthStore((s) => s.isAdmin);
   const [stats, setStats] = useState<SidebarStats | null>(null);
+  const [statsError, setStatsError] = useState(false);
 
   useEffect(() => {
     sidebarApi
       .getStats()
-      .then(setStats)
-      .catch(() => {});
+      .then((data) => {
+        setStats(data);
+        setStatsError(false);
+      })
+      .catch(() => {
+        setStatsError(true);
+      });
   }, []);
 
   const items = [...NAV_ITEMS];
@@ -138,25 +144,47 @@ export function Sidebar() {
           }}
         >
           <span style={{ fontWeight: 600 }}>系统状态</span>
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              color: 'var(--accent-green)',
-              fontSize: 10,
-            }}
-          >
+          {statsError ? (
             <span
               style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: 'var(--accent-green)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                color: 'var(--accent-red)',
+                fontSize: 10,
               }}
-            />
-            运行正常
-          </span>
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: 'var(--accent-red)',
+                }}
+              />
+              状态未知
+            </span>
+          ) : (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                color: 'var(--accent-green)',
+                fontSize: 10,
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: 'var(--accent-green)',
+                }}
+              />
+              运行正常
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {[

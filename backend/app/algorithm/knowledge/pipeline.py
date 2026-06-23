@@ -37,11 +37,13 @@ class KnowledgePipeline:
             from app.database import get_db
 
             db = get_db()
-            row = db.execute(
-                "SELECT embedding_model_id, rerank_model_id FROM knowledge_bases WHERE id=? AND user_id=?",
-                (self.base_id, self.user_id),
-            ).fetchone()
-            db.close()
+            try:
+                row = db.execute(
+                    "SELECT embedding_model_id, rerank_model_id FROM knowledge_bases WHERE id=? AND user_id=?",
+                    (self.base_id, self.user_id),
+                ).fetchone()
+            finally:
+                db.close()
 
             if row:
                 if row["embedding_model_id"]:
@@ -156,11 +158,13 @@ class KnowledgePipeline:
             from app.database import get_db
 
             db = get_db()
-            rows = db.execute(
-                "SELECT key, value FROM system_settings WHERE key IN (?, ?, ?, ?, ?)",
-                ("search_mode", "hybrid_alpha", "rag_rerank_model", "document_count", "threshold"),
-            ).fetchall()
-            db.close()
+            try:
+                rows = db.execute(
+                    "SELECT key, value FROM system_settings WHERE key IN (?, ?, ?, ?, ?)",
+                    ("search_mode", "hybrid_alpha", "rag_rerank_model", "document_count", "threshold"),
+                ).fetchall()
+            finally:
+                db.close()
             cfg = {r["key"]: r["value"] for r in rows}
             if search_mode is None:
                 search_mode = cfg.get("search_mode") or "hybrid"
@@ -233,16 +237,18 @@ def get_embedding_api_config(provider_id: str = "") -> dict:
     from app.database import get_db
 
     db = get_db()
-    if provider_id:
-        row = db.execute(
-            "SELECT api_host, api_model, models FROM model_providers WHERE provider_id=? AND is_enabled=1",
-            (provider_id,),
-        ).fetchone()
-    else:
-        row = db.execute(
-            "SELECT api_host, api_model, models FROM model_providers WHERE is_enabled=1 LIMIT 1",
-        ).fetchone()
-    db.close()
+    try:
+        if provider_id:
+            row = db.execute(
+                "SELECT api_host, api_model, models FROM model_providers WHERE provider_id=? AND is_enabled=1",
+                (provider_id,),
+            ).fetchone()
+        else:
+            row = db.execute(
+                "SELECT api_host, api_model, models FROM model_providers WHERE is_enabled=1 LIMIT 1",
+            ).fetchone()
+    finally:
+        db.close()
 
     if not row:
         return {}

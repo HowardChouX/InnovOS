@@ -121,34 +121,35 @@ async def _chat_with_model(
 
     last_error = None
     for attempt in range(max_retries):
+        await key_manager.acquire()
         try:
             from app.algorithm.model_runtime import ModelRuntime
 
-            http_client = httpx.Client(timeout=httpx.Timeout(30.0, connect=10.0))
-            client = OpenAI(
-                api_key=resolved.api_key,
-                base_url=ModelRuntime.ensure_v1_url(resolved.api_host),
-                http_client=http_client,
-            )
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": user_prompt})
+            with httpx.Client(timeout=httpx.Timeout(30.0, connect=10.0)) as http_client:
+                client = OpenAI(
+                    api_key=resolved.api_key,
+                    base_url=ModelRuntime.ensure_v1_url(resolved.api_host),
+                    http_client=http_client,
+                )
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": user_prompt})
 
-            kwargs: dict[str, Any] = {
-                "model": resolved.model_id,
-                "messages": messages,
-                "temperature": temperature,
-            }
-            if response_format is dict:
-                kwargs["response_format"] = {"type": "json_object"}
+                kwargs: dict[str, Any] = {
+                    "model": resolved.model_id,
+                    "messages": messages,
+                    "temperature": temperature,
+                }
+                if response_format is dict:
+                    kwargs["response_format"] = {"type": "json_object"}
 
-            resp = client.chat.completions.create(**kwargs)
-            content = resp.choices[0].message.content
+                resp = client.chat.completions.create(**kwargs)
+                content = resp.choices[0].message.content
 
-            if response_format is dict:
-                return json.loads(content)
-            return content
+                if response_format is dict:
+                    return json.loads(content)
+                return content
 
         except Exception as e:
             last_error = e
@@ -156,6 +157,8 @@ async def _chat_with_model(
                 await asyncio.sleep(1)
                 continue
             raise
+        finally:
+            key_manager.release()
 
     raise RuntimeError(f"AI调用失败: {last_error}")
 
@@ -178,32 +181,32 @@ async def _chat_with_key_manager(
             key_config = await key_manager.get_key_for_request(provider_id)
             base_url = _resolve_base_url(key_config, provider_id)
 
-            http_client = httpx.Client(timeout=httpx.Timeout(30.0, connect=10.0))
-            client = OpenAI(
-                api_key=key_config["api_key"],
-                base_url=base_url,
-                http_client=http_client,
-            )
+            with httpx.Client(timeout=httpx.Timeout(30.0, connect=10.0)) as http_client:
+                client = OpenAI(
+                    api_key=key_config["api_key"],
+                    base_url=base_url,
+                    http_client=http_client,
+                )
 
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": user_prompt})
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": user_prompt})
 
-            kwargs: dict[str, Any] = {
-                "model": pick_model(key_config["api_model"]),
-                "messages": messages,
-                "temperature": temperature,
-            }
-            if response_format is dict:
-                kwargs["response_format"] = {"type": "json_object"}
+                kwargs: dict[str, Any] = {
+                    "model": pick_model(key_config["api_model"]),
+                    "messages": messages,
+                    "temperature": temperature,
+                }
+                if response_format is dict:
+                    kwargs["response_format"] = {"type": "json_object"}
 
-            resp = client.chat.completions.create(**kwargs)
-            content = resp.choices[0].message.content
+                resp = client.chat.completions.create(**kwargs)
+                content = resp.choices[0].message.content
 
-            if response_format is dict:
-                return json.loads(content)
-            return content
+                if response_format is dict:
+                    return json.loads(content)
+                return content
 
         except Exception as e:
             last_error = e

@@ -36,9 +36,7 @@ function StarInput({ value, onChange }: { value: number; onChange: (v: number) =
 }
 
 export function DemandPortraitView({ output }: { output: unknown }) {
-  return (
-    <DemandPortraitViewInner key={output ? JSON.stringify(output) : 'empty'} output={output} />
-  );
+  return <DemandPortraitViewInner key={JSON.stringify(output)} output={output} />;
 }
 
 function DemandPortraitViewInner({ output }: { output: unknown }) {
@@ -66,6 +64,8 @@ function DemandPortraitViewInner({ output }: { output: unknown }) {
   const [ratings, setRatings] = useState<Record<string, number>>(initialRatings);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(Object.keys(initialRatings).length > 0);
+
+  // State resets via key remount — no useEffect needed
   const [error, setError] = useState('');
   const [manualDemands, setManualDemands] = useState<Demand[]>([]);
   const [newDesc, setNewDesc] = useState('');

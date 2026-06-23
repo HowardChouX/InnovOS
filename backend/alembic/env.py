@@ -1,35 +1,26 @@
 """
-Alembic migrations environment — SQLModel-aware.
+Alembic migrations environment — raw SQL (SQLModel removed).
 
-target_metadata = SQLModel.metadata enables `alembic revision --autogenerate`.
-Importing SQLModel table models registers them in the metadata.
+Migrations are written manually. target_metadata = None disables autogenerate.
 """
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-# Import app bootstrap first: load_dotenv + setup_logging
-# (triggered by importing any app submodule)
 from app.core.config import settings
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Database URL from settings (pydantic-settings, reads from .env / env vars)
+# Database URL from settings
 db_url = settings.DATABASE_URL
 if db_url:
     config.set_main_option("sqlalchemy.url", db_url)
 
-# Import all SQLModel table models so autogenerate detects schema changes
-from app.models.user import User  # noqa: F401
-# Future: import app.models.* when migrated to SQLModel
-
-# SQLModel.metadata is the target for autogenerate
-from sqlmodel import SQLModel
-
-target_metadata = SQLModel.metadata
+# No SQLModel metadata — migrations are manual
+target_metadata = None
 
 
 def run_migrations_offline() -> None:

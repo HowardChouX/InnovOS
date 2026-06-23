@@ -1,13 +1,9 @@
 """
 Authentication & authorization utilities.
 
-PROVISIONAL — kept for backward compatibility with 25+ existing modules.
-NEW code should import from app.api.deps (SessionDep, CurrentUser, etc.).
-
 Admin: validated against .env vars on every login (no DB record).
-Users: stored in DB with bcrypt password hashing via SQLModel.
+Users: stored in DB with bcrypt password hashing via raw psycopg2.
 
-Internal implementation migrated from raw psycopg2 to SQLModel (Phase 1).
 Return type is kept as dict for backward compatibility.
 """
 
@@ -18,11 +14,10 @@ from typing import Any
 from fastapi import Depends, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from sqlmodel import Session
 
 from app.core.config import settings
-from app.core.db import engine
 from app.core.security import ALGORITHM
+from app.database import get_db
 from app.models.user import User
 
 SECRET_KEY: str = settings.SECRET_KEY
@@ -70,7 +65,7 @@ def _verify_admin_credentials(username: str, password: str) -> bool:
 
 
 def _user_to_dict(user: User) -> dict[str, Any]:
-    """Convert SQLModel User to dict (backward compat return type)."""
+    """Convert User to dict (backward compat return type)."""
     return {
         "id": user.id if user.id is not None else 0,
         "username": user.username,
@@ -91,7 +86,7 @@ def get_current_user(
     """获取当前登录用户。
 
     管理员：从 .env 验证，每次登录都实时校验，不存 DB。
-    普通用户：从 DB 读取并验证（通过 SQLModel）。
+    普通用户：从 DB 读取并验证（通过 psycopg2 raw SQL）。
 
     支持 `Authorization: Bearer <token>` 头和 httpOnly `token` cookie 两种方式。
     NOTE: 保持 dict 返回类型以兼容 25+ 现有模块。
@@ -122,12 +117,16 @@ def get_current_user(
             "created_at": "",
         }
 
-    # 普通用户 — 使用 SQLModel（Phase 1 migration）
-    with Session(engine) as session:
-        user = session.get(User, user_id)
-        if user is None:
+    # 普通用户 — psycopg2 raw SQL
+    db = get_db()
+    try:
+        row = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+        if row is None:
             raise HTTPException(status_code=401, detail="用户不存在")
+        user = User(**row)
         return _user_to_dict(user)
+    finally:
+        db.close()
 
 
 def require_admin(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:

@@ -93,8 +93,8 @@ export function PatentSearchView({ output }: { output: unknown }) {
     if (!selectedTaskId || !allRated || submitting) return;
     setSubmitting(true);
     try {
-      const ratingsPayload = patents.map((_p: unknown, i: number) => ({
-        demandId: String(i),
+      const ratingsPayload = patents.map((patent: Record<string, unknown>, i: number) => ({
+        demandId: (patent.id as string) || String(i),
         score: ratings[String(i)] || 0,
       }));
       await workflowApi.proceed(selectedTaskId, ratingsPayload);

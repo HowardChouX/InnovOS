@@ -22,7 +22,7 @@ const PHASE_VIEWS: Record<string, React.ComponentType<{ output: unknown }>> = {
 };
 
 export function WorkflowStepResults() {
-  const { workflow, currentPhase, phaseStatus } = useWorkflowStore();
+  const { workflow, currentPhase, phaseStatus, loading } = useWorkflowStore();
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
 
   // 等待评分或已完成时，显示最后一个已完成的阶段
@@ -59,6 +59,14 @@ export function WorkflowStepResults() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <EmptyState msg="输入文字，点击开始进行分析" icon="fa-solid fa-hand-pointer" />
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        <EmptyState msg="加载中..." icon="fa-solid fa-circle-notch" />
       </div>
     );
   }

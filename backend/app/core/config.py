@@ -14,7 +14,6 @@ from pydantic import (
     AnyUrl,
     BeforeValidator,
     Field,
-    PostgresDsn,
     computed_field,
     model_validator,
 )
@@ -63,19 +62,6 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = ""
     POSTGRES_DB: str = "innovos"
     DATABASE_URL: str | None = None
-
-    @computed_field
-    def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn | None:
-        if self.DATABASE_URL:
-            return PostgresDsn(self.DATABASE_URL)
-        return PostgresDsn.build(
-            scheme="postgresql+psycopg2",
-            username=self.POSTGRES_USER,
-            password=self.POSTGRES_PASSWORD,
-            host=self.POSTGRES_SERVER,
-            port=self.POSTGRES_PORT,
-            path=self.POSTGRES_DB,
-        )
 
     # ── 管理员（从环境变量实时验证，不存数据库）──
     FIRST_SUPERUSER: str = Field(default="", validation_alias=AliasChoices("INNOVOS_ADMIN_USER", "FIRST_SUPERUSER"))

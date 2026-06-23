@@ -132,9 +132,18 @@ class KnowledgeRetriever:
         )
         return results
 
-    def is_indexed(self, item_id: str) -> bool:
-        """检查知识项是否已索引。"""
-        return self.vector_store.count() > 0  # 简化检查
+    def is_indexed(self, item_id: str, base_id: str = "") -> bool:
+        """Check if a specific item has been indexed by querying the vector store."""
+        from app.database import get_db
+        db = get_db()
+        try:
+            row = db.execute(
+                "SELECT 1 FROM knowledge_vectors WHERE item_id=%s AND base_id=%s LIMIT 1",
+                (item_id, base_id),
+            ).fetchone()
+            return row is not None
+        finally:
+            db.close()
 
     @property
     def reranker(self):
@@ -203,7 +212,7 @@ def get_retriever(
     reranker_config: dict | None = None,
 ) -> KnowledgeRetriever:
     """获取或创建用户的检索器实例。"""
-    if user_id not in _retrievers or embedder_config is not None:
+    if user_id not in _retrievers or embedder_config is not None or reranker_config is not None:
         _retrievers[user_id] = KnowledgeRetriever(
             user_id,
             embedder_config=embedder_config,

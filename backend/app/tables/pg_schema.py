@@ -510,9 +510,13 @@ def init_models(db):
 
 def _migrate_models_from_json_column(db):
     """从 model_providers.models JSON 列迁移数据到 models 表（幂等）。"""
-    rows = db.execute(
-        "SELECT provider_id, models FROM model_providers WHERE models IS NOT NULL AND models::text != '[]'"
-    ).fetchall()
+    try:
+        rows = db.execute(
+            "SELECT provider_id, models FROM model_providers WHERE models IS NOT NULL AND models::text != '[]'"
+        ).fetchall()
+    except Exception:
+        logger.debug("model_providers.models 列不存在或已废弃，跳过迁移")
+        return
     migrated = 0
     for row in rows:
         pid = row["provider_id"]
@@ -592,9 +596,22 @@ def init_all_tables(db):
     init_users(db)
     init_tasks(db)
     init_analyses(db)
+    _ensure_columns(db, "analyses", [("created_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_solutions(db)
+    _ensure_columns(db, "solutions", [("created_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_workflows(db)
     init_patents(db)
+    _ensure_columns(db, "patents", [("created_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
+    # ── UNIQUE index on patent_number ──
+    try:
+        db.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_patents_patent_number
+            ON patents(patent_number) WHERE patent_number != ''
+        """)
+        logger.info("  + 创建 patents.patent_number 唯一索引")
+    except Exception as e:
+        logger.warning(f"  无法创建 patent_number 索引: {e}")
+
     init_patent_vectors(db)
     init_evaluations(db)
     init_feedbacks(db)
@@ -607,9 +624,30 @@ def init_all_tables(db):
     init_knowledge_jobs(db)
     init_knowledge_docs(db)
     init_knowledge_items_pgvector(db)
+    # ── pgvector HNSW index for efficient similarity search ──
+    try:
+        db.execute("SAVEPOINT sp_hnsw")
+        db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_knowledge_vectors_embedding
+            ON knowledge_vectors USING hnsw (embedding vector_cosine_ops)
+        """)
+        db.execute("RELEASE SAVEPOINT sp_hnsw")
+        logger.info("  + 创建 knowledge_vectors.embedding HNSW 索引")
+    except Exception as e:
+        db.execute("ROLLBACK TO SAVEPOINT sp_hnsw")
+        logger.warning(f"  HNSW 索引创建失败（可能 pgvector 版本不支持）: {e}")
+
     init_problem_modelings(db)
+    _ensure_columns(db, "problem_modelings", [("created_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_system_settings(db)
     init_model_providers(db)
+    # ── Drop deprecated columns ───────────────────────────
+    try:
+        db.execute("ALTER TABLE model_providers DROP COLUMN IF EXISTS api_key_encrypted")
+        logger.info("  - 移除 model_providers.api_key_encrypted（废弃列）")
+    except Exception as e:
+        logger.warning(f"  无法移除 api_key_encrypted: {e}")
+
     init_models(db)
 
     # ── Foreign Key constraints ──────────────────────────────────
@@ -641,6 +679,20 @@ def init_all_tables(db):
         except Exception:
             db.execute("ROLLBACK TO SAVEPOINT sp_fk")
             logger.debug(f"FK {fk_name} already exists")
+
+    # ── FK: knowledge_items.group_id → knowledge_groups.id ──
+    try:
+        db.execute("SAVEPOINT sp_fk_group")
+        db.execute("""
+            ALTER TABLE knowledge_items
+            ADD CONSTRAINT fk_ki_group
+            FOREIGN KEY (group_id) REFERENCES knowledge_groups(id) ON DELETE SET NULL
+        """)
+        db.execute("RELEASE SAVEPOINT sp_fk_group")
+        logger.info("  + 添加 FK: knowledge_items.group_id → knowledge_groups")
+    except Exception:
+        db.execute("ROLLBACK TO SAVEPOINT sp_fk_group")
+        logger.debug("  FK knowledge_items.group_id 已存在")
 
     # ── Performance indexes ──────────────────────────────────────
     logger.info("Creating performance indexes...")

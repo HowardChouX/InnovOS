@@ -168,6 +168,7 @@ export function PatentSearchPage() {
   const [pageSize] = useState(20);
   const [selectedPatent, setSelectedPatent] = useState<Patent | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const initialized = useRef(false);
 
   const totalPages = Math.ceil(total / pageSize);
@@ -187,8 +188,8 @@ export function PatentSearchPage() {
         setPatents(res.data);
         setTotal(res.total);
         setPage(pageNum);
-      } catch {
-        // ignore
+      } catch (e) {
+        setError(e instanceof Error ? e.message : '搜索失败，请重试');
       } finally {
         setLoading(false);
       }
@@ -401,6 +402,28 @@ export function PatentSearchPage() {
               加载中...
             </div>
           </div>
+        ) : error ? (
+          <div className="text-red-400 p-4 text-center">
+            <p>{error}</p>
+            <button
+              onClick={() => {
+                setError(null);
+                handleSearch();
+              }}
+              className="mt-2 text-blue-400 hover:underline"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 12,
+                color: 'var(--accent-blue)',
+                fontFamily: 'inherit',
+                marginTop: 8,
+              }}
+            >
+              重试
+            </button>
+          </div>
         ) : patents.length === 0 ? (
           <div
             style={{
@@ -571,28 +594,53 @@ export function PatentSearchPage() {
           </button>
 
           <div style={{ display: 'flex', gap: 4 }}>
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              const pageNum = i + 1;
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => handlePageChange(pageNum)}
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 4,
-                    background: pageNum === page ? 'var(--accent)' : 'rgba(0,0,0,0.2)',
-                    border: '1px solid var(--border-light)',
-                    color: pageNum === page ? '#fff' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    fontSize: 11,
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  {pageNum}
-                </button>
+            {(() => {
+              const pages: (number | string)[] = [];
+              const delta = 2;
+              const start = Math.max(1, page - delta);
+              const end = Math.min(totalPages, page + delta);
+              if (start > 1) pages.push(1);
+              if (start > 2) pages.push('...');
+              for (let i = start; i <= end; i++) pages.push(i);
+              if (end < totalPages - 1) pages.push('...');
+              if (end < totalPages) pages.push(totalPages);
+              return pages.map((pageNum) =>
+                typeof pageNum === 'string' ? (
+                  <span
+                    key={pageNum}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 11,
+                      color: 'var(--text-tertiary)',
+                    }}
+                  >
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    key={pageNum}
+                    onClick={() => handlePageChange(pageNum)}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 4,
+                      background: pageNum === page ? 'var(--accent)' : 'rgba(0,0,0,0.2)',
+                      border: '1px solid var(--border-light)',
+                      color: pageNum === page ? '#fff' : 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      fontSize: 11,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {pageNum}
+                  </button>
+                ),
               );
-            })}
+            })()}
           </div>
 
           <button

@@ -1,13 +1,6 @@
 """
-User CRUD operations — SQLModel-based.
-
-Aligns with full-stack-fastapi-template pattern:
-  create_user()    — hash password, persist, return User
-  get_user_by_username() — lookup by username
-  authenticate()  — verify password with timing-attack prevention
+User CRUD operations — raw psycopg2 (SQLModel removed).
 """
-
-from sqlmodel import Session, select
 
 from app.core.security import get_password_hash, verify_password
 from app.models.user import User, UserRegister
@@ -18,32 +11,30 @@ from app.models.user import User, UserRegister
 _DUMMY_HASH = "$2b$12$LJ3m4ys3Lk0TSwHnbfOMiOXPm1Qlq5GypGm9Gk1TzOyZvqJ7VxHXO"
 
 
-def get_user_by_username(*, session: Session, username: str) -> User | None:
+def get_user_by_username(*, db, username: str) -> User | None:
     """Look up a user by username."""
-    statement = select(User).where(User.username == username)
-    return session.exec(statement).first()
+    row = db.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+    return User(**row) if row else None
 
 
-def create_user(*, session: Session, user_in: UserRegister) -> User:
+def create_user(*, db, user_in: UserRegister) -> User:
     """Create a new user with hashed password."""
-    db_user = User(
-        username=user_in.username,
-        password_hash=get_password_hash(user_in.password),
-    )
-    session.add(db_user)
-    session.commit()
-    session.refresh(db_user)
-    return db_user
+    row = db.execute(
+        "INSERT INTO users (username, password_hash) VALUES (?, ?) RETURNING id, username, password_hash, role, email, is_active, created_at",
+        (user_in.username, get_password_hash(user_in.password)),
+    ).fetchone()
+    db.commit()
+    return User(**row)
 
 
-def authenticate(*, session: Session, username: str, password: str) -> User | None:
+def authenticate(*, db, username: str, password: str) -> User | None:
     """Verify credentials — constant-time comparison.
 
     Uses a dummy hash when the user is not found, preventing
     attackers from distinguishing "wrong password" from
     "user doesn't exist" via response timing.
     """
-    db_user = get_user_by_username(session=session, username=username)
+    db_user = get_user_by_username(db=db, username=username)
     if not db_user:
         verify_password(password, _DUMMY_HASH)
         return None

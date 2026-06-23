@@ -1,33 +1,27 @@
 """
-User models — SQLModel table + Pydantic API schemas.
-
-Aligns with full-stack-fastapi-template pattern:
-  User (table model) → UserPublic (response) → UserRegister/UserLogin (request)
+User models — Pydantic BaseModel schemas (SQLModel removed).
 
 Admin users are validated against .env vars (no DB record).
 Regular users are stored in the `users` table.
 """
 
-from sqlmodel import Field, SQLModel
+from pydantic import BaseModel, Field
 
 # ═══════════════════════════════════════════════════════════════
-#  Database model
+#  Data model
 # ═══════════════════════════════════════════════════════════════
 
 
-class User(SQLModel, table=True):
-    """SQLModel ORM for the `users` table."""
+class User(BaseModel):
+    """User data model (not a DB table model — use raw SQL + psycopg2)."""
 
-    __tablename__ = "users"
-    __table_args__ = {"extend_existing": True}
-
-    id: int | None = Field(default=None, primary_key=True)
-    username: str = Field(unique=True, index=True, max_length=100)
+    id: int | None = None
+    username: str
     password_hash: str
-    role: str = Field(default="user", max_length=20)
-    email: str = Field(default="", max_length=255)
-    is_active: int = Field(default=1)
-    created_at: str | None = Field(default=None)
+    role: str = "user"
+    email: str = ""
+    is_active: int = 1
+    created_at: str | None = None
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -35,21 +29,21 @@ class User(SQLModel, table=True):
 # ═══════════════════════════════════════════════════════════════
 
 
-class UserRegister(SQLModel):
+class UserRegister(BaseModel):
     """POST /api/auth/register"""
 
     username: str = Field(min_length=2, max_length=100)
     password: str = Field(min_length=8)
 
 
-class UserLogin(SQLModel):
+class UserLogin(BaseModel):
     """POST /api/auth/login"""
 
     username: str
     password: str
 
 
-class UserPublic(SQLModel):
+class UserPublic(BaseModel):
     """User data returned to client (never exposes password_hash)."""
 
     id: int
@@ -59,21 +53,21 @@ class UserPublic(SQLModel):
     created_at: str | None = None
 
 
-class UserUpdate(SQLModel):
+class UserUpdate(BaseModel):
     """PATCH /api/users/{id} or /api/users/me"""
 
     email: str | None = None
     is_active: int | None = None
 
 
-class UpdatePassword(SQLModel):
+class UpdatePassword(BaseModel):
     """PATCH /api/users/me/password"""
 
     current_password: str
     new_password: str = Field(min_length=8)
 
 
-class TokenPayload(SQLModel):
+class TokenPayload(BaseModel):
     """Contents of the JWT token (sub = user_id)."""
 
     sub: str | None = None

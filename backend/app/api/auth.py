@@ -1,10 +1,8 @@
 """
-Auth API routes — SQLModel-based.
+Auth API routes — raw psycopg2 (SQLModel removed).
 
 管理员：每次登录从 .env 验证，不存 DB。
-普通用户：通过 SQLModel ORM 注册/登录验证。
-
-Phase 1 migration target — uses SessionDep + CurrentUser.
+普通用户：通过 psycopg2 raw SQL 注册/登录验证。
 """
 
 from typing import Any
@@ -28,7 +26,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 @router.post("/register")
 def register(
     body: UserRegister,
-    session: SessionDep,
+    db: SessionDep,
     request: Request,
     response: Response,
 ) -> dict[str, Any]:
@@ -36,11 +34,11 @@ def register(
 
     Returns access_token + user data (consistent with login response).
     """
-    existing = get_user_by_username(session=session, username=body.username)
+    existing = get_user_by_username(db=db, username=body.username)
     if existing:
         raise HTTPException(status_code=400, detail="用户名已存在")
 
-    user = create_user(session=session, user_in=body)
+    user = create_user(db=db, user_in=body)
 
     uid: int = user.id  # type: ignore[assignment]  # guaranteed non-None after commit
     log_audit(
@@ -70,7 +68,7 @@ def register(
 @router.post("/login")
 def login(
     body: UserLogin,
-    session: SessionDep,
+    db: SessionDep,
     request: Request,
     response: Response,
 ) -> Any:
@@ -102,10 +100,10 @@ def login(
             "user": {"id": 0, "username": username, "role": "admin", "created_at": ""},
         }
 
-    # 普通用户：通过 SQLModel 验证
+    # 普通用户：通过 psycopg2 raw SQL 验证
     from app.crud.users import authenticate
 
-    user = authenticate(session=session, username=username, password=password)
+    user = authenticate(db=db, username=username, password=password)
     if not user:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
 

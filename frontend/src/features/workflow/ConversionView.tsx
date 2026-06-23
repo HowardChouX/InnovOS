@@ -496,38 +496,49 @@ function ConversionViewInner({ selectedTaskId }: { selectedTaskId: string }) {
   const [analysisFailed, setAnalysisFailed] = useState<string[]>([]);
 
   useEffect(() => {
-    historySolutionsApi
-      .getData(selectedTaskId)
-      .then((d) => {
+    let cancelled = false;
+
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const d = await historySolutionsApi.getData(selectedTaskId);
+        if (cancelled) return;
         setData(d);
         if (d.solutions.length > 0 && d.solutions.some((s) => s.refPatents.length > 0)) {
           setAnalyzingAll(true);
-          Promise.allSettled(
+          const outcomes = await Promise.allSettled(
             d.solutions.map((sol) =>
               historySolutionsApi
                 .checkInfringement(sol.id)
                 .then((result) => ({ id: sol.id, result }))
                 .catch(() => ({ id: sol.id, result: null })),
             ),
-          )
-            .then((outcomes) => {
-              const results: Record<string, InfringementResult> = {};
-              const failed: string[] = [];
-              outcomes.forEach((o) => {
-                if (o.status === 'fulfilled' && o.value.result) {
-                  results[o.value.id] = o.value.result;
-                } else {
-                  failed.push(o.status === 'fulfilled' ? o.value.id : 'unknown');
-                }
-              });
-              setAnalysisResults(results);
-              setAnalysisFailed(failed);
-            })
-            .finally(() => setAnalyzingAll(false));
+          );
+          if (cancelled) return;
+          const results: Record<string, InfringementResult> = {};
+          const failed: string[] = [];
+          outcomes.forEach((o) => {
+            if (o.status === 'fulfilled' && o.value.result) {
+              results[o.value.id] = o.value.result;
+            } else {
+              failed.push(o.status === 'fulfilled' ? o.value.id : 'unknown');
+            }
+          });
+          setAnalysisResults(results);
+          setAnalysisFailed(failed);
+          setAnalyzingAll(false);
         }
-      })
-      .catch((err) => setError(err?.message || '加载失败'))
-      .finally(() => setLoading(false));
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : '加载失败');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadData();
+    return () => {
+      cancelled = true;
+    };
   }, [selectedTaskId]);
 
   if (loading) {

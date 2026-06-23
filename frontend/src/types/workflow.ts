@@ -18,7 +18,7 @@ export interface WorkflowState {
   id: string;
   // taskId is numeric (backend uses int path params), but stored as string for route consistency
   taskId: string;
-  status: 'idle' | 'running' | 'completed' | 'failed';
+  status: 'idle' | 'running' | 'completed' | 'failed' | 'awaiting_rating';
   steps: AgentStep[];
   createdAt: string;
 }

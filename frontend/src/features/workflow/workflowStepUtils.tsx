@@ -10,10 +10,11 @@ const PHASE_TO_AGENT: Record<string, string> = {
   conversion: 'agent6',
 };
 
-export function getStepOutput(workflow: WorkflowState, phaseId: string): unknown {
+export function getStepOutput(workflow: WorkflowState | null, phaseId: string): unknown {
+  if (!workflow?.steps) return null;
   const agentId = PHASE_TO_AGENT[phaseId];
   if (!agentId) return null;
-  const step = workflow.steps.find((s) => s.agentId === agentId);
+  const step = workflow.steps.find((s) => (s.agentId || s.agent_id) === agentId);
   if (!step || !step.output) return null;
   try {
     return JSON.parse(step.output);

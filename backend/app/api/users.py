@@ -1,5 +1,5 @@
 """
-Profile & account management routes.
+Profile & account management routes — raw psycopg2 (SQLModel removed).
 
 - GET    /api/users/me        — get current user profile
 - PUT    /api/users/me        — update profile (email)
@@ -44,7 +44,7 @@ def get_profile(current_user: CurrentUser) -> User:
 @router.put("/me", response_model=UserPublic)
 def update_profile(
     body: UpdateProfileInput,
-    session: SessionDep,
+    db: SessionDep,
     current_user: CurrentUser,
 ) -> User:
     """Update profile fields (email)."""
@@ -52,18 +52,17 @@ def update_profile(
         raise HTTPException(status_code=400, detail="管理员账号不支持修改个人资料")
 
     if body.email is not None:
+        db.execute("UPDATE users SET email=? WHERE id=?", (body.email, current_user.id))
+        db.commit()
         current_user.email = body.email
 
-    session.add(current_user)
-    session.commit()
-    session.refresh(current_user)
     return current_user
 
 
 @router.put("/me/password")
 def change_password(
     body: UpdatePassword,
-    session: SessionDep,
+    db: SessionDep,
     current_user: CurrentUser,
 ) -> dict:
     """Change the current user's password."""
@@ -73,8 +72,8 @@ def change_password(
     if not verify_password(body.current_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="当前密码错误")
 
-    current_user.password_hash = get_password_hash(body.new_password)
-    session.add(current_user)
-    session.commit()
+    new_hash = get_password_hash(body.new_password)
+    db.execute("UPDATE users SET password_hash=? WHERE id=?", (new_hash, current_user.id))
+    db.commit()
 
     return {"message": "密码已修改"}

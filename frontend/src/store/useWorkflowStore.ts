@@ -24,7 +24,8 @@ interface WorkflowStore {
   clearWorkflow: () => void;
 }
 
-let pollTimer: ReturnType<typeof setInterval> | null = null;
+let pollTimer: ReturnType<typeof setTimeout> | null = null;
+let pollingFlag = false;
 
 // 后端 agent_id 到前端 phaseId 的映射
 const AGENT_TO_PHASE: Record<string, string> = {
@@ -110,6 +111,8 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
     set({ polling: true, isRunning: true });
 
     const poll = async () => {
+      if (pollingFlag) return;
+      pollingFlag = true;
       try {
         const workflow = await workflowApi.getByTaskId(taskId);
         const phaseStatus = syncPhaseStatus(workflow.steps);
@@ -118,29 +121,35 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         set({ workflow, phaseStatus, currentPhase, isRunning });
         if (workflow.status === 'completed' || workflow.status === 'failed') {
           get().stopPolling();
+          return;
         }
       } catch (err) {
         console.warn('Workflow poll warning (will retry):', err);
+      } finally {
+        pollingFlag = false;
+        pollTimer = setTimeout(poll, 3000);
       }
     };
 
     poll();
-    pollTimer = setInterval(poll, 3000);
   },
   stopPolling: () => {
     if (pollTimer !== null) {
-      clearInterval(pollTimer);
+      clearTimeout(pollTimer);
       pollTimer = null;
     }
+    pollingFlag = false;
     set({ polling: false, isRunning: false });
   },
-  clearWorkflow: () =>
+  clearWorkflow: () => {
+    get().stopPolling();
     set({
       workflow: null,
       isRunning: false,
       phaseStatus: { ...DEFAULT_PHASE_STATUS },
       currentPhase: 'demand_portrait',
-    }),
+    });
+  },
   reset: () => {
     get().stopPolling();
     set({
