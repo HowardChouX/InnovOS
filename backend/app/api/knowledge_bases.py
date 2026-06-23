@@ -296,7 +296,9 @@ async def import_directory(
         rel_path = upload_file.filename or "unnamed"
         # 路径穿越防护：去除目录组件
         rel_path = os.path.basename(rel_path)
-        safe_path = rel_path.replace("..", "_")
+        safe_path = os.path.normpath(rel_path).lstrip("/")
+        if safe_path.startswith("..") or "/.." in safe_path:
+            raise ValueError(f"Invalid path: {rel_path}")
 
         # 尝试上传到 MinIO/S3（如果已配置）
         if file_storage.enabled:

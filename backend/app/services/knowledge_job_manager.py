@@ -117,13 +117,6 @@ class KnowledgeJobManager:
         if not handler:
             raise ValueError(f"Unknown job type: {job_type}")
 
-        # 幂等性检查
-        if idempotency_key:
-            existing = self._find_by_idempotency_key(idempotency_key)
-            if existing:
-                logger.info(f"Job already exists (idempotency): {idempotency_key}")
-                return existing["id"]
-
         now = _now_iso()
         job_id = _generate_job_id(job_type)
 
@@ -132,11 +125,15 @@ class KnowledgeJobManager:
 
         db = get_db()
         try:
-            db.execute(
+            # 原子化插入 + ON CONFLICT 防止 TOCTOU 竞态条件
+            cur = db.execute(
                 """INSERT INTO knowledge_jobs
                    (id, job_type, queue, input_data, status, attempt, max_attempts,
                     timeout_ms, parent_job_id, idempotency_key, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT (idempotency_key)
+                   WHERE idempotency_key IS NOT NULL AND idempotency_key != ''
+                   DO NOTHING""",
                 (
                     job_id,
                     job_type,
@@ -153,6 +150,13 @@ class KnowledgeJobManager:
                 ),
             )
             db.commit()
+
+            # 如果冲突导致未插入，返回现有作业 ID
+            if cur.rowcount == 0 and idempotency_key:
+                existing = self._find_by_idempotency_key(idempotency_key)
+                if existing:
+                    logger.info(f"Job already exists (idempotency): {idempotency_key}")
+                    return existing["id"]
         finally:
             db.close()
 

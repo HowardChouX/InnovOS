@@ -84,6 +84,15 @@ export const providersApi = {
   delete: (providerId: string) =>
     apiRequest(`/api/admin/providers/${providerId}`, { method: 'DELETE' }),
 
+  check: (
+    providerId: string,
+    model?: string,
+  ): Promise<{ data: { status: string; latency_ms?: number; message?: string; model?: string } }> =>
+    apiRequest(`/api/admin/providers/${providerId}/check`, {
+      method: 'POST',
+      body: JSON.stringify(model ? { model } : {}),
+    }),
+
   detectModels: (providerId: string): Promise<{ data: { models: ModelEntry[] } }> =>
     apiRequest(`/api/admin/providers/${providerId}/detect-models`, { method: 'POST' }),
 

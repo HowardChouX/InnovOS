@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router-dom';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ProtectedRoute } from '../components/layout/ProtectedRoute';
+import { AdminRoute } from '../components/layout/AdminRoute';
 import { lazyPage } from '../components/common/LazyPage';
 
 const DashboardPage = lazyPage(() => import('../features/dashboard/DashboardPage'));
@@ -38,9 +39,30 @@ export const routes: RouteObject[] = [
       { path: 'workflow/modeling', element: <PlaceholderPage title="问题建模" /> },
       { path: 'guide', element: <GuidePage /> },
       { path: 'profile', element: <ProfilePage /> },
-      { path: 'admin/keys', element: <KeyManagementPage /> },
-      { path: 'admin/users', element: <UserManagementPage /> },
-      { path: 'admin/patents', element: <PatentDbPage /> },
+      {
+        path: 'admin/keys',
+        element: (
+          <AdminRoute>
+            <KeyManagementPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/users',
+        element: (
+          <AdminRoute>
+            <UserManagementPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/patents',
+        element: (
+          <AdminRoute>
+            <PatentDbPage />
+          </AdminRoute>
+        ),
+      },
     ],
   },
 ];

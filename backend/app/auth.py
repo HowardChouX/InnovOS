@@ -1,5 +1,10 @@
 """
 Authentication & authorization utilities.
+"""
+
+import hmac
+"""
+Authentication & authorization utilities.
 
 PROVISIONAL — kept for backward compatibility with 25+ existing modules.
 NEW code should import from app.api.deps (SessionDep, CurrentUser, etc.).
@@ -11,6 +16,7 @@ Internal implementation migrated from raw psycopg2 to SQLModel (Phase 1).
 Return type is kept as dict for backward compatibility.
 """
 
+import hmac
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -61,12 +67,12 @@ def clear_token_cookie(response: Response) -> None:
 
 
 def _verify_admin_credentials(username: str, password: str) -> bool:
-    """验证是否匹配 .env 中配置的管理员凭据。"""
-    env_user = settings.FIRST_SUPERUSER
-    env_pass = settings.FIRST_SUPERUSER_PASSWORD
-    if not env_user or not env_pass:
-        return False
-    return username == env_user and password == env_pass
+    """Constant-time comparison to prevent timing attacks."""
+    admin_user = settings.FIRST_SUPERUSER or ""
+    admin_pass = settings.FIRST_SUPERUSER_PASSWORD or ""
+    # 常量时间比较防止时序攻击
+    return (hmac.compare_digest(username, admin_user) and
+            hmac.compare_digest(password, admin_pass))
 
 
 def _user_to_dict(user: User) -> dict[str, Any]:

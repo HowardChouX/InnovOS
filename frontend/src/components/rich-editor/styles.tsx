@@ -92,33 +92,39 @@ EditorContent.displayName = 'StyledEditorContent';
 export const RichEditorWrapper = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & {
+    $minHeight?: number;
     $maxHeight?: number;
+    $isFullWidth?: boolean;
     $fontFamily?: string;
     $fontSize?: number;
   }
->(({ $maxHeight, $fontFamily, $fontSize, ...props }, ref) => (
-  <div
-    ref={ref}
-    {...props}
-    className={cn('rich-editor-wrapper', props.className)}
-    style={
-      {
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: 0,
-        maxHeight: $maxHeight || 'none',
-        fontFamily:
-          $fontFamily === 'default'
-            ? '"PingFang SC","Microsoft YaHei","Inter",sans-serif'
-            : $fontFamily,
-        fontSize: $fontSize || 16,
-        border: '1px solid var(--border)',
-        borderRadius: 8,
-        background: 'var(--bg-panel)',
-        color: 'var(--text-primary)',
-        ...props.style,
-      } as React.CSSProperties
-    }
-  />
-));
+>(({ $minHeight, $maxHeight, $isFullWidth, $fontFamily, $fontSize, ...props }, ref) => {
+  void $minHeight;
+  void $isFullWidth;
+  return (
+    <div
+      ref={ref}
+      {...props}
+      className={cn('rich-editor-wrapper', props.className)}
+      style={
+        {
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          maxHeight: $maxHeight || 'none',
+          fontFamily:
+            $fontFamily === 'default'
+              ? '"PingFang SC","Microsoft YaHei","Inter",sans-serif'
+              : $fontFamily,
+          fontSize: $fontSize || 16,
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          background: 'var(--bg-panel)',
+          color: 'var(--text-primary)',
+          ...props.style,
+        } as React.CSSProperties
+      }
+    />
+  );
+});
 RichEditorWrapper.displayName = 'RichEditorWrapper';

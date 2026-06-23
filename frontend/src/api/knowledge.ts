@@ -8,6 +8,12 @@ import type {
   OffsetPaginationResponse,
 } from '../types/knowledge';
 
+export interface UploadResponse {
+  id: string;
+  name: string;
+  size: number;
+}
+
 export interface CreateKnowledgeBaseInput {
   name: string;
   groupId?: string;
@@ -105,7 +111,7 @@ export const knowledgeApi = {
   },
 
   // ─── 文件上传 ────────────────────────────────────────
-  async uploadFile(file: File, baseId?: string): Promise<{ data: unknown }> {
+  async uploadFile(file: File, baseId?: string): Promise<{ data: UploadResponse }> {
     const formData = new FormData();
     formData.append('file', file);
     if (baseId) formData.append('base_id', baseId);
@@ -115,11 +121,15 @@ export const knowledgeApi = {
       credentials: 'include',
       body: formData,
     });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `Upload failed (${res.status})`);
+    }
     return res.json();
   },
 
   // ─── 文件夹导入（生产环境：上传文件列表）─────────────────
-  async importDirectory(baseId: string, files: File[]): Promise<{ data: { id: string } }> {
+  async importDirectory(baseId: string, files: File[]): Promise<{ data: UploadResponse }> {
     const formData = new FormData();
     for (const file of files) {
       formData.append('files', file);
@@ -130,6 +140,10 @@ export const knowledgeApi = {
       credentials: 'include',
       body: formData,
     });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `Import failed (${res.status})`);
+    }
     return res.json();
   },
 

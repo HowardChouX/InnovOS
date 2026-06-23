@@ -92,11 +92,11 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
   isRestoringBase: false,
 
   fetchBases: async () => {
-    set({ loading: true });
+    set({ loading: true, error: null });
     try {
       const res = await knowledgeApi.listBases();
       const bases = res.data?.items || [];
-      set({ bases });
+      set({ bases, error: null });
       if (bases.length > 0 && !get().selectedBaseId) {
         set({ selectedBaseId: bases[0].id });
         await get().fetchItems(bases[0].id);
@@ -112,7 +112,7 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
   fetchGroups: async () => {
     try {
       const res = await knowledgeApi.listGroups();
-      set({ groups: res.data || [] });
+      set({ groups: res.data || [], error: null });
     } catch (e) {
       console.error('[useKnowledgeStore] fetchGroups failed:', e);
       set({ groups: [], error: e instanceof Error ? e.message : '加载知识库分组失败' });
@@ -126,6 +126,7 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
       activeTab: 'file',
       searchQuery: '',
       items: [],
+      error: null,
     });
     if (id) get().fetchItems(id);
   },
@@ -165,6 +166,7 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
         items: [],
         itemsTotal: 0,
         tabCounts: { file: 0, note: 0, directory: 0, url: 0 },
+        error: null,
       });
     }
     await get().fetchBases();
@@ -210,6 +212,7 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
           KnowledgeTabKey,
           number
         >,
+        error: null,
       });
     } catch (e) {
       console.error('[useKnowledgeStore] fetchItems failed:', e);
@@ -256,25 +259,27 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
   },
 
   setActiveTab: (tab) => {
-    set({ activeTab: tab, selectedItemId: null });
+    set({ activeTab: tab, selectedItemId: null, error: null });
     const { selectedBaseId } = get();
     if (selectedBaseId) get().fetchItems(selectedBaseId);
   },
-  setSearchQuery: (q) => set({ searchQuery: q }),
-  openItemChunks: (id) => set({ selectedItemId: id }),
-  closeItemChunks: () => set({ selectedItemId: null }),
-  openRecallTest: () => set({ isRecallTestOpen: true }),
-  closeRecallTest: () => set({ isRecallTestOpen: false }),
-  openCreateBase: (groupId) => set({ isCreateBaseOpen: true, createBaseGroupId: groupId }),
-  closeCreateBase: () => set({ isCreateBaseOpen: false, createBaseGroupId: undefined }),
-  openCreateGroup: () => set({ isCreateGroupOpen: true }),
-  closeCreateGroup: () => set({ isCreateGroupOpen: false }),
-  openRename: (id, name, type) => set({ editingName: { id, name, type } }),
-  closeRename: () => set({ editingName: null }),
-  openRestoreBase: (base) => set({ restoringBase: base }),
-  closeRestoreBase: () => set({ restoringBase: null }),
+  setSearchQuery: (q) => set({ searchQuery: q, error: null }),
+  openItemChunks: (id) => set({ selectedItemId: id, error: null }),
+  closeItemChunks: () => set({ selectedItemId: null, error: null }),
+  openRecallTest: () => set({ isRecallTestOpen: true, error: null }),
+  closeRecallTest: () => set({ isRecallTestOpen: false, error: null }),
+  openCreateBase: (groupId) =>
+    set({ isCreateBaseOpen: true, createBaseGroupId: groupId, error: null }),
+  closeCreateBase: () =>
+    set({ isCreateBaseOpen: false, createBaseGroupId: undefined, error: null }),
+  openCreateGroup: () => set({ isCreateGroupOpen: true, error: null }),
+  closeCreateGroup: () => set({ isCreateGroupOpen: false, error: null }),
+  openRename: (id, name, type) => set({ editingName: { id, name, type }, error: null }),
+  closeRename: () => set({ editingName: null, error: null }),
+  openRestoreBase: (base) => set({ restoringBase: base, error: null }),
+  closeRestoreBase: () => set({ restoringBase: null, error: null }),
   restoreBase: async (input) => {
-    set({ isRestoringBase: true });
+    set({ isRestoringBase: true, error: null });
     try {
       const res = await knowledgeApi.restoreBase(input.sourceBaseId, {
         name: input.name,
@@ -284,7 +289,7 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
       await get().fetchBases();
       return res.data as KnowledgeBase;
     } finally {
-      set({ isRestoringBase: false });
+      set({ isRestoringBase: false, error: null });
     }
   },
 

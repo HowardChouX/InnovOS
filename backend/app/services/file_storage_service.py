@@ -76,7 +76,10 @@ class FileStorageService:
 
     def _object_key(self, user_id: int, filename: str, base_id: str | None = None, item_id: str | None = None) -> str:
         """生成 S3 对象键: knowledge/{user_id}/{base_id}/{filename}。"""
-        safe_name = filename.replace("/", "_").replace("\\", "_")
+        safe_name = os.path.basename(filename)
+        # 路径穿越防护：验证文件名安全
+        if ".." in safe_name or "/" in safe_name or "\\" in safe_name:
+            raise ValueError(f"Invalid filename: {filename}")
         parts = ["knowledge", str(user_id)]
         if base_id:
             parts.append(base_id)

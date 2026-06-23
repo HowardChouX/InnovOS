@@ -2,6 +2,11 @@
 Database abstraction layer — PostgreSQL only.
 Uses psycopg2 with connection pooling.
 
+NOTE: psycopg2 connections are not coroutine-safe. Each asyncio task should use
+its own connection. The get_db()/db_session() pattern already provides per-call
+connections, which is correct. However, sharing a connection across concurrent
+coroutines within the same call is unsafe.
+
 Compatible with existing sqlite3-based code patterns:
   db = get_db()
   db.execute("SELECT * FROM users WHERE id=?", (uid,))    # ? auto-converted to %s for PG

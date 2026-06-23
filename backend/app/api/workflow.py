@@ -57,6 +57,18 @@ class UpdateStepInput(BaseModel):
     output: str | None = None
 
 
+def _convert_step_to_camel(step: dict) -> dict:
+    return {
+        "agentId": step.get("agent_id", step.get("agentId", "")),
+        "agentType": step.get("agent_type", step.get("agentType", "")),
+        "status": step.get("status"),
+        "input": step.get("input"),
+        "output": step.get("output"),
+        "startedAt": step.get("started_at", step.get("startedAt")),
+        "completedAt": step.get("completed_at", step.get("completedAt")),
+    }
+
+
 @router.get("/{task_id}")
 def get_workflow(task_id: int, user: dict = Depends(get_current_user)):
     db = get_db()
@@ -142,7 +154,7 @@ def create_workflow(task_id: int, user: dict = Depends(get_current_user)):
             "id": str(row["id"]),
             "taskId": str(row["task_id"]),
             "status": row["status"],
-            "steps": json.loads(row["steps"]),
+            "steps": [_convert_step_to_camel(s) for s in json.loads(row["steps"])],
             "createdAt": utc_iso(row["created_at"]),
         },
         "message": "Workflow created",

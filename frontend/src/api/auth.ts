@@ -1,8 +1,4 @@
-/// <reference types="vite/client" />
-
-// In production (nginx reverse proxy), API is same origin → empty string.
-// In development, Vite proxy or explicit URL.
-const BASE = import.meta.env.VITE_API_URL ?? '';
+import { apiRequest } from './client';
 
 interface AuthUser {
   id: number;
@@ -17,38 +13,27 @@ interface AuthResponse {
   user: AuthUser;
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || '请求失败');
-  return data;
-}
-
 export const authApi = {
   register(username: string, password: string) {
-    return request<AuthResponse>('/api/auth/register', {
+    return apiRequest<AuthResponse>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     });
   },
 
   login(username: string, password: string) {
-    return request<AuthResponse>('/api/auth/login', {
+    return apiRequest<AuthResponse>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     });
   },
 
   me() {
-    return request<AuthUser>('/api/auth/me');
+    return apiRequest<AuthUser>('/api/auth/me');
   },
 
   logout() {
-    return request<{ message: string }>('/api/auth/logout', { method: 'POST' });
+    return apiRequest<{ message: string }>('/api/auth/logout', { method: 'POST' });
   },
 };
 

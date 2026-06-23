@@ -69,7 +69,8 @@ app_.add_middleware(
 @app_.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     # 对敏感路由启用限流
-    path = request.url.path
+    # Normalize path to prevent trailing-slash bypass
+    path = request.url.path.rstrip('/') or '/'
     ip = get_client_ip(request)
 
     if path == "/api/auth/login":

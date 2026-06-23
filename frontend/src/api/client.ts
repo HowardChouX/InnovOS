@@ -13,7 +13,10 @@ function buildHeaders(options?: RequestInit): HeadersInit {
   return headers;
 }
 
-export async function apiRequest<T>(path: string, options?: RequestInit): Promise<T> {
+export async function apiRequest<T>(
+  path: string,
+  options?: RequestInit & { signal?: AbortSignal },
+): Promise<T> {
   // httpOnly cookie is sent automatically by the browser (credentials: 'include').
   const res = await fetch(`${BASE}${path}`, {
     ...options,

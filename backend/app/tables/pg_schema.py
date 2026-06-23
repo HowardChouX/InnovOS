@@ -408,6 +408,11 @@ def init_knowledge_jobs(db):
         CREATE INDEX IF NOT EXISTS idx_knowledge_jobs_idempotency
         ON knowledge_jobs(idempotency_key);
     """)
+    db.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_knowledge_jobs_idempotency_unique
+        ON knowledge_jobs(idempotency_key)
+        WHERE idempotency_key IS NOT NULL AND idempotency_key != '';
+    """)
     logger.info("Initialized knowledge_jobs table")
 
 
