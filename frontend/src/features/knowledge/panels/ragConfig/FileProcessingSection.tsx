@@ -1,17 +1,17 @@
-import { RagFieldLabel, RagSelectField } from './panelPrimitives'
+import { RagFieldLabel, RagSelectField } from './panelPrimitives';
 
-const EMPTY_OPTION_VALUE = '__none__'
+const EMPTY_OPTION_VALUE = '__none__';
 
 interface FileProcessingSectionProps {
-  fileProcessorId: string | null
-  fileProcessorOptions: { label: string; value: string }[]
-  onFileProcessorChange: (value: string | null) => void
+  fileProcessorId: string | null;
+  fileProcessorOptions: { label: string; value: string }[];
+  onFileProcessorChange: (value: string | null) => void;
 }
 
 export default function FileProcessingSection({
   fileProcessorId,
   fileProcessorOptions,
-  onFileProcessorChange
+  onFileProcessorChange,
 }: FileProcessingSectionProps) {
   return (
     <div>
@@ -19,8 +19,10 @@ export default function FileProcessingSection({
       <RagSelectField
         value={fileProcessorId ?? EMPTY_OPTION_VALUE}
         options={[{ value: EMPTY_OPTION_VALUE, label: '未设置' }, ...fileProcessorOptions]}
-        onValueChange={(value) => onFileProcessorChange(value === EMPTY_OPTION_VALUE ? null : value)}
+        onValueChange={(value) =>
+          onFileProcessorChange(value === EMPTY_OPTION_VALUE ? null : value)
+        }
       />
     </div>
-  )
+  );
 }

@@ -1,11 +1,19 @@
-import type { ReactNode } from 'react'
+import type { ReactNode } from 'react';
 
 export interface KnowledgeSelectOption {
-  label: string
-  value: string
+  label: string;
+  value: string;
 }
 
-export const RagFieldLabel = ({ className, label, hint }: { className?: string; label: string; hint?: string }) => {
+export const RagFieldLabel = ({
+  className,
+  label,
+  hint,
+}: {
+  className?: string;
+  label: string;
+  hint?: string;
+}) => {
   return (
     <div className={`mb-2 flex items-center gap-1.5 ${className ?? ''}`}>
       <span className="text-sm font-medium text-foreground">{label}</span>
@@ -18,25 +26,26 @@ export const RagFieldLabel = ({ className, label, hint }: { className?: string; 
         </div>
       ) : null}
     </div>
-  )
-}
+  );
+};
 
 export const RagSelectField = ({
   value,
   options,
   placeholder,
-  onValueChange
+  onValueChange,
 }: {
-  value?: string
-  options: KnowledgeSelectOption[]
-  placeholder?: string
-  onValueChange: (value: string) => void
+  value?: string;
+  options: KnowledgeSelectOption[];
+  placeholder?: string;
+  onValueChange: (value: string) => void;
 }) => {
   return (
     <select
       value={value ?? ''}
       onChange={(e) => onValueChange(e.target.value)}
-      className="w-full rounded-md border border-border bg-background-muted px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring">
+      className="w-full rounded-md border border-border bg-background-muted px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+    >
       {placeholder ? (
         <option value="" disabled>
           {placeholder}
@@ -48,8 +57,8 @@ export const RagSelectField = ({
         </option>
       ))}
     </select>
-  )
-}
+  );
+};
 
 export const RagNumericField = ({
   label,
@@ -57,14 +66,14 @@ export const RagNumericField = ({
   suffix,
   hint,
   onChange,
-  inputClassName
+  inputClassName,
 }: {
-  label?: string
-  value: string
-  suffix?: string
-  hint?: string
-  onChange: (value: string) => void
-  inputClassName?: string
+  label?: string;
+  value: string;
+  suffix?: string;
+  hint?: string;
+  onChange: (value: string) => void;
+  inputClassName?: string;
 }) => {
   return (
     <div>
@@ -84,10 +93,18 @@ export const RagNumericField = ({
         ) : null}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export const RagReadonlyField = ({ label, value, hint }: { label: string; value: string; hint?: string }) => {
+export const RagReadonlyField = ({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) => {
   return (
     <div>
       <RagFieldLabel label={label} hint={hint} />
@@ -97,26 +114,24 @@ export const RagReadonlyField = ({ label, value, hint }: { label: string; value:
         className="w-full rounded-md border border-border bg-background-muted px-3 py-2 text-sm text-foreground shadow-none"
       />
     </div>
-  )
-}
+  );
+};
 
 export const RagHintText = ({
   children,
-  tone = 'info'
+  tone = 'info',
 }: {
-  children: ReactNode
-  tone?: 'info' | 'warning' | 'error'
+  children: ReactNode;
+  tone?: 'info' | 'warning' | 'error';
 }) => {
   if (tone === 'error') {
     return (
-      <div className="rounded-md badge-danger px-2.5 py-1.5 text-xs leading-4">
-        {children}
-      </div>
-    )
+      <div className="rounded-md badge-danger px-2.5 py-1.5 text-xs leading-4">{children}</div>
+    );
   }
 
-  return <p className="text-xs leading-4 text-foreground-muted">{children}</p>
-}
+  return <p className="text-xs leading-4 text-foreground-muted">{children}</p>;
+};
 
 export const RagSliderField = ({
   label,
@@ -129,25 +144,27 @@ export const RagSliderField = ({
   maxLabel,
   formatValue,
   hint,
-  disabled = false
+  disabled = false,
 }: {
-  label: string
-  value: number
-  onValueChange: (value: number) => void
-  min: number
-  max: number
-  step: number
-  minLabel: string
-  maxLabel: string
-  formatValue: (value: number) => string
-  hint?: string
-  disabled?: boolean
+  label: string;
+  value: number;
+  onValueChange: (value: number) => void;
+  min: number;
+  max: number;
+  step: number;
+  minLabel: string;
+  maxLabel: string;
+  formatValue: (value: number) => string;
+  hint?: string;
+  disabled?: boolean;
 }) => {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-3">
         <RagFieldLabel label={label} hint={hint} className="mb-0" />
-        <span className="text-xs leading-4 text-foreground-secondary tabular-nums">{formatValue(value)}</span>
+        <span className="text-xs leading-4 text-foreground-secondary tabular-nums">
+          {formatValue(value)}
+        </span>
       </div>
 
       <div className={disabled ? 'opacity-50' : undefined}>
@@ -169,5 +186,5 @@ export const RagSliderField = ({
         </div>
       </div>
     </div>
-  )
-}
+  );
+};

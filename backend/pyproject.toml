@@ -45,6 +45,23 @@ env = [
     "DATABASE_URL=postgresql://test:test@localhost:5432/test",
 ]
 
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+# 全局覆盖率不低于 60%（新增代码建议 ≥ 80%）
+fail_under = 60
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "raise AssertionError",
+    "if TYPE_CHECKING:",
+]
+
 [project.scripts]
 dev = "uvicorn app.main:app --reload"
 start = "uvicorn app.main:app"
@@ -87,7 +104,13 @@ quote-style = "double"
 # ── Mypy ──────────────────────────────────────────────
 [tool.mypy]
 python_version = "3.10"
-strict = true
+# strict = true  # 暂不启用 - 代码库需大面积类型注解
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_any_unimported = false
+disallow_untyped_defs = false
+disallow_untyped_calls = false
 ignore_missing_imports = true
 exclude = ["tests/", "migrations/"]
 

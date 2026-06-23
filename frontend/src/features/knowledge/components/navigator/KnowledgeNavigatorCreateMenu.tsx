@@ -31,14 +31,20 @@ export function KnowledgeNavigatorCreateMenu({
           onMouseLeave={onClose}
         >
           <button
-            onClick={() => { onClose(); onCreateBase(); }}
+            onClick={() => {
+              onClose();
+              onCreateBase();
+            }}
             className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs text-foreground hover:bg-accent"
           >
             <i className="fa-solid fa-book text-[10px]" />
             新建知识库
           </button>
           <button
-            onClick={() => { onClose(); onCreateGroup(); }}
+            onClick={() => {
+              onClose();
+              onCreateGroup();
+            }}
             className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs text-foreground hover:bg-accent"
           >
             <i className="fa-solid fa-folder-plus text-[10px]" />

@@ -32,7 +32,10 @@ export const usePreviewKnowledgeSource = () => {
             previewUrl = (item.data as { sourceUrl?: string }).sourceUrl || source;
           }
 
-          if (previewUrl && (previewUrl.startsWith('http://') || previewUrl.startsWith('https://'))) {
+          if (
+            previewUrl &&
+            (previewUrl.startsWith('http://') || previewUrl.startsWith('https://'))
+          ) {
             window.open(previewUrl, '_blank', 'noopener,noreferrer');
             return;
           }
@@ -48,7 +51,7 @@ export const usePreviewKnowledgeSource = () => {
         alert(`${t('knowledge.data_source.preview.failed')}: ${getErrorMessage(previewError)}`);
       }
     },
-    [t]
+    [t],
   );
 
   return {

@@ -1,14 +1,14 @@
-import type { KnowledgeItemType } from '../../../../types/knowledge'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import type { KnowledgeItemType } from '../../../../types/knowledge';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface DataSourcePanelHeaderProps {
-  readyCount: number
-  totalCount: number
-  selectedCount: number
-  onBulkReindex: () => void
-  onBulkDelete: () => void
-  onCancelBulk: () => void
-  onAdd: (source?: KnowledgeItemType, files?: File[]) => void
+  readyCount: number;
+  totalCount: number;
+  selectedCount: number;
+  onBulkReindex: () => void;
+  onBulkDelete: () => void;
+  onCancelBulk: () => void;
+  onAdd: (source?: KnowledgeItemType, files?: File[]) => void;
 }
 
 const SOURCE_TYPES: { value: KnowledgeItemType; label: string }[] = [
@@ -16,7 +16,7 @@ const SOURCE_TYPES: { value: KnowledgeItemType; label: string }[] = [
   { value: 'note', label: '笔记' },
   { value: 'directory', label: '目录' },
   { value: 'url', label: '网址' },
-]
+];
 
 export default function DataSourcePanelHeader({
   readyCount,
@@ -25,41 +25,41 @@ export default function DataSourcePanelHeader({
   onBulkReindex,
   onBulkDelete,
   onCancelBulk,
-  onAdd
+  onAdd,
 }: DataSourcePanelHeaderProps) {
-  const [isSourceMenuOpen, setIsSourceMenuOpen] = useState(false)
-  const sourceMenuCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [isSourceMenuOpen, setIsSourceMenuOpen] = useState(false);
+  const sourceMenuCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearSourceMenuCloseTimer = useCallback(() => {
     if (sourceMenuCloseTimerRef.current) {
-      clearTimeout(sourceMenuCloseTimerRef.current)
-      sourceMenuCloseTimerRef.current = null
+      clearTimeout(sourceMenuCloseTimerRef.current);
+      sourceMenuCloseTimerRef.current = null;
     }
-  }, [])
+  }, []);
 
   const openSourceMenu = useCallback(() => {
-    clearSourceMenuCloseTimer()
-    setIsSourceMenuOpen(true)
-  }, [clearSourceMenuCloseTimer])
+    clearSourceMenuCloseTimer();
+    setIsSourceMenuOpen(true);
+  }, [clearSourceMenuCloseTimer]);
 
   const scheduleSourceMenuClose = useCallback(() => {
-    clearSourceMenuCloseTimer()
+    clearSourceMenuCloseTimer();
     sourceMenuCloseTimerRef.current = setTimeout(() => {
-      setIsSourceMenuOpen(false)
-      sourceMenuCloseTimerRef.current = null
-    }, 120)
-  }, [clearSourceMenuCloseTimer])
+      setIsSourceMenuOpen(false);
+      sourceMenuCloseTimerRef.current = null;
+    }, 120);
+  }, [clearSourceMenuCloseTimer]);
 
   const handleSourceSelect = useCallback(
     (source: KnowledgeItemType) => {
-      clearSourceMenuCloseTimer()
-      setIsSourceMenuOpen(false)
-      onAdd(source)
+      clearSourceMenuCloseTimer();
+      setIsSourceMenuOpen(false);
+      onAdd(source);
     },
-    [clearSourceMenuCloseTimer, onAdd]
-  )
+    [clearSourceMenuCloseTimer, onAdd],
+  );
 
-  useEffect(() => clearSourceMenuCloseTimer, [clearSourceMenuCloseTimer])
+  useEffect(() => clearSourceMenuCloseTimer, [clearSourceMenuCloseTimer]);
 
   if (selectedCount > 0) {
     return (
@@ -69,7 +69,8 @@ export default function DataSourcePanelHeader({
           <button
             type="button"
             className="rounded-md px-2 py-1 text-sm text-foreground-secondary hover:bg-accent"
-            onClick={onCancelBulk}>
+            onClick={onCancelBulk}
+          >
             取消
           </button>
         </div>
@@ -77,20 +78,22 @@ export default function DataSourcePanelHeader({
           <button
             type="button"
             className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-foreground-secondary hover:bg-accent"
-            onClick={onBulkReindex}>
+            onClick={onBulkReindex}
+          >
             <i className="fa-solid fa-rotate text-xs" />
             重新索引
           </button>
           <button
             type="button"
             className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-foreground-secondary hover:bg-accent"
-            onClick={onBulkDelete}>
+            onClick={onBulkDelete}
+          >
             <i className="fa-solid fa-trash-can text-xs" />
             删除
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -111,7 +114,8 @@ export default function DataSourcePanelHeader({
             onClick={openSourceMenu}
             onFocus={openSourceMenu}
             onMouseEnter={openSourceMenu}
-            onMouseLeave={scheduleSourceMenuClose}>
+            onMouseLeave={scheduleSourceMenuClose}
+          >
             <i className="fa-solid fa-plus text-xs" />
             添加数据源
           </button>
@@ -119,14 +123,16 @@ export default function DataSourcePanelHeader({
             <div
               className="absolute right-0 z-30 mt-1 w-40 rounded-xl border border-border bg-popover p-1.5 shadow-lg"
               onMouseEnter={openSourceMenu}
-              onMouseLeave={scheduleSourceMenuClose}>
+              onMouseLeave={scheduleSourceMenuClose}
+            >
               <div className="flex flex-col gap-1" role="menu">
                 {SOURCE_TYPES.map((source) => (
                   <button
                     key={source.value}
                     role="menuitem"
                     className="flex h-8 items-center rounded-lg px-2.5 text-sm text-foreground hover:bg-accent"
-                    onClick={() => handleSourceSelect(source.value)}>
+                    onClick={() => handleSourceSelect(source.value)}
+                  >
                     {source.label}
                   </button>
                 ))}
@@ -136,5 +142,5 @@ export default function DataSourcePanelHeader({
         </div>
       </div>
     </div>
-  )
+  );
 }

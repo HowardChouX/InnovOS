@@ -66,7 +66,9 @@ class ModelsCrudService:
                 json.dumps(metadata or {}),
             ),
         )
-        return self.get(provider_id, model_id)
+        result = self.get(provider_id, model_id)
+        assert result is not None, f"Failed to get created model {provider_id}/{model_id}"
+        return result
 
     def get(self, provider_id: str, model_id: str) -> dict | None:
         db = get_db()
@@ -124,7 +126,7 @@ class ModelsCrudService:
 
     def batch_upsert(self, provider_id: str, models: list[dict]) -> list[dict]:
         """批量写入模型行（用于 reconcile 同步）。"""
-        results = []
+        results: list[dict] = []
         for m in models:
             mid = m.get("model_id", m.get("id", ""))
             if not mid:
@@ -148,7 +150,9 @@ class ModelsCrudService:
                     is_enabled=m.get("is_enabled", True),
                     metadata=m.get("metadata"),
                 )
-            results.append(self.get(provider_id, mid))
+            entry = self.get(provider_id, mid)
+            if entry is not None:
+                results.append(entry)
         return results
 
     def _row_to_dict(self, row) -> dict:

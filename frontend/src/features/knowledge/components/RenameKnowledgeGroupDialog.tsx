@@ -7,7 +7,11 @@ interface RenameKnowledgeGroupDialogProps {
   onClose: () => void;
 }
 
-export default function RenameKnowledgeGroupDialog({ open, group, onClose }: RenameKnowledgeGroupDialogProps) {
+export default function RenameKnowledgeGroupDialog({
+  open,
+  group,
+  onClose,
+}: RenameKnowledgeGroupDialogProps) {
   const { renameGroup } = useKnowledgeStore();
   if (!open || !group) return null;
 
@@ -18,7 +22,9 @@ export default function RenameKnowledgeGroupDialog({ open, group, onClose }: Ren
       onSubmit={async (name) => {
         await renameGroup(group.id, name);
       }}
-      onOpenChange={(open) => { if (!open) onClose(); }}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
     />
   );
 }

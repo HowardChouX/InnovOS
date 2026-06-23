@@ -5,6 +5,7 @@ Python loads __init__.py when the `app` package is first imported. Putting
 load_dotenv() and setup_logging() here ensures env vars are ready and logging
 is configured before FastAPI router modules or pydantic-settings evaluate.
 """
+
 import logging
 import os
 from pathlib import Path

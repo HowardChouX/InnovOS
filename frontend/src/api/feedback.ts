@@ -11,9 +11,7 @@ export const feedbackApi = {
   },
 
   async getBySolution(solutionId: string): Promise<Feedback[]> {
-    const res = await apiRequest<{ data: Feedback[] }>(
-      `/api/feedback/${solutionId}`,
-    );
+    const res = await apiRequest<{ data: Feedback[] }>(`/api/feedback/${solutionId}`);
     return res.data;
   },
 };

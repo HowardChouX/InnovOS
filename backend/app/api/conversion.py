@@ -103,7 +103,7 @@ async def get_conversion_data(task_id: int, user: dict = Depends(get_current_use
     ).fetchall()
 
     # 获取 workflow 中 agent5 的专利数据
-    patent_details = []
+    patent_details: list[dict] = []
     wf = db.execute("SELECT steps FROM workflows WHERE task_id=?", (task_id,)).fetchone()
     if wf:
         steps = json.loads(wf["steps"])

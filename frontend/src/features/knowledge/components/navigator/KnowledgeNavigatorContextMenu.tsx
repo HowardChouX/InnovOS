@@ -38,59 +38,93 @@ export function KnowledgeNavigatorContextMenu({
       {contextMenu.type === 'base' && (
         <>
           <button
-            onClick={() => { const ctx = contextMenu as CtxMenu; onClose(); onRenameBase(ctx.baseId!, ctx.name); }}
+            onClick={() => {
+              const ctx = contextMenu as CtxMenu;
+              onClose();
+              onRenameBase(ctx.baseId!, ctx.name);
+            }}
             className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs text-foreground hover:bg-accent"
           >
-            <i className="fa-solid fa-pen text-[10px]" />重命名
+            <i className="fa-solid fa-pen text-[10px]" />
+            重命名
           </button>
           <button
-            onClick={async () => { const ctx = contextMenu as CtxMenu; await onMoveBase(ctx.baseId!, null); }}
+            onClick={async () => {
+              const ctx = contextMenu as CtxMenu;
+              await onMoveBase(ctx.baseId!, null);
+            }}
             className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs text-foreground hover:bg-accent"
           >
-            <i className="fa-solid fa-arrow-right text-[10px]" />移至未分组
+            <i className="fa-solid fa-arrow-right text-[10px]" />
+            移至未分组
           </button>
-          {groups.filter(g => g.id !== contextMenu.currentGroupId).map(g => (
-            <button
-              key={g.id}
-              onClick={async () => { const ctx = contextMenu as CtxMenu; await onMoveBase(ctx.baseId!, g.id); }}
-              className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs text-foreground hover:bg-accent"
-            >
-              <i className="fa-solid fa-arrow-right text-[10px]" />移至 {g.name}
-            </button>
-          ))}
+          {groups
+            .filter((g) => g.id !== contextMenu.currentGroupId)
+            .map((g) => (
+              <button
+                key={g.id}
+                onClick={async () => {
+                  const ctx = contextMenu as CtxMenu;
+                  await onMoveBase(ctx.baseId!, g.id);
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs text-foreground hover:bg-accent"
+              >
+                <i className="fa-solid fa-arrow-right text-[10px]" />
+                移至 {g.name}
+              </button>
+            ))}
           <div className="my-1 border-t border-border-light" />
           <button
-            onClick={async () => { const ctx = contextMenu as CtxMenu; await onDeleteBase(ctx.baseId!); onClose(); }}
+            onClick={async () => {
+              const ctx = contextMenu as CtxMenu;
+              await onDeleteBase(ctx.baseId!);
+              onClose();
+            }}
             className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10"
           >
-            <i className="fa-solid fa-trash-can text-[10px]" />删除
+            <i className="fa-solid fa-trash-can text-[10px]" />
+            删除
           </button>
         </>
       )}
       {contextMenu.type === 'group' && (
         <>
           <button
-            onClick={() => { const ctx = contextMenu as CtxMenu; onClose(); onRenameGroup(ctx.groupId!, ctx.name); }}
+            onClick={() => {
+              const ctx = contextMenu as CtxMenu;
+              onClose();
+              onRenameGroup(ctx.groupId!, ctx.name);
+            }}
             className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs text-foreground hover:bg-accent"
           >
-            <i className="fa-solid fa-pen text-[10px]" />重命名
+            <i className="fa-solid fa-pen text-[10px]" />
+            重命名
           </button>
           <button
-            onClick={() => { onClose(); onCreateBaseInGroup(contextMenu.groupId!); }}
+            onClick={() => {
+              onClose();
+              onCreateBaseInGroup(contextMenu.groupId!);
+            }}
             className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs text-foreground hover:bg-accent"
           >
-            <i className="fa-solid fa-plus text-[10px]" />在此分组创建
+            <i className="fa-solid fa-plus text-[10px]" />
+            在此分组创建
           </button>
           <div className="my-1 border-t border-border-light" />
           <button
-            onClick={async () => { const ctx = contextMenu as CtxMenu; await onDeleteGroup(ctx.groupId!); onClose(); }}
+            onClick={async () => {
+              const ctx = contextMenu as CtxMenu;
+              await onDeleteGroup(ctx.groupId!);
+              onClose();
+            }}
             className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10"
           >
-            <i className="fa-solid fa-trash-can text-[10px]" />删除分组
+            <i className="fa-solid fa-trash-can text-[10px]" />
+            删除分组
           </button>
         </>
       )}
     </div>,
-    document.body
+    document.body,
   );
 }

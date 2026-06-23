@@ -24,8 +24,7 @@ logger = logging.getLogger(__name__)
 # ── SSRF 防护 ──────────────────────────────────────────────────────────
 
 _PRIVATE_IPS_ERROR_MSG = (
-    "URL 解析到的目标 IP 地址为内网/保留地址，已拒绝访问。"
-    "为避免 SSRF 攻击，知识库 URL 抓取不支持内网地址。"
+    "URL 解析到的目标 IP 地址为内网/保留地址，已拒绝访问。为避免 SSRF 攻击，知识库 URL 抓取不支持内网地址。"
 )
 
 
@@ -43,18 +42,18 @@ def _resolve_hostname(hostname: str) -> list[str]:
 # 注意：不使用 ipaddress.is_private，因为它也会拦截 198.18.0.0/15（Benchmarking）
 # 和 100.64.0.0/10（CGNAT），这些在部分测试/网络环境下会误杀公网域名。
 _SSRF_BLOCKED_V4 = [
-    ipaddress.IPv4Network("127.0.0.0/8"),       # Loopback
-    ipaddress.IPv4Network("10.0.0.0/8"),         # Private A
-    ipaddress.IPv4Network("172.16.0.0/12"),      # Private B
-    ipaddress.IPv4Network("192.168.0.0/16"),     # Private C
-    ipaddress.IPv4Network("169.254.0.0/16"),     # Link-local
-    ipaddress.IPv4Network("0.0.0.0/8"),          # Current network
+    ipaddress.IPv4Network("127.0.0.0/8"),  # Loopback
+    ipaddress.IPv4Network("10.0.0.0/8"),  # Private A
+    ipaddress.IPv4Network("172.16.0.0/12"),  # Private B
+    ipaddress.IPv4Network("192.168.0.0/16"),  # Private C
+    ipaddress.IPv4Network("169.254.0.0/16"),  # Link-local
+    ipaddress.IPv4Network("0.0.0.0/8"),  # Current network
 ]
 _SSRF_BLOCKED_V6 = [
-    ipaddress.IPv6Network("::1/128"),            # Loopback
-    ipaddress.IPv6Network("fc00::/7"),           # Unique-local
-    ipaddress.IPv6Network("fe80::/10"),          # Link-local
-    ipaddress.IPv6Network("::/128"),             # Unspecified
+    ipaddress.IPv6Network("::1/128"),  # Loopback
+    ipaddress.IPv6Network("fc00::/7"),  # Unique-local
+    ipaddress.IPv6Network("fe80::/10"),  # Link-local
+    ipaddress.IPv6Network("::/128"),  # Unspecified
 ]
 
 
@@ -110,6 +109,7 @@ def validate_url(url: str) -> None:
     if private_ips:
         logger.warning("SSRF blocked: %s resolved to private IPs: %s", hostname, private_ips)
         raise ValueError(_PRIVATE_IPS_ERROR_MSG)
+
 
 # ── Cloudflare 检测 ────────────────────────────────────────────────────────
 

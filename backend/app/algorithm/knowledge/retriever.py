@@ -175,7 +175,7 @@ class KnowledgeRetriever:
             return results
 
         # 将重排结果映射回原始数据
-        mapped = []
+        mapped: list[dict] = []
         for r in reranked:
             idx = r["index"]
             if idx < len(results):

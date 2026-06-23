@@ -1,12 +1,12 @@
-import React from 'react'
+import React from 'react';
 
 interface PlaceholderBlockProps {
   /** Icon element to display */
-  icon: React.ReactNode
+  icon: React.ReactNode;
   /** Localised message */
-  message: string
+  message: string;
   /** Click handler */
-  onClick: () => void
+  onClick: () => void;
 }
 
 /**
@@ -30,22 +30,23 @@ const PlaceholderBlock: React.FC<PlaceholderBlockProps> = ({ icon, message, onCl
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        minHeight: 80
+        minHeight: 80,
       }}
       onMouseEnter={(e) => {
-        const target = e.currentTarget as HTMLElement
-        target.style.borderColor = 'var(--accent)'
-        target.style.backgroundColor = 'rgba(59, 130, 246, 0.15)'
+        const target = e.currentTarget as HTMLElement;
+        target.style.borderColor = 'var(--accent)';
+        target.style.backgroundColor = 'rgba(59, 130, 246, 0.15)';
       }}
       onMouseLeave={(e) => {
-        const target = e.currentTarget as HTMLElement
-        target.style.borderColor = 'var(--border)'
-        target.style.backgroundColor = 'var(--bg-card)'
-      }}>
+        const target = e.currentTarget as HTMLElement;
+        target.style.borderColor = 'var(--border)';
+        target.style.backgroundColor = 'var(--bg-card)';
+      }}
+    >
       {icon}
       <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{message}</span>
     </div>
-  )
-}
+  );
+};
 
-export default PlaceholderBlock
+export default PlaceholderBlock;

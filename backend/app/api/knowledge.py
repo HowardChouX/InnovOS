@@ -87,6 +87,8 @@ async def upload_file(file: UploadFile = File(...), base_id: str = Form(""), use
     # 4. 异步索引（通过 job queue，与 URL/Note 统一）
     from app.services.knowledge_orchestration_service import knowledge_orchestration_service
 
+    if item is None:
+        raise HTTPException(status_code=500, detail="创建知识项失败")
     await knowledge_orchestration_service.job_manager.enqueue(
         JOB_TYPE_INDEX_DOCUMENTS,
         {"baseId": base_id, "itemId": item["id"]},
@@ -110,7 +112,7 @@ def list_items(
     groupId: str = "",
     user: dict = Depends(get_current_user),
 ):
-    result = KnowledgeItemService.list(
+    result = KnowledgeItemService.paginate(
         user["id"],
         base_id,
         page=page,

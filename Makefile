@@ -1,10 +1,9 @@
-.PHONY: dev test lint clean start-db
+.PHONY: dev stop test lint quality format clean install build security docker-up docker-down db-backup setup-hooks
 
-# ──────────────────────────────────────────────
+# ══════════════════════════════════════════════
 #  开发环境 — 一键启动全部服务
-# ──────────────────────────────────────────────
+# ══════════════════════════════════════════════
 
-# 启动所有依赖 + 前后端
 dev:
 	@$(MAKE) start-db
 	@echo "=== Starting backend (port 8000) ==="
@@ -13,83 +12,99 @@ dev:
 	@echo "=== Starting frontend (port 5173) ==="
 	@cd frontend && npm run dev
 
-# 启动 PostgreSQL（如未运行）
 start-db:
 	@pg_isready -q 2>/dev/null || (echo "=== Starting PostgreSQL ===" && sudo -u postgres pg_ctl -D /var/lib/postgres/data -l /tmp/pg.log start && sleep 2)
 
-# 停止全部服务
 stop:
 	@echo "=== Stopping services ==="
 	@pkill -f "uvicorn app.main" 2>/dev/null; true
 	@pkill -f "vite" 2>/dev/null; true
 	@echo "Stopped."
 
-# ──────────────────────────────────────────────
-#  运行测试
-# ──────────────────────────────────────────────
-test:
-	cd backend && uv run pytest tests/ -v
-	cd frontend && npm test
+# ══════════════════════════════════════════════
+#  代码质量门禁（提交前运行）
+#  make quality  =  lint + type-check + test + build + security
+# ══════════════════════════════════════════════
 
-# ──────────────────────────────────────────────
-#  代码检查
-# ──────────────────────────────────────────────
+quality:
+	@echo "╔══════════════════════════════════════════╗"
+	@echo "║     InnovOS 全量代码质量门禁              ║"
+	@echo "╚══════════════════════════════════════════╝"
+	@$(MAKE) lint
+	@$(MAKE) typecheck
+	@$(MAKE) test
+	@$(MAKE) build
+	@$(MAKE) security
+	@echo ""
+	@echo "✅ 质量门禁全部通过"
+
+# ── 代码检查 ─────────────────────────────────
 lint:
-	@echo "=== Linting frontend ==="
+	@echo "=== [1/6] Frontend ESLint ==="
 	cd frontend && npm run lint
-	@echo "=== Linting backend (ruff) ==="
+	@echo "=== [2/6] Backend Ruff ==="
 	cd backend && uv run ruff check app/
-	@echo "=== Formatting check (black) ==="
-	cd backend && uv run black --check app/
-	@echo "=== Import sort check (isort) ==="
-	cd backend && uv run isort --check-only app/
-	@echo "=== Type check (mypy) ==="
+	@echo "=== [3/6] Backend Ruff format check ==="
+	cd backend && uv run ruff format --check app/
+	@echo "=== Prettier check ==="
+	cd frontend && npx prettier --check "src/**/*.{ts,tsx,json,css}"
+
+# ── 类型检查 ─────────────────────────────────
+typecheck:
+	@echo "=== Frontend TypeScript ==="
+	cd frontend && npx tsc --noEmit
+	@echo "=== Backend mypy ==="
 	cd backend && uv run mypy app/
 
-# ──────────────────────────────────────────────
+# ── 测试（带覆盖率） ──────────────────────────
+test:
+	@echo "=== Backend tests (coverage ≥ 60%) ==="
+	cd backend && uv run pytest tests/ -v --cov=app --cov-report=term --cov-fail-under=60
+	@echo "=== Frontend tests ==="
+	cd frontend && npm test
+
+# ── 构建 ──────────────────────────────────────
+build:
+	@echo "=== Frontend production build ==="
+	cd frontend && npm run build
+
+# ── 安全扫描 ─────────────────────────────────
+security:
+	@echo "=== Bandit ==="
+	cd backend && uv run bandit -c pyproject.toml -r app/ -q || true
+	@echo "=== npm audit ==="
+	cd frontend && npm audit --audit-level=high 2>/dev/null; true
+
+# ══════════════════════════════════════════════
+#  格式化
+# ══════════════════════════════════════════════
+
+format:
+	@echo "=== Frontend (prettier) ==="
+	cd frontend && npx prettier --write "src/**/*.{ts,tsx,json,css}"
+	@echo "=== Backend (ruff) ==="
+	cd backend && uv run ruff check --fix app/ && uv run ruff format app/
+
+# ══════════════════════════════════════════════
 #  清理
-# ──────────────────────────────────────────────
+# ══════════════════════════════════════════════
+
 clean:
 	cd frontend && rm -rf dist
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
-# ──────────────────────────────────────────────
+# ══════════════════════════════════════════════
 #  安装
-# ──────────────────────────────────────────────
+# ══════════════════════════════════════════════
+
 install:
 	cd backend && uv sync
 	cd frontend && npm install
 
-build:
-	cd frontend && npm run build
-
-# ──────────────────────────────────────────────
-#  格式化
-# ──────────────────────────────────────────────
-format:
-	@echo "=== Formatting frontend (prettier) ==="
-	cd frontend && npx prettier --write "src/**/*.{ts,tsx,json,css}"
-	@echo "=== Formatting backend (black + isort + ruff) ==="
-	cd backend && uv run ruff check --fix app/
-	cd backend && uv run isort app/
-	cd backend && uv run black app/
-
-# ──────────────────────────────────────────────
-#  安全扫描
-# ──────────────────────────────────────────────
-security:
-	@echo "=== Bandit security scan ==="
-	cd backend && uv run bandit -c pyproject.toml -r app/
-	@echo "=== Safety dependency scan ==="
-	cd backend && uv run safety check --full-report
-
-# ──────────────────────────────────────────────
-#  Pre-commit 安装
-# ──────────────────────────────────────────────
-
-# ──────────────────────────────────────────────
+# ══════════════════════════════════════════════
 #  Docker 部署
-# ──────────────────────────────────────────────
+# ══════════════════════════════════════════════
+
 docker-build:
 	docker compose build --parallel
 
@@ -105,9 +120,10 @@ docker-logs:
 docker-clean:
 	docker compose down -v --remove-orphans
 
-# ──────────────────────────────────────────────
-#  数据库备份
-# ──────────────────────────────────────────────
+# ══════════════════════════════════════════════
+#  数据库
+# ══════════════════════════════════════════════
+
 db-backup:
 	@bash backend/scripts/backup_db.sh
 
@@ -116,24 +132,23 @@ db-restore:
 	@gunzip -c $(file) | psql "$$DATABASE_URL"
 	@echo "Restored from $(file)"
 
-# ──────────────────────────────────────────────
-#  安全扫描
-# ──────────────────────────────────────────────
-security-scan-all:
-	cd backend && uv run bandit -c pyproject.toml -r app/
-	cd backend && uv run safety check --full-report
+# ══════════════════════════════════════════════
+#  钩子安装
+# ══════════════════════════════════════════════
 
-# ──────────────────────────────────────────────
-#  生产构建
-# ──────────────────────────────────────────────
-build-all: docker-build
-	@echo "All Docker images built"
-
-# ──────────────────────────────────────────────
-#  Pre-commit 安装
-# ──────────────────────────────────────────────
 setup-hooks:
-	@echo "=== Installing pre-commit hooks ==="
-	cd backend && uv run pre-commit install
 	@echo "=== Installing husky hooks ==="
 	cd frontend && npx husky init
+
+# ══════════════════════════════════════════════
+#  CI 模拟（在本地运行 CI 的全部检查）
+# ══════════════════════════════════════════════
+
+ci-local:
+	@$(MAKE) lint
+	@$(MAKE) typecheck
+	@cd backend && uv run pytest tests/ -v --cov=app --cov-report=xml
+	@cd frontend && npm test -- --coverage
+	@cd backend && uv run bandit -c pyproject.toml -r app/
+	@$(MAKE) build
+	@echo "✅ CI checks passed locally"

@@ -71,7 +71,7 @@ export interface KnowledgeRagChunkValidationErrors {
  */
 export const getKnowledgeRagChunkValidationErrors = (
   values: Pick<KnowledgeRagConfigFormValues, 'chunkOverlap' | 'chunkSize'> &
-    Partial<Pick<KnowledgeRagConfigFormValues, 'dimensions'>>
+    Partial<Pick<KnowledgeRagConfigFormValues, 'dimensions'>>,
 ): KnowledgeRagChunkValidationErrors => {
   const chunkSize = parseOptionalInteger(values.chunkSize);
   const chunkOverlap = parseOptionalInteger(values.chunkOverlap);
@@ -102,11 +102,13 @@ export const getKnowledgeRagChunkValidationErrors = (
  */
 export const getKnowledgeRagConfigFormState = (
   initialValues: KnowledgeRagConfigFormValues,
-  currentValues: KnowledgeRagConfigFormValues
+  currentValues: KnowledgeRagConfigFormValues,
 ) => {
   const validationErrorCodes = getKnowledgeRagChunkValidationErrors(currentValues);
   const hasEmptyChunkFields =
-    currentValues.chunkSize === '' || currentValues.chunkOverlap === '' || currentValues.dimensions === '';
+    currentValues.chunkSize === '' ||
+    currentValues.chunkOverlap === '' ||
+    currentValues.dimensions === '';
   const hasValidationErrors = Object.values(validationErrorCodes).some(Boolean);
   const isDirty = knowledgeRagConfigKeys.some((key) => initialValues[key] !== currentValues[key]);
 

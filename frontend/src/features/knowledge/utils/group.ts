@@ -17,7 +17,7 @@ export interface KnowledgePageBaseGroupSection {
 export const buildKnowledgeBaseGroupSections = (
   bases: ReadonlyArray<KnowledgeBaseListItem>,
   groups: ReadonlyArray<KnowledgeGroup>,
-  searchValue: string
+  searchValue: string,
 ): KnowledgePageBaseGroupSection[] => {
   const normalizedSearch = searchValue.trim().toLowerCase();
   const includeEmptyKnownGroups = normalizedSearch.length === 0;
@@ -74,7 +74,7 @@ export const buildKnowledgeBaseGroupSections = (
  */
 export const sortItemsByCreatedAt = <T extends { createdAt: string }>(
   items: T[],
-  order: 'asc' | 'desc' = 'desc'
+  order: 'asc' | 'desc' = 'desc',
 ): T[] => {
   return [...items].sort((a, b) => {
     const diff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();

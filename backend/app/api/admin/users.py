@@ -34,7 +34,7 @@ class SendNotificationInput(BaseModel):
 @router.get("")
 def list_users(session: SessionDep, _admin: SuperUserDep):
     """List all users with usage statistics (admin only)."""
-    users = session.exec(select(User).order_by(User.created_at.desc())).all()
+    users = session.exec(select(User).order_by(User.created_at.desc())).all()  # type: ignore[union-attr]
 
     # Per-user aggregate stats via raw SQL
     rows = session.execute(
@@ -70,13 +70,16 @@ def list_users(session: SessionDep, _admin: SuperUserDep):
                 "role": u.role,
                 "isActive": bool(u.is_active),
                 "createdAt": u.created_at or "",
-                "stats": stats_map.get(u.id, {
-                    "totalTasks": 0,
-                    "completedTasks": 0,
-                    "failedTasks": 0,
-                    "totalSolutions": 0,
-                    "lastActive": "",
-                }),
+                "stats": stats_map.get(
+                    u.id or 0,
+                    {
+                        "totalTasks": 0,
+                        "completedTasks": 0,
+                        "failedTasks": 0,
+                        "totalSolutions": 0,
+                        "lastActive": "",
+                    },
+                ),
             }
             for u in users
         ],

@@ -197,9 +197,12 @@ BUILTIN_PROVIDERS = {
 
 def get_provider_info(provider_id: str) -> dict | None:
     """获取内置供应商信息。"""
-    return BUILTIN_PROVIDERS.get(provider_id)
+    info = BUILTIN_PROVIDERS.get(provider_id)
+    if info is None:
+        return None
+    return {**info}  # type: ignore[dict-item]
 
 
 def list_all_builtin() -> list[dict]:
     """返回所有内置供应商列表。"""
-    return list(BUILTIN_PROVIDERS.values())
+    return [{**v} for v in BUILTIN_PROVIDERS.values()]  # type: ignore[dict-item]

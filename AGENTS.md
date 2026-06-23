@@ -2,27 +2,48 @@
 
 **Stack:** Python FastAPI (backend) + React 19/Vite/TypeScript (frontend) + PostgreSQL (pgvector) + Tailwind CSS v4.
 
+## Quality Gates
+
+提交代码前运行 `make quality` 确保所有关卡通过：
+
+```bash
+make quality    # lint → typecheck → test → build → security（完整门禁）
+make lint       # ESLint + Ruff + Ruff format + Prettier
+make typecheck  # tsc --noEmit + mypy
+make test       # pytest --cov --cov-fail-under=60 + npm test
+make build      # Frontend production build
+make format     # prettier + ruff check+format（自动修复）
+make security   # bandit + npm audit
+make ci-local   # 模拟 CI 全流程（含 coverage.xml 输出）
+```
+
 ## Dev Commands
 
 ```bash
 make dev                    # Start PostgreSQL (if not running) + backend (:8000) + frontend (:5173)
 make stop                   # Kill uvicorn + vite processes
-make test                   # uv run pytest (backend) + npm test (frontend)
-make lint                   # Ruff lint + mypy + ESLint + prettier check
-make build                  # Frontend production build
 make format                 # Auto-format both frontend and backend
 make docker-build           # Build Docker images (multi-stage)
 make docker-up              # docker compose up -d
 make docker-down            # docker compose down
-make security               # Bandit + safety dependency scan
 make db-backup              # pg_dump backup
 
-cd backend && uv run pytest tests/ -v        # Backend tests only
-cd frontend && npm run dev                   # Frontend only
-cd frontend && npx tsc --noEmit              # TypeScript type-check
-cd backend && uv run ruff check app/         # Python lint only
+cd backend && uv run pytest tests/ -v              # Backend tests only
+cd backend && uv run pytest tests/ -v --cov=app    # Backend tests with coverage
+cd frontend && npm run dev                         # Frontend only
+cd frontend && npx tsc --noEmit                    # TypeScript type-check
+cd backend && uv run ruff check app/               # Python lint only
 make install                # uv sync + npm install
 ```
+
+## Coverage Thresholds
+
+| 范围         | 最低覆盖率 | 命令                         |
+| ------------ | ---------- | ---------------------------- |
+| Backend 全局 | ≥ 60%      | `pytest --cov-fail-under=60` |
+| Frontend     | 未设阈值   | `npm test -- --coverage`     |
+
+CI 在 GitHub Actions 中自动执行上述全部检查。`make quality` 在本地模拟 CI 门禁。
 
 Backend auto-reloads via `uvicorn --reload`. API docs at `http://localhost:8000/docs`.
 

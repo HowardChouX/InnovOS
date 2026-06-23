@@ -1,17 +1,17 @@
-import { RagHintText, RagNumericField } from './panelPrimitives'
+import { RagHintText, RagNumericField } from './panelPrimitives';
 
 export type KnowledgeRagChunkValidationErrorCode =
   | 'chunkSizeInvalid'
   | 'chunkOverlapInvalid'
-  | 'chunkOverlapMustBeSmaller'
+  | 'chunkOverlapMustBeSmaller';
 
 interface ChunkingSectionProps {
-  chunkSize: string
-  chunkOverlap: string
-  chunkSizeErrorCode?: KnowledgeRagChunkValidationErrorCode
-  chunkOverlapErrorCode?: KnowledgeRagChunkValidationErrorCode
-  onChunkSizeChange: (value: string) => void
-  onChunkOverlapChange: (value: string) => void
+  chunkSize: string;
+  chunkOverlap: string;
+  chunkSizeErrorCode?: KnowledgeRagChunkValidationErrorCode;
+  chunkOverlapErrorCode?: KnowledgeRagChunkValidationErrorCode;
+  onChunkSizeChange: (value: string) => void;
+  onChunkOverlapChange: (value: string) => void;
 }
 
 export default function ChunkingSection({
@@ -20,20 +20,20 @@ export default function ChunkingSection({
   chunkSizeErrorCode,
   chunkOverlapErrorCode,
   onChunkSizeChange,
-  onChunkOverlapChange
+  onChunkOverlapChange,
 }: ChunkingSectionProps) {
   const getValidationErrorMessage = (errorCode?: KnowledgeRagChunkValidationErrorCode) => {
     switch (errorCode) {
       case 'chunkSizeInvalid':
-        return '分块大小必须为正整数'
+        return '分块大小必须为正整数';
       case 'chunkOverlapInvalid':
-        return '重叠大小必须为非负整数'
+        return '重叠大小必须为非负整数';
       case 'chunkOverlapMustBeSmaller':
-        return '重叠大小必须小于分块大小'
+        return '重叠大小必须小于分块大小';
       default:
-        return undefined
+        return undefined;
     }
-  }
+  };
 
   return (
     <div className="space-y-2">
@@ -62,5 +62,5 @@ export default function ChunkingSection({
       ) : null}
       <RagHintText tone="warning">修改分块大小或重叠大小后，需要重新索引所有数据源</RagHintText>
     </div>
-  )
+  );
 }

@@ -208,12 +208,12 @@ def convert_to_markdown(html: str, base_url: str = "") -> str:
         h.bypass_tables = False  # 保留表格
         h.mark_code = True  # 代码块围栏
         h.ignore_emphasis = False  # 保留斜体/粗体
-        h.ignore_anchors = False  # 保留锚点
+        h.ignore_anchors = False  # type: ignore[attr-defined]  # 保留锚点
 
         # MarkDownload 风格配置
         h.wrap_links = False  # 不要打断链接
         h.skip_internal_links = False  # 保留内部锚点
-        h.reference_links = False  # 使用内联链接而非引用
+        h.reference_links = False  # type: ignore[attr-defined]  # 使用内联链接而非引用
         h.use_automatic_links = False  # 不要自动检测 URL
         h.google_doc = False
 

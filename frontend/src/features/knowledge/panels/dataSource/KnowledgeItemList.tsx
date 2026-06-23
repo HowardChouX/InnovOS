@@ -1,18 +1,18 @@
-import type { KnowledgeItem } from '../../../../types/knowledge'
-import KnowledgeItemRow from './KnowledgeItemRow'
+import type { KnowledgeItem } from '../../../../types/knowledge';
+import KnowledgeItemRow from './KnowledgeItemRow';
 
 export interface KnowledgeItemListProps {
-  items: KnowledgeItem[]
-  allItemsCount: number
-  isLoading: boolean
-  selectedIds: Set<string>
-  onToggleOne: (itemId: string, next: boolean) => void
-  onToggleAll: (next: boolean) => void
-  onItemClick: (itemId: string) => void
-  onDelete: (item: KnowledgeItem) => void | Promise<unknown>
-  onPreviewSource: (item: KnowledgeItem) => void | Promise<unknown>
-  onReindex: (item: KnowledgeItem) => void | Promise<unknown>
-  onViewChunks: (itemId: string) => void
+  items: KnowledgeItem[];
+  allItemsCount: number;
+  isLoading: boolean;
+  selectedIds: Set<string>;
+  onToggleOne: (itemId: string, next: boolean) => void;
+  onToggleAll: (next: boolean) => void;
+  onItemClick: (itemId: string) => void;
+  onDelete: (item: KnowledgeItem) => void | Promise<unknown>;
+  onPreviewSource: (item: KnowledgeItem) => void | Promise<unknown>;
+  onReindex: (item: KnowledgeItem) => void | Promise<unknown>;
+  onViewChunks: (itemId: string) => void;
 }
 
 export default function KnowledgeItemList({
@@ -26,7 +26,7 @@ export default function KnowledgeItemList({
   onDelete,
   onPreviewSource,
   onReindex,
-  onViewChunks
+  onViewChunks,
 }: KnowledgeItemListProps) {
   if (isLoading) {
     return (
@@ -34,11 +34,11 @@ export default function KnowledgeItemList({
         <i className="fa-solid fa-circle-notch fa-spin mr-1.5" />
         加载中...
       </div>
-    )
+    );
   }
 
   if (allItemsCount === 0) {
-    return null
+    return null;
   }
 
   if (items.length === 0) {
@@ -46,11 +46,11 @@ export default function KnowledgeItemList({
       <div className="flex min-h-0 flex-1 items-center justify-center px-3 text-center text-sm text-foreground-muted">
         未找到搜索结果
       </div>
-    )
+    );
   }
 
-  const allSelected = items.every((item) => selectedIds.has(item.id))
-  const someSelected = !allSelected && items.some((item) => selectedIds.has(item.id))
+  const allSelected = items.every((item) => selectedIds.has(item.id));
+  const someSelected = !allSelected && items.some((item) => selectedIds.has(item.id));
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -74,7 +74,7 @@ export default function KnowledgeItemList({
                   checked={allSelected}
                   ref={(el) => {
                     if (el) {
-                      el.indeterminate = someSelected
+                      el.indeterminate = someSelected;
                     }
                   }}
                   onChange={(event) => onToggleAll(event.target.checked)}
@@ -116,5 +116,5 @@ export default function KnowledgeItemList({
         </tbody>
       </table>
     </div>
-  )
+  );
 }

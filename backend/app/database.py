@@ -104,7 +104,7 @@ class _PostgresDatabase:
     def close(self):
         global _pg_pool
         try:
-            _pg_pool.putconn(self._conn)  # type: ignore[union-attr]
+            _pg_pool.putconn(self._conn)
         except Exception:
             logger.warning("Failed to return connection to pool, closing directly")
             self._conn.close()

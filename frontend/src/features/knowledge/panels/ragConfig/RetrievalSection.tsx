@@ -1,22 +1,22 @@
-import type { KnowledgeSearchMode } from '../../../../types/knowledge'
-import { RagFieldLabel, RagSelectField, RagSliderField } from './panelPrimitives'
+import type { KnowledgeSearchMode } from '../../../../types/knowledge';
+import { RagFieldLabel, RagSelectField, RagSliderField } from './panelPrimitives';
 
-const EMPTY_OPTION_VALUE = '__none__'
-const DEFAULT_HYBRID_ALPHA = 0.5
+const EMPTY_OPTION_VALUE = '__none__';
+const DEFAULT_HYBRID_ALPHA = 0.5;
 
 interface RetrievalSectionProps {
-  searchModeOptions: { label: string; value: string }[]
-  rerankModelOptions: { label: string; value: string }[]
-  documentCount: number
-  threshold: number
-  searchMode: KnowledgeSearchMode
-  hybridAlpha: number | null
-  rerankModelId: string | null
-  onDocumentCountChange: (value: number) => void
-  onThresholdChange: (value: number) => void
-  onSearchModeChange: (value: KnowledgeSearchMode) => void
-  onHybridAlphaChange: (value: number) => void
-  onRerankModelChange: (value: string | null) => void
+  searchModeOptions: { label: string; value: string }[];
+  rerankModelOptions: { label: string; value: string }[];
+  documentCount: number;
+  threshold: number;
+  searchMode: KnowledgeSearchMode;
+  hybridAlpha: number | null;
+  rerankModelId: string | null;
+  onDocumentCountChange: (value: number) => void;
+  onThresholdChange: (value: number) => void;
+  onSearchModeChange: (value: KnowledgeSearchMode) => void;
+  onHybridAlphaChange: (value: number) => void;
+  onRerankModelChange: (value: string | null) => void;
 }
 
 export default function RetrievalSection({
@@ -31,10 +31,10 @@ export default function RetrievalSection({
   onThresholdChange,
   onSearchModeChange,
   onHybridAlphaChange,
-  onRerankModelChange
+  onRerankModelChange,
 }: RetrievalSectionProps) {
-  const isHybridMode = searchMode === 'hybrid'
-  const usesRelevanceThreshold = searchMode === 'default' || rerankModelId !== null
+  const isHybridMode = searchMode === 'hybrid';
+  const usesRelevanceThreshold = searchMode === 'default' || rerankModelId !== null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -95,9 +95,11 @@ export default function RetrievalSection({
         <RagSelectField
           value={rerankModelId ?? EMPTY_OPTION_VALUE}
           options={[{ value: EMPTY_OPTION_VALUE, label: '禁用重排序' }, ...rerankModelOptions]}
-          onValueChange={(value) => onRerankModelChange(value === EMPTY_OPTION_VALUE ? null : value)}
+          onValueChange={(value) =>
+            onRerankModelChange(value === EMPTY_OPTION_VALUE ? null : value)
+          }
         />
       </div>
     </div>
-  )
+  );
 }

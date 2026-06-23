@@ -4,6 +4,7 @@ FastAPI application entry point.
 The `app` package import triggers bootstrap (load_dotenv + setup_logging)
 via its __init__.py. All subsequent imports are E402-clean.
 """
+
 import asyncio
 import logging
 import os

@@ -4,7 +4,11 @@ interface SearchProps {
   placeholder?: string;
 }
 
-export function KnowledgeNavigatorSearch({ value, onChange, placeholder = '搜索知识库...' }: SearchProps) {
+export function KnowledgeNavigatorSearch({
+  value,
+  onChange,
+  placeholder = '搜索知识库...',
+}: SearchProps) {
   return (
     <div className="relative">
       <i className="fa-solid fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-foreground-muted" />

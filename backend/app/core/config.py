@@ -40,16 +40,20 @@ class Settings(BaseSettings):
     # ── 应用基础 ──
     PROJECT_NAME: str = "InnovOS"
     API_V1_STR: str = "/api"
-    ENVIRONMENT: Literal["development", "production"] = Field(default="development", validation_alias=AliasChoices("ENVIRONMENT", "ENV"))
+    ENVIRONMENT: Literal["development", "production"] = Field(
+        default="development", validation_alias=AliasChoices("ENVIRONMENT", "ENV")
+    )
     BACKEND_CORS_ORIGINS: Annotated[list[AnyUrl] | str, BeforeValidator(parse_cors)] = []
 
-    @computed_field
     @property
+    @computed_field
     def all_cors_origins(self) -> list[str]:
         return [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS]
 
     # ── 认证 ──
-    SECRET_KEY: str = Field(default=secrets.token_urlsafe(32), validation_alias=AliasChoices("INNOVOS_JWT_SECRET", "SECRET_KEY"))
+    SECRET_KEY: str = Field(
+        default=secrets.token_urlsafe(32), validation_alias=AliasChoices("INNOVOS_JWT_SECRET", "SECRET_KEY")
+    )
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
     # ── 数据库 ──
@@ -61,7 +65,6 @@ class Settings(BaseSettings):
     DATABASE_URL: str | None = None
 
     @computed_field
-    @property
     def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn | None:
         if self.DATABASE_URL:
             return PostgresDsn(self.DATABASE_URL)
@@ -76,7 +79,9 @@ class Settings(BaseSettings):
 
     # ── 管理员（从环境变量实时验证，不存数据库）──
     FIRST_SUPERUSER: str = Field(default="", validation_alias=AliasChoices("INNOVOS_ADMIN_USER", "FIRST_SUPERUSER"))
-    FIRST_SUPERUSER_PASSWORD: str = Field(default="", validation_alias=AliasChoices("INNOVOS_ADMIN_PASSWORD", "FIRST_SUPERUSER_PASSWORD"))
+    FIRST_SUPERUSER_PASSWORD: str = Field(
+        default="", validation_alias=AliasChoices("INNOVOS_ADMIN_PASSWORD", "FIRST_SUPERUSER_PASSWORD")
+    )
 
     # ── S3 / MinIO ──
     S3_ENDPOINT: str = ""

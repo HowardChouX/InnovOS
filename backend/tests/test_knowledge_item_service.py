@@ -116,7 +116,7 @@ def test_list_returns_paginated_items(mock_db):
         },
     ]
 
-    result = KnowledgeItemService.list(user_id=1, base_id="base-1")
+    result = KnowledgeItemService.paginate(user_id=1, base_id="base-1")
 
     assert len(result["items"]) == 3
     assert result["total"] == 3
@@ -356,7 +356,7 @@ def test_list_with_type_filter_appends_condition(mock_db):
         },
     ]
 
-    KnowledgeItemService.list(user_id=1, base_id="base-1", type="file")
+    KnowledgeItemService.paginate(user_id=1, base_id="base-1", type="file")
 
     all_text = " ".join(mock_db.all_sql)
     assert "type = ?" in all_text or "type =" in all_text

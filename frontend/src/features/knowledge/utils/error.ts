@@ -32,7 +32,7 @@ export const normalizeKnowledgeError = (error: unknown): Error => {
  */
 export const getKnowledgeBaseFailureReason = (
   base: Pick<KnowledgeBase, 'error'>,
-  t: KnowledgeErrorTranslator
+  t: KnowledgeErrorTranslator,
 ) => {
   if (base.error === KNOWLEDGE_BASE_ERROR_MISSING_EMBEDDING_MODEL) {
     return t('knowledge.error.missing_embedding_model');

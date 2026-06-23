@@ -135,7 +135,7 @@ async def _chat_with_model(
                 messages.append({"role": "system", "content": system_prompt})
             messages.append({"role": "user", "content": user_prompt})
 
-            kwargs = {
+            kwargs: dict[str, Any] = {
                 "model": resolved.model_id,
                 "messages": messages,
                 "temperature": temperature,
@@ -190,7 +190,7 @@ async def _chat_with_key_manager(
                 messages.append({"role": "system", "content": system_prompt})
             messages.append({"role": "user", "content": user_prompt})
 
-            kwargs = {
+            kwargs: dict[str, Any] = {
                 "model": pick_model(key_config["api_model"]),
                 "messages": messages,
                 "temperature": temperature,

@@ -124,7 +124,7 @@ class Reranker:
         if not results and isinstance(data, list):
             results = data
 
-        parsed = []
+        parsed: list[dict] = []
         for item in results:
             idx = item.get("index", item.get("originalIndex", len(parsed)))
             score = item.get("relevance_score", item.get("score", item.get("relevanceScore", 0.0)))
@@ -180,7 +180,7 @@ class Reranker:
             data = resp.json()
 
         results = data.get("output", {}).get("results", [])
-        parsed = []
+        parsed: list[dict] = []
         for item in results:
             idx = item.get("index", len(parsed))
             score = item.get("relevance_score", 0.0)
@@ -231,7 +231,7 @@ class Reranker:
             data = resp.json()
 
         results = data if isinstance(data, list) else data.get("results", [])
-        parsed = []
+        parsed: list[dict] = []
         for item in results:
             idx = item.get("index", len(parsed))
             score = item.get("score", item.get("relevance_score", 0.0))

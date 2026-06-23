@@ -8,15 +8,26 @@ interface KnowledgeBaseRowProps {
   onContextMenu: (e: React.MouseEvent, item: CtxMenu) => void;
 }
 
-export function KnowledgeBaseRow({ base, isSelected, onSelect, onContextMenu }: KnowledgeBaseRowProps) {
+export function KnowledgeBaseRow({
+  base,
+  isSelected,
+  onSelect,
+  onContextMenu,
+}: KnowledgeBaseRowProps) {
   return (
     <div
       key={base.id}
       onClick={() => onSelect(base.id)}
-      onContextMenu={(e) => onContextMenu(e, {
-        x: e.clientX, y: e.clientY, type: 'base',
-        baseId: base.id, name: base.name, currentGroupId: base.groupId,
-      })}
+      onContextMenu={(e) =>
+        onContextMenu(e, {
+          x: e.clientX,
+          y: e.clientY,
+          type: 'base',
+          baseId: base.id,
+          name: base.name,
+          currentGroupId: base.groupId,
+        })
+      }
       className={`group/kb flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-sm ${
         isSelected
           ? 'bg-accent font-medium text-accent-foreground'
@@ -33,8 +44,12 @@ export function KnowledgeBaseRow({ base, isSelected, onSelect, onContextMenu }: 
           onClick={(e) => {
             e.stopPropagation();
             onContextMenu(e, {
-              x: e.clientX, y: e.clientY, type: 'base',
-              baseId: base.id, name: base.name, currentGroupId: base.groupId,
+              x: e.clientX,
+              y: e.clientY,
+              type: 'base',
+              baseId: base.id,
+              name: base.name,
+              currentGroupId: base.groupId,
             });
           }}
           className="ml-0.5 flex h-5 w-5 items-center justify-center rounded text-foreground-muted opacity-0 hover:bg-accent group-hover/kb:opacity-100"

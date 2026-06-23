@@ -39,13 +39,23 @@ export const useKnowledgeRagConfig = (base: KnowledgeBase) => {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    knowledgeApi.listEmbeddingModels().then((res) => {
-      setEmbeddingModels(res.data || []);
-    }).catch(() => { /* silently ignore — models may not be configured yet */ });
+    knowledgeApi
+      .listEmbeddingModels()
+      .then((res) => {
+        setEmbeddingModels(res.data || []);
+      })
+      .catch(() => {
+        /* silently ignore — models may not be configured yet */
+      });
 
-    knowledgeApi.listRerankModels().then((res) => {
-      setRerankModels(res.data || []);
-    }).catch(() => { /* silently ignore */ });
+    knowledgeApi
+      .listRerankModels()
+      .then((res) => {
+        setRerankModels(res.data || []);
+      })
+      .catch(() => {
+        /* silently ignore */
+      });
   }, []);
 
   const initialValues = useMemo(() => createKnowledgeRagConfigFormValues(base), [base]);
@@ -72,7 +82,7 @@ export const useKnowledgeRagConfig = (base: KnowledgeBase) => {
       { value: 'default', label: t('knowledge.rag.search_mode.default') },
       { value: 'bm25', label: t('knowledge.rag.search_mode.bm25') },
     ],
-    [t]
+    [t],
   );
 
   const save = useCallback(
@@ -92,7 +102,7 @@ export const useKnowledgeRagConfig = (base: KnowledgeBase) => {
         setIsLoading(false);
       }
     },
-    [base.id, initialValues]
+    [base.id, initialValues],
   );
 
   return {

@@ -28,12 +28,10 @@ def get_overview(current_user: CurrentUser):
     else:
         uid = current_user.id
         total_tasks = db.execute("SELECT COUNT(*) FROM tasks WHERE user_id=?", (uid,)).fetchone()[0]
-        completed = db.execute(
-            "SELECT COUNT(*) FROM tasks WHERE user_id=? AND status='completed'", (uid,)
-        ).fetchone()[0]
-        failed = db.execute("SELECT COUNT(*) FROM tasks WHERE user_id=? AND status='failed'", (uid,)).fetchone()[
+        completed = db.execute("SELECT COUNT(*) FROM tasks WHERE user_id=? AND status='completed'", (uid,)).fetchone()[
             0
         ]
+        failed = db.execute("SELECT COUNT(*) FROM tasks WHERE user_id=? AND status='failed'", (uid,)).fetchone()[0]
         total_analyses = db.execute(
             "SELECT COUNT(*) FROM analyses a JOIN tasks t ON a.task_id=t.id WHERE t.user_id=?", (uid,)
         ).fetchone()[0]
@@ -163,7 +161,7 @@ def get_system_status(_admin: SuperUserDep):
         db_size_str = "N/A"
 
     # 内存使用（Linux /proc/meminfo，非 Linux 返回默认值）
-    memory_info = {"total": 0, "used": 0, "percent": 0}
+    memory_info: dict[str, str | int | float] = {"total": 0, "used": 0, "percent": 0}
     try:
         with open("/proc/meminfo") as f:
             mem = {}
@@ -183,7 +181,7 @@ def get_system_status(_admin: SuperUserDep):
         memory_info = {"total": "-", "used": "-", "percent": 0}
 
     # CPU 信息
-    cpu_info = {"cores": 0, "usage": 0}
+    cpu_info: dict[str, int | float] = {"cores": 0, "usage": 0}
     try:
         import multiprocessing
 

@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import os
+from typing import Any, cast
 
 from app.algorithm.model_registry import model_registry
 from app.algorithm.providers_registry import (
@@ -203,9 +204,10 @@ class ModelService:
         db.close()
 
         if not row:
-            builtin = BUILTIN_PROVIDERS.get(provider_id)
-            if not builtin:
+            builtin_raw = BUILTIN_PROVIDERS.get(provider_id)
+            if not builtin_raw:
                 return {"models": []}
+            builtin = cast(dict[str, Any], builtin_raw)
             api_host = builtin["api_host"]
         else:
             api_host = row["api_host"]
@@ -240,7 +242,8 @@ class ModelService:
         result = []
 
         # 1. 内置供应商
-        for pid, info in BUILTIN_PROVIDERS.items():
+        for pid, raw_info in BUILTIN_PROVIDERS.items():
+            info = cast(dict[str, Any], raw_info)
             c = configured_all.pop(pid, None)  # pop 掉已处理的
             result.append(
                 {

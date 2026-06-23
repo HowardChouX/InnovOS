@@ -1,15 +1,15 @@
-import type { KnowledgeSelectOption } from './panelPrimitives'
-import { RagFieldLabel, RagNumericField, RagSelectField } from './panelPrimitives'
+import type { KnowledgeSelectOption } from './panelPrimitives';
+import { RagFieldLabel, RagNumericField, RagSelectField } from './panelPrimitives';
 
 interface EmbeddingSectionProps {
-  embeddingModelId: string | null
-  embeddingModelOptions: KnowledgeSelectOption[]
-  dimensions: string
-  dimensionsErrorCode?: 'dimensionsInvalid'
-  isFetchingDimensions?: boolean
-  onEmbeddingModelChange: (embeddingModelId: string) => void
-  onDimensionsChange: (dimensions: string) => void
-  onRefreshDimensions: () => void
+  embeddingModelId: string | null;
+  embeddingModelOptions: KnowledgeSelectOption[];
+  dimensions: string;
+  dimensionsErrorCode?: 'dimensionsInvalid';
+  isFetchingDimensions?: boolean;
+  onEmbeddingModelChange: (embeddingModelId: string) => void;
+  onDimensionsChange: (dimensions: string) => void;
+  onRefreshDimensions: () => void;
 }
 
 export default function EmbeddingSection({
@@ -20,7 +20,7 @@ export default function EmbeddingSection({
   isFetchingDimensions = false,
   onEmbeddingModelChange,
   onDimensionsChange,
-  onRefreshDimensions
+  onRefreshDimensions,
 }: EmbeddingSectionProps) {
   return (
     <div className="flex flex-col gap-4">
@@ -45,8 +45,11 @@ export default function EmbeddingSection({
             disabled={!embeddingModelId || isFetchingDimensions}
             aria-label="刷新维度"
             onClick={onRefreshDimensions}
-            className="flex shrink-0 items-center justify-center rounded-md border border-border bg-background-muted p-2 text-foreground-muted hover:bg-accent disabled:opacity-50">
-            <i className={`fa-solid fa-rotate text-xs ${isFetchingDimensions ? 'animate-spin' : ''}`} />
+            className="flex shrink-0 items-center justify-center rounded-md border border-border bg-background-muted p-2 text-foreground-muted hover:bg-accent disabled:opacity-50"
+          >
+            <i
+              className={`fa-solid fa-rotate text-xs ${isFetchingDimensions ? 'animate-spin' : ''}`}
+            />
           </button>
         </div>
         {dimensionsErrorCode === 'dimensionsInvalid' ? (
@@ -54,5 +57,5 @@ export default function EmbeddingSection({
         ) : null}
       </div>
     </div>
-  )
+  );
 }

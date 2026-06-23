@@ -4,6 +4,7 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
@@ -256,7 +257,9 @@ async def import_directory(
         if ext in supported_extensions:
             valid_files.append(f)
         else:
-            raise HTTPException(status_code=400, detail=f"不支持的文件格式: {f.filename}（仅允许文档、图片、视频、压缩包等安全格式）")
+            raise HTTPException(
+                status_code=400, detail=f"不支持的文件格式: {f.filename}（仅允许文档、图片、视频、压缩包等安全格式）"
+            )
 
     if not valid_files:
         raise HTTPException(status_code=400, detail="没有支持的文件格式（仅允许文档、图片、视频、压缩包等安全格式）")
@@ -266,31 +269,31 @@ async def import_directory(
     upload_dir = os.path.join(UPLOAD_DIR, str(user["id"]), base_id, item_id)
     os.makedirs(upload_dir, exist_ok=True)
 
-    saved_files = []
+    saved_files: list[dict[str, Any]] = []
     total_size = 0
-    for file in valid_files:
-        content = await file.read()
+    for upload_file in valid_files:
+        content = await upload_file.read()
         # ── File size validation ──
         if len(content) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=400, detail=f"文件 {file.filename} 超过大小限制 (50MB)")
+            raise HTTPException(status_code=400, detail=f"文件 {upload_file.filename} 超过大小限制 (50MB)")
         total_size += len(content)
         if total_size > MAX_TOTAL_SIZE:
             raise HTTPException(status_code=400, detail="总文件大小超过限制 (500MB)")
         # ── MIME type hint check — reject on mismatch ──
-        ext = os.path.splitext(file.filename or "")[1].lower()
+        ext = os.path.splitext(upload_file.filename or "")[1].lower()
         expected_mime = SUPPORTED_MIME_TYPES.get(ext)
         if (
             expected_mime
-            and file.content_type
-            and file.content_type != expected_mime
-            and file.content_type != "application/octet-stream"
+            and upload_file.content_type
+            and upload_file.content_type != expected_mime
+            and upload_file.content_type != "application/octet-stream"
         ):
             raise HTTPException(
                 status_code=400,
-                detail=f"文件 {file.filename} 的 MIME 类型不匹配：期望 {expected_mime}，实际 {file.content_type}",
+                detail=f"文件 {upload_file.filename} 的 MIME 类型不匹配：期望 {expected_mime}，实际 {upload_file.content_type}",
             )
 
-        rel_path = file.filename or "unnamed"
+        rel_path = upload_file.filename or "unnamed"
         # 路径穿越防护：去除目录组件
         rel_path = os.path.basename(rel_path)
         safe_path = rel_path.replace("..", "_")
@@ -306,8 +309,8 @@ async def import_directory(
         # 回退到本地文件系统
         target_path = os.path.join(upload_dir, safe_path)
         os.makedirs(os.path.dirname(target_path), exist_ok=True)
-        with open(target_path, "wb") as f:
-            f.write(content)
+        with open(target_path, "wb") as dst_file:
+            dst_file.write(content)
         saved_files.append({"name": rel_path, "path": target_path, "size": len(content)})
 
     # Audit log for the import operation

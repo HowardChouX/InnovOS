@@ -1,24 +1,24 @@
-import { type NodeViewProps, NodeViewWrapper } from '@tiptap/react'
-import { Calculator } from 'lucide-react'
-import React, { useCallback, useRef } from 'react'
+import { type NodeViewProps, NodeViewWrapper } from '@tiptap/react';
+import { Calculator } from 'lucide-react';
+import React, { useCallback, useRef } from 'react';
 
-import PlaceholderBlock from './PlaceholderBlock'
+import PlaceholderBlock from './PlaceholderBlock';
 
 const MathPlaceholderNodeView: React.FC<NodeViewProps> = ({ node, deleteNode, editor }) => {
-  const wrapperRef = useRef<HTMLDivElement>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const handleClick = useCallback(() => {
-    let hasCreatedMath = false
-    const mathType = node.attrs.mathType || 'block'
+    let hasCreatedMath = false;
+    const mathType = node.attrs.mathType || 'block';
 
-    let position: { x: number; y: number; top: number } | undefined
+    let position: { x: number; y: number; top: number } | undefined;
     if (wrapperRef.current) {
-      const rect = wrapperRef.current.getBoundingClientRect()
+      const rect = wrapperRef.current.getBoundingClientRect();
       position = {
         x: rect.left + rect.width / 2,
         y: rect.bottom,
-        top: rect.top
-      }
+        top: rect.top,
+      };
     }
 
     const event = new CustomEvent('openMathDialog', {
@@ -29,33 +29,33 @@ const MathPlaceholderNodeView: React.FC<NodeViewProps> = ({ node, deleteNode, ed
           // onSubmit just needs to close the dialog
           // Only delete if input is empty
           if (!latex.trim()) {
-            deleteNode()
+            deleteNode();
           }
         },
         onCancel: () => deleteNode(),
         onFormulaChange: (formula: string) => {
           if (formula.trim()) {
             if (!hasCreatedMath) {
-              hasCreatedMath = true
-              deleteNode()
+              hasCreatedMath = true;
+              deleteNode();
               if (mathType === 'block') {
-                editor.chain().insertBlockMath({ latex: formula }).run()
+                editor.chain().insertBlockMath({ latex: formula }).run();
               } else {
-                editor.chain().insertInlineMath({ latex: formula }).run()
+                editor.chain().insertInlineMath({ latex: formula }).run();
               }
             } else {
               if (mathType === 'block') {
-                editor.chain().updateBlockMath({ latex: formula }).run()
+                editor.chain().updateBlockMath({ latex: formula }).run();
               } else {
-                editor.chain().updateInlineMath({ latex: formula }).run()
+                editor.chain().updateInlineMath({ latex: formula }).run();
               }
             }
           }
-        }
-      }
-    })
-    window.dispatchEvent(event)
-  }, [node.attrs.mathType, deleteNode, editor])
+        },
+      },
+    });
+    window.dispatchEvent(event);
+  }, [node.attrs.mathType, deleteNode, editor]);
 
   return (
     <NodeViewWrapper className="math-placeholder-wrapper" ref={wrapperRef}>
@@ -65,7 +65,7 @@ const MathPlaceholderNodeView: React.FC<NodeViewProps> = ({ node, deleteNode, ed
         onClick={handleClick}
       />
     </NodeViewWrapper>
-  )
-}
+  );
+};
 
-export default MathPlaceholderNodeView
+export default MathPlaceholderNodeView;

@@ -1,109 +1,109 @@
-import React, { useState } from 'react'
+import React, { useState } from 'react';
 
 interface ImageUploaderProps {
   /** Whether the uploader is visible */
-  visible: boolean
+  visible: boolean;
   /** Callback when image is selected/uploaded */
-  onImageSelect: (imageUrl: string) => void
+  onImageSelect: (imageUrl: string) => void;
   /** Callback when uploader should be closed */
-  onClose: () => void
+  onClose: () => void;
 }
 
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
 // Convert file to base64 URL
 const convertFileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader()
+    const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') {
-        resolve(reader.result)
+        resolve(reader.result);
       } else {
-        reject(new Error('Failed to convert file to base64'))
+        reject(new Error('Failed to convert file to base64'));
       }
-    }
-    reader.onerror = () => reject(new Error('Failed to read file'))
-    reader.readAsDataURL(file)
-  })
-}
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+};
 
 const ImageUploader: React.FC<ImageUploaderProps> = ({ visible, onImageSelect, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'upload' | 'link'>('upload')
-  const [urlInput, setUrlInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'upload' | 'link'>('upload');
+  const [urlInput, setUrlInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const validateFile = (file: File): string | null => {
     if (!file.type.startsWith('image/')) {
-      return '仅支持图片格式'
+      return '仅支持图片格式';
     }
     if (file.size >= MAX_IMAGE_SIZE) {
-      return '图片大小不能超过 10MB'
+      return '图片大小不能超过 10MB';
     }
-    return null
-  }
+    return null;
+  };
 
   const handleFileSelect = async (file: File) => {
-    const validationError = validateFile(file)
+    const validationError = validateFile(file);
     if (validationError) {
-      setError(validationError)
-      return
+      setError(validationError);
+      return;
     }
 
     try {
-      setLoading(true)
-      setError(null)
-      const base64Url = await convertFileToBase64(file)
-      onImageSelect(base64Url)
-      onClose()
+      setLoading(true);
+      setError(null);
+      const base64Url = await convertFileToBase64(file);
+      onImageSelect(base64Url);
+      onClose();
     } catch {
-      setError('图片上传失败，请重试')
+      setError('图片上传失败，请重试');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const files = e.dataTransfer.files
+    e.preventDefault();
+    e.stopPropagation();
+    const files = e.dataTransfer.files;
     if (files.length > 0) {
-      const file = files[0]
+      const file = files[0];
       if (file) {
-        void handleFileSelect(file)
+        void handleFileSelect(file);
       }
     }
-  }
+  };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-  }
+    e.preventDefault();
+    e.stopPropagation();
+  };
 
   const handleUrlSubmit = () => {
-    const trimmed = urlInput.trim()
+    const trimmed = urlInput.trim();
     if (!trimmed) {
-      setError('请输入图片链接')
-      return
+      setError('请输入图片链接');
+      return;
     }
 
     try {
-      new URL(trimmed)
-      onImageSelect(trimmed)
-      setUrlInput('')
-      onClose()
+      new URL(trimmed);
+      onImageSelect(trimmed);
+      setUrlInput('');
+      onClose();
     } catch {
-      setError('链接格式不正确，请输入有效的 URL')
+      setError('链接格式不正确，请输入有效的 URL');
     }
-  }
+  };
 
   const handleCancel = () => {
-    setUrlInput('')
-    setError(null)
-    onClose()
-  }
+    setUrlInput('');
+    setError(null);
+    onClose();
+  };
 
-  if (!visible) return null
+  if (!visible) return null;
 
   const overlayStyle: React.CSSProperties = {
     position: 'fixed',
@@ -113,7 +113,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ visible, onImageSelect, o
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-  }
+  };
 
   const cardStyle: React.CSSProperties = {
     background: 'var(--bg-card, #fff)',
@@ -123,7 +123,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ visible, onImageSelect, o
     padding: 24,
     width: 540,
     maxWidth: '90vw',
-  }
+  };
 
   const tabBarStyle: React.CSSProperties = {
     display: 'flex',
@@ -131,7 +131,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ visible, onImageSelect, o
     marginBottom: 16,
     borderBottom: '1px solid var(--border, #e5e7eb)',
     paddingBottom: 0,
-  }
+  };
 
   const tabBtnStyle = (active: boolean): React.CSSProperties => ({
     display: 'flex',
@@ -146,7 +146,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ visible, onImageSelect, o
     cursor: 'pointer',
     fontWeight: active ? 600 : 400,
     marginBottom: -1,
-  })
+  });
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -159,7 +159,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ visible, onImageSelect, o
     color: 'var(--color-foreground, #333)',
     outline: 'none',
     boxSizing: 'border-box',
-  }
+  };
 
   const btnStyle: React.CSSProperties = {
     padding: '8px 16px',
@@ -169,20 +169,20 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ visible, onImageSelect, o
     cursor: 'pointer',
     background: 'transparent',
     color: 'var(--color-foreground, #333)',
-  }
+  };
 
   const primaryBtnStyle: React.CSSProperties = {
     ...btnStyle,
     background: 'var(--color-primary, #7c3aed)',
     color: '#fff',
     border: 'none',
-  }
+  };
 
   const disabledBtnStyle: React.CSSProperties = {
     ...primaryBtnStyle,
     opacity: 0.5,
     cursor: 'not-allowed',
-  }
+  };
 
   const dropzoneStyle: React.CSSProperties = {
     minHeight: 180,
@@ -197,13 +197,20 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ visible, onImageSelect, o
     cursor: loading ? 'not-allowed' : 'pointer',
     opacity: loading ? 0.6 : 1,
     padding: 24,
-  }
+  };
 
   return (
     <div style={overlayStyle} onClick={handleCancel}>
       <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
         {/* Title */}
-        <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 16, color: 'var(--color-foreground, #333)' }}>
+        <div
+          style={{
+            fontSize: 18,
+            fontWeight: 600,
+            marginBottom: 16,
+            color: 'var(--color-foreground, #333)',
+          }}
+        >
           插入图片
         </div>
 
@@ -216,10 +223,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ visible, onImageSelect, o
             <i className="fa-solid fa-upload" style={{ fontSize: 13 }} />
             上传
           </button>
-          <button
-            style={tabBtnStyle(activeTab === 'link')}
-            onClick={() => setActiveTab('link')}
-          >
+          <button style={tabBtnStyle(activeTab === 'link')} onClick={() => setActiveTab('link')}>
             <i className="fa-solid fa-link" style={{ fontSize: 13 }} />
             链接
           </button>
@@ -227,15 +231,17 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ visible, onImageSelect, o
 
         {/* Error message */}
         {error && (
-          <div style={{
-            padding: '8px 12px',
-            marginBottom: 12,
-            background: 'var(--bg-danger-light, #fef2f2)',
-            border: '1px solid var(--color-danger, #e53e3e)',
-            borderRadius: 6,
-            color: 'var(--color-danger, #e53e3e)',
-            fontSize: 13,
-          }}>
+          <div
+            style={{
+              padding: '8px 12px',
+              marginBottom: 12,
+              background: 'var(--bg-danger-light, #fef2f2)',
+              border: '1px solid var(--color-danger, #e53e3e)',
+              borderRadius: 6,
+              color: 'var(--color-danger, #e53e3e)',
+              fontSize: 13,
+            }}
+          >
             {error}
           </div>
         )}
@@ -248,19 +254,27 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ visible, onImageSelect, o
             onDragOver={handleDragOver}
             onClick={() => !loading && document.getElementById('image-upload-input')?.click()}
           >
-            <div style={{
-              width: 40,
-              height: 40,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 8,
-              background: 'var(--bg-muted-foreground, #f3f4f6)',
-            }}>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 8,
+                background: 'var(--bg-muted-foreground, #f3f4f6)',
+              }}
+            >
               {loading ? (
-                <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 18, color: 'var(--text-muted, #9ca3af)' }} />
+                <i
+                  className="fa-solid fa-spinner fa-spin"
+                  style={{ fontSize: 18, color: 'var(--text-muted, #9ca3af)' }}
+                />
               ) : (
-                <i className="fa-solid fa-image" style={{ fontSize: 18, color: 'var(--text-muted, #9ca3af)' }} />
+                <i
+                  className="fa-solid fa-image"
+                  style={{ fontSize: 18, color: 'var(--text-muted, #9ca3af)' }}
+                />
               )}
             </div>
             <div style={{ fontWeight: 500, fontSize: 14, color: 'var(--color-foreground, #333)' }}>
@@ -276,12 +290,12 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ visible, onImageSelect, o
               style={{ display: 'none' }}
               disabled={loading}
               onChange={(e) => {
-                const file = e.target.files?.[0]
+                const file = e.target.files?.[0];
                 if (file) {
-                  void handleFileSelect(file)
+                  void handleFileSelect(file);
                 }
                 // Reset so the same file can be selected again
-                e.target.value = ''
+                e.target.value = '';
               }}
             />
           </div>
@@ -307,12 +321,12 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ visible, onImageSelect, o
                 placeholder="输入图片 URL 链接"
                 value={urlInput}
                 onChange={(e) => {
-                  setUrlInput(e.target.value)
-                  if (error) setError(null)
+                  setUrlInput(e.target.value);
+                  if (error) setError(null);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    handleUrlSubmit()
+                    handleUrlSubmit();
                   }
                 }}
               />
@@ -320,8 +334,8 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ visible, onImageSelect, o
             <button
               style={btnStyle}
               onClick={() => {
-                setUrlInput('')
-                setError(null)
+                setUrlInput('');
+                setError(null);
               }}
             >
               清空
@@ -337,7 +351,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ visible, onImageSelect, o
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default ImageUploader
+export default ImageUploader;

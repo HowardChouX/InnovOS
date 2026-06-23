@@ -276,6 +276,7 @@ class AIBase:
             kwargs["response_format"] = {"type": "json_object"}
 
         max_attempts = 3
+        assert self.client is not None, "AI client is not initialized"
         for attempt in range(max_attempts):
             try:
                 resp = self.client.chat.completions.create(**kwargs)

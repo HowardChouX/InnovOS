@@ -352,9 +352,9 @@ async def upload_patent_pdf(
         fields.get("claims", "") or "",
         fields.get("description", "") or "",
     ]
-    content = "\n".join(p for p in parts if p.strip()) or full_text
-    if len(content) > 100:
-        asyncio.create_task(_index_patent_vectors(row_id, content))
+    text_content = "\n".join(p for p in parts if p.strip()) or full_text
+    if len(text_content) > 100:
+        asyncio.create_task(_index_patent_vectors(row_id, text_content))
 
     return {**row_to_patent(patent), "mode": mode, "extractSource": parsed["type"]}
 

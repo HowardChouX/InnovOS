@@ -1,14 +1,14 @@
-import { Extension, InputRule, mergeAttributes, Node } from '@tiptap/core'
-import { BlockMath, InlineMath } from '@tiptap/extension-mathematics'
-import { ReactNodeViewRenderer } from '@tiptap/react'
+import { Extension, InputRule, mergeAttributes, Node } from '@tiptap/core';
+import { BlockMath, InlineMath } from '@tiptap/extension-mathematics';
+import { ReactNodeViewRenderer } from '@tiptap/react';
 
-import MathPlaceholderNodeView from '../components/placeholder/MathPlaceholderNodeView'
+import MathPlaceholderNodeView from '../components/placeholder/MathPlaceholderNodeView';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     enhancedMath: {
-      insertMathPlaceholder: (options?: { mathType?: 'block' | 'inline' }) => ReturnType
-    }
+      insertMathPlaceholder: (options?: { mathType?: 'block' | 'inline' }) => ReturnType;
+    };
   }
 }
 
@@ -19,8 +19,8 @@ export const EnhancedMath = Extension.create({
     return {
       inlineOptions: undefined,
       blockOptions: undefined,
-      katexOptions: undefined
-    }
+      katexOptions: undefined,
+    };
   },
 
   addCommands() {
@@ -31,11 +31,11 @@ export const EnhancedMath = Extension.create({
           return commands.insertContent({
             type: 'mathPlaceholder',
             attrs: {
-              mathType: options.mathType || 'block'
-            }
-          })
-        }
-    }
+              mathType: options.mathType || 'block',
+            },
+          });
+        },
+    };
   },
 
   addExtensions() {
@@ -46,33 +46,39 @@ export const EnhancedMath = Extension.create({
             new InputRule({
               find: /^\$\$([^$]+)\$\$$/,
               handler: ({ state, range, match }) => {
-                const [, latex] = match
-                const { tr } = state
-                const start = range.from
-                const end = range.to
-                tr.replaceWith(start, end, this.type.create({ latex }))
-              }
-            })
-          ]
-        }
-      }).configure({ ...(this.options.blockOptions ?? {}), katexOptions: this.options.katexOptions }),
+                const [, latex] = match;
+                const { tr } = state;
+                const start = range.from;
+                const end = range.to;
+                tr.replaceWith(start, end, this.type.create({ latex }));
+              },
+            }),
+          ];
+        },
+      }).configure({
+        ...(this.options.blockOptions ?? {}),
+        katexOptions: this.options.katexOptions,
+      }),
       InlineMath.extend({
         addInputRules() {
           return [
             new InputRule({
               find: /(^|[^$])(\$([^$\n]+?)\$)(?!\$)/,
               handler: ({ state, range, match }) => {
-                const latex = match[3]
-                const { tr } = state
-                const start = range.from
-                const end = range.to
+                const latex = match[3];
+                const { tr } = state;
+                const start = range.from;
+                const end = range.to;
 
-                tr.replaceWith(start, end, this.type.create({ latex }))
-              }
-            })
-          ]
-        }
-      }).configure({ ...(this.options.inlineOptions ?? {}), katexOptions: this.options.katexOptions }),
+                tr.replaceWith(start, end, this.type.create({ latex }));
+              },
+            }),
+          ];
+        },
+      }).configure({
+        ...(this.options.inlineOptions ?? {}),
+        katexOptions: this.options.katexOptions,
+      }),
       Node.create({
         name: 'mathPlaceholder',
         group: 'block',
@@ -81,8 +87,8 @@ export const EnhancedMath = Extension.create({
 
         addOptions() {
           return {
-            HTMLAttributes: {}
-          }
+            HTMLAttributes: {},
+          };
         },
 
         addAttributes() {
@@ -91,33 +97,33 @@ export const EnhancedMath = Extension.create({
               default: 'block',
               parseHTML: (element) => element.getAttribute('data-math-type'),
               renderHTML: (attributes) => ({
-                'data-math-type': attributes.mathType
-              })
-            }
-          }
+                'data-math-type': attributes.mathType,
+              }),
+            },
+          };
         },
 
         parseHTML() {
           return [
             {
-              tag: 'div[data-type="math-placeholder"]'
-            }
-          ]
+              tag: 'div[data-type="math-placeholder"]',
+            },
+          ];
         },
 
         renderHTML({ HTMLAttributes }) {
           return [
             'div',
             mergeAttributes(HTMLAttributes, {
-              'data-type': 'math-placeholder'
-            })
-          ]
+              'data-type': 'math-placeholder',
+            }),
+          ];
         },
 
         addNodeView() {
-          return ReactNodeViewRenderer(MathPlaceholderNodeView)
-        }
-      })
-    ]
-  }
-})
+          return ReactNodeViewRenderer(MathPlaceholderNodeView);
+        },
+      }),
+    ];
+  },
+});

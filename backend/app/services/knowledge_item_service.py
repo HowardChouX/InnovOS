@@ -25,7 +25,9 @@ class KnowledgeItemService:
     """知识项服务 — 完全对齐 CherryStudio KnowledgeItemService"""
 
     @staticmethod
-    def list(user_id: int, base_id: str, page: int = 1, limit: int = 20, type: str = None, groupId: str = None) -> dict:
+    def paginate(
+        user_id: int, base_id: str, page: int = 1, limit: int = 20, type: str | None = None, groupId: str | None = None
+    ) -> dict:
         """分页列出知识项"""
         db = get_db()
         # Verify the base belongs to user
@@ -72,7 +74,7 @@ class KnowledgeItemService:
         return KnowledgeItemService._row_to_item(row)
 
     @staticmethod
-    def get_items_by_base_id(user_id: int, base_id: str, groupId: str = None) -> list[dict]:
+    def get_items_by_base_id(user_id: int, base_id: str, groupId: str | None = None) -> list[dict]:
         """获取知识库下的所有知识项（非分页）"""
         db = get_db()
         # Verify the base belongs to user
@@ -133,7 +135,7 @@ class KnowledgeItemService:
         ).fetchall()
         db.close()
 
-        root_ids_by_base = {}
+        root_ids_by_base: dict[str, list[str]] = {}
         for row in rows:
             base_id = row["baseId"]
             if base_id not in root_ids_by_base:
@@ -179,7 +181,7 @@ class KnowledgeItemService:
 
     @staticmethod
     def set_subtree_status(
-        user_id: int, base_id: str, root_ids: list[str], status: str, error: str = None
+        user_id: int, base_id: str, root_ids: list[str], status: str, error: str | None = None
     ) -> list[str]:
         """递归设置子树状态（使用递归 CTE）"""
         unique_root_ids = list(dict.fromkeys(root_ids))
@@ -301,7 +303,7 @@ class KnowledgeItemService:
         return [KnowledgeItemService._row_to_item(r) for r in rows]
 
     @staticmethod
-    def update_status(user_id: int, item_id: str, status: str, error: str = None) -> dict | None:
+    def update_status(user_id: int, item_id: str, status: str, error: str | None = None) -> dict | None:
         """更新知识项状态"""
         db = get_db()
         existing = db.execute(
@@ -319,9 +321,10 @@ class KnowledgeItemService:
             db.close()
             return KnowledgeItemService._row_to_item(existing)
 
-        err = error.strip() if status == "failed" else None
-        if status == "failed" and not err:
-            err = CONTAINER_CHILD_FAILURE_ERROR
+        if status == "failed":
+            err = (error or "").strip() or CONTAINER_CHILD_FAILURE_ERROR
+        else:
+            err = None
 
         now = datetime.now(timezone.utc).isoformat()
         db.execute(
@@ -493,7 +496,7 @@ class KnowledgeItemServiceCompat:
 
     @staticmethod
     def list_items(user_id, base_id, page=1, limit=20, item_type="", group_id=""):
-        return KnowledgeItemService.list(user_id, base_id, page, limit, item_type or None, group_id or None)
+        return KnowledgeItemService.paginate(user_id, base_id, page, limit, item_type or None, group_id or None)
 
     @staticmethod
     def get_by_id(user_id, item_id):

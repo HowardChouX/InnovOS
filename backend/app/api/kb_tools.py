@@ -101,7 +101,7 @@ async def list_kb_tools(
     # 构建输出项
     output_items = []
     for base in all_bases:
-        root_items = []
+        root_items: list[dict] = []
         if base.get("status") == "completed":
             try:
                 root_items = KnowledgeItemService.get_root_items_by_base_id(user["id"], base["id"])

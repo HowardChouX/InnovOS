@@ -10,7 +10,12 @@ export interface PaginatedTasks {
 }
 
 export const tasksApi = {
-  async list(params?: { page?: number; pageSize?: number; search?: string; status?: string }): Promise<PaginatedTasks> {
+  async list(params?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    status?: string;
+  }): Promise<PaginatedTasks> {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.set('page', String(params.page));
     if (params?.pageSize) searchParams.set('page_size', String(params.pageSize));

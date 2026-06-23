@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
   --color-background: var(--bg-dark);
@@ -46,11 +46,11 @@
   --accent-red: #f87171;
   --accent-purple: #8b5cf6;
   --accent-cyan: #22d3ee;
-  --shadow: rgba(0,0,0,0.4);
+  --shadow: rgba(0, 0, 0, 0.4);
 }
 
 /* Light theme */
-[data-theme="light"] {
+[data-theme='light'] {
   --bg-dark: #f0f4f8;
   --bg-panel: #ffffff;
   --bg-card: #e8eef4;
@@ -67,7 +67,7 @@
   --accent-red: #dc2626;
   --accent-purple: #7c3aed;
   --accent-cyan: #0891b2;
-  --shadow: rgba(0,0,0,0.08);
+  --shadow: rgba(0, 0, 0, 0.08);
 }
 
 body {
@@ -75,40 +75,76 @@ body {
   font-family: 'PingFang SC', 'Microsoft YaHei', 'Inter', sans-serif;
   background-color: var(--bg-dark);
   color: var(--text-primary);
-  transition: background-color 0.3s, color 0.3s;
+  transition:
+    background-color 0.3s,
+    color 0.3s;
 }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
 
 /* Card entrance animation */
 @keyframes fade-in-up {
-  0% { opacity: 0; transform: translateY(12px); }
-  100% { opacity: 1; transform: translateY(0); }
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-.card-enter { animation: fade-in-up 0.4s ease-out forwards; }
+.card-enter {
+  animation: fade-in-up 0.4s ease-out forwards;
+}
 
 /* Spin animation for running indicators */
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Pulse ring animation for active steps */
 @keyframes pulse-ring {
-  0% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.4); }
-  70% { box-shadow: 0 0 0 6px rgba(96, 165, 250, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(96, 165, 250, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0);
+  }
 }
 
 /* Pulse animation for running indicators */
 @keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.5; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 /* Utility classes */
@@ -152,8 +188,12 @@ body {
   font-family: inherit;
   transition: opacity 0.15s;
 }
-.btn-primary:hover { opacity: 0.9; }
-.btn-primary:active { opacity: 0.8; }
+.btn-primary:hover {
+  opacity: 0.9;
+}
+.btn-primary:active {
+  opacity: 0.8;
+}
 
 .badge {
   font-size: 10px;
@@ -183,14 +223,30 @@ select option {
 }
 
 /* ── Accent status text classes ── */
-.text-accent-success { color: var(--accent-green); }
-.text-accent-danger { color: var(--accent-red); }
-.text-accent-info { color: var(--accent-blue); }
-.text-accent-warning { color: var(--accent-yellow); }
-.text-accent-purple { color: var(--accent-purple); }
-.text-accent-cyan { color: var(--accent-cyan); }
-.text-accent-violet { color: #a78bfa; }
-.text-accent-amber { color: #f59e0b; }
+.text-accent-success {
+  color: var(--accent-green);
+}
+.text-accent-danger {
+  color: var(--accent-red);
+}
+.text-accent-info {
+  color: var(--accent-blue);
+}
+.text-accent-warning {
+  color: var(--accent-yellow);
+}
+.text-accent-purple {
+  color: var(--accent-purple);
+}
+.text-accent-cyan {
+  color: var(--accent-cyan);
+}
+.text-accent-violet {
+  color: #a78bfa;
+}
+.text-accent-amber {
+  color: #f59e0b;
+}
 
 /* ── Badge status classes (border + bg + text) ── */
 .badge-success {

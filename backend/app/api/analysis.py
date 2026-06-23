@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 
 # 保持对后台任务的引用，防止被垃圾回收
-_background_tasks = set()
+_background_tasks: set[asyncio.Task] = set()
 
 # 并发锁：防止同一个 task_id 的多个后台任务同时执行
 _running_workflows: set[int] = set()
@@ -281,7 +281,7 @@ async def _update_problem_modeling(
             row = db.execute("SELECT model_structure FROM problem_modelings WHERE task_id=?", (task_id,)).fetchone()
             model_structure = json.loads(row["model_structure"]) if row and row["model_structure"] else {}
 
-            avg_score = 0
+            avg_score: float = 0.0
             if evaluations:
                 scores = []
                 for ev in evaluations:
@@ -611,8 +611,8 @@ async def run_analysis_background(
         if _is_step_pending(db, task_id, "agent5"):
             update_workflow_step(db, task_id, "agent5", "running")
 
-            patent_info = []
-            direction_patents = {}
+            patent_info: list[dict] = []
+            direction_patents: dict[str, list[str]] = {}
             try:
                 all_directions = [task_description[:200]]  # fallback
                 row_steps = db.execute("SELECT steps FROM workflows WHERE task_id=?", (task_id,)).fetchone()

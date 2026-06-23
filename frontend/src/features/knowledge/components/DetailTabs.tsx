@@ -13,7 +13,7 @@ const TAB_DEFS: { key: string; label: string; icon: string }[] = [
 const DetailTabs = ({ activeTab, dataSourceCount, onChange }: DetailTabsProps) => {
   return (
     <div className="flex shrink-0 items-center gap-0 border-b border-border-muted bg-background px-3">
-      {TAB_DEFS.map(tab => {
+      {TAB_DEFS.map((tab) => {
         const isActive = activeTab === tab.key;
         return (
           <button

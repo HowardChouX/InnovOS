@@ -201,7 +201,7 @@ class KnowledgeOrchestrationService:
 
     async def _assert_subtrees_can_reindex(self, user_id: int, base_id: str, root_ids: list[str]) -> None:
         """断言子树可以重新索引"""
-        blocking_counts = {}
+        blocking_counts: dict[str, int] = {}
         for root_id in root_ids:
             subtree = KnowledgeItemService.get_subtree_items(user_id, base_id, [root_id], include_roots=True)
             for item in subtree:
