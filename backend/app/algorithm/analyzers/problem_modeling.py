@@ -57,7 +57,8 @@ class ProblemModelingAnalyzer:
 只输出JSON：
 {{"system_components": [{{"name": "组件名", "description": "功能描述"}}], "supersystem_components": [{{"name": "超系统组件", "description": "与系统的交互"}}], "key_interactions": [{{"tool": "组件A", "receiver": "组件B", "type": "有害/不足/正常", "verb": "交互动词"}}]}}"""
             result = await self.ai.call_ai_async(
-                "", prompt, temperature=0.1, logger_prefix="功能分析(简化)", json_mode=True
+                "你是一个系统分析专家。请严格按照用户提示词中的 JSON 格式输出分析结果。",
+                prompt, temperature=0.1, logger_prefix="功能分析(简化)", json_mode=True
             )
             return result if isinstance(result, dict) else None
 
@@ -70,7 +71,8 @@ class ProblemModelingAnalyzer:
 只输出JSON：
 {{"root_causes": [{{"id": "rc1", "text": "根因描述"}}], "key_insights": ["关键洞察1"], "initial_defect": "初始问题描述"}}"""
             result = await self.ai.call_ai_async(
-                "", prompt, temperature=0.2, logger_prefix="因果链(简化)", json_mode=True
+                "你是一个系统分析专家。请严格按照用户提示词中的 JSON 格式输出分析结果。",
+                prompt, temperature=0.2, logger_prefix="因果链(简化)", json_mode=True
             )
             return result if isinstance(result, dict) else None
 
@@ -115,7 +117,8 @@ class ProblemModelingAnalyzer:
 只输出JSON：
 {{"trimming_candidates": [{{"component": "组件名", "reason": "裁剪理由", "transferred_to": "承接方"}}], "summary": "裁剪分析总结"}}"""
             trim_result = await self.ai.call_ai_async(
-                "", trim_prompt, temperature=0.2, logger_prefix="裁剪分析(简化)", json_mode=True
+                "你是一个系统分析专家。请严格按照用户提示词中的 JSON 格式输出分析结果。",
+                trim_prompt, temperature=0.2, logger_prefix="裁剪分析(简化)", json_mode=True
             )
             trimming_result = trim_result if isinstance(trim_result, dict) else None
         except Exception as e:

@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "InnovOS 创新智能操作系统后端"
 requires-python = ">=3.10"
 dependencies = [
+    "redis>=5.2.0",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "pydantic>=2.0.0",
@@ -71,6 +72,7 @@ dev = [
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
+    "fakeredis[lua]>=2.26.0",
     "ruff>=0.11.0",
     "mypy>=1.15.0",
     "black>=25.0.0",

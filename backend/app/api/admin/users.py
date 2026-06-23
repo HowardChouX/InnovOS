@@ -174,3 +174,18 @@ def delete_user(
     db.commit()
 
     return {"data": None, "message": "已删除", "code": 200}
+
+
+@router.post("/{user_id}/revoke-tokens")
+def revoke_user_tokens(
+    user_id: int,
+    db: SessionDep,
+    _admin: SuperUserDep,
+):
+    """Revoke all active tokens for a user by incrementing token_version (admin only)."""
+    row = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    db.execute("UPDATE users SET token_version = token_version + 1 WHERE id = ?", (user_id,))
+    db.commit()
+    return {"ok": True}

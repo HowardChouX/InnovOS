@@ -141,7 +141,7 @@ User Input → 知识库RAG检索 → 需求洞察 → 问题建模 → 专利�
 - `patents` — 专利数据
 - `evaluations` — 四维评估
 - `feedbacks` — 用户反馈
-- `api_keys` — AES-256 加密 API 密钥 + providers
+- `api_keys` — API 密钥管理（从环境变量读取，兼容旧版）
 - `notifications` — 通知
 - `knowledge_bases` — 知识库
 - `knowledge_items` — 知识项（含状态机）
@@ -157,7 +157,6 @@ User Input → 知识库RAG检索 → 需求洞察 → 问题建模 → 专利�
 Backend: `.env` (see `.env.example`)
 
 ```env
-INNOVOS_ENCRYPT_KEY=       # 必须：Fernet 加密密钥（生产环境必填）
 INNOVOS_JWT_SECRET=        # 必须：JWT 签名密钥（生产环境必填）
 DATABASE_URL=              # PostgreSQL 连接串
 ENV=production             # production 启用 JSON 日志
@@ -176,8 +175,8 @@ INNOVOS_ADMIN_PASSWORD=    # 可选：管理员密码（未设置则自动生成
 - **Database Init:** Automatic on backend startup (`init_db()` + `seed_if_empty()` in startup event)
 - **Dev Servers:** Backend on `:8000`, Frontend on `:5173`
 - **Seed:** First-run only — creates admin user if none exists. Does NOT overwrite existing admin password.
-- **Encryption:** API keys encrypted with AES-256 Fernet + random salt (600K PBKDF2 iterations)
-- **Rate Limiting:** per-IP sliding window (auth 10/min, API 60/min, in-memory, single-worker)
+- **Key Management:** API keys from environment variables (`AI_{PROVIDER_ID}_API_KEY`), no database encryption. Per-provider round-robin pool with in-memory rate limiting.
+- **Rate Limiting:** per-IP sliding window (auth 10/min, register 3/5min, API 120/min, in-memory, single-worker)
 - **Security Headers:** CSP, HSTS, XFO, X-XSS-Protection, Referrer-Policy, Permissions-Policy
 - **Build:** Code splitting (vendor/ui/state chunks), esbuild minification
 - **Error Boundary:** Global React error boundary with professional Chinese error UI and reload button

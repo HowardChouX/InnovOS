@@ -43,7 +43,6 @@ http://localhost
 | `POSTGRES_PASSWORD`      | ✅   | 数据库密码                                     |
 | `MINIO_ROOT_PASSWORD`    | ✅   | MinIO 管理员密码                               |
 | `AI_*_API_KEY`           | 按需 | AI 供应商密钥，格式 `AI_{供应商ID}_API_KEY`    |
-| `INNOVOS_ENCRYPT_KEY`    | 旧版 | 仅用于解密旧版加密数据（新部署不需要）         |
 
 ### AI 密钥配置
 
@@ -71,14 +70,14 @@ make format      # 自动格式化
 ## 项目结构
 
 ```
-backend/
+    backend/
   app/
     api/            # FastAPI 路由
     algorithm/      # AI 核心（模型/嵌入/重排/检索/管线）
     services/       # 业务逻辑（知识库/作业系统/通知）
     tables/         # 数据库 schema
     main.py         # 应用入口
-  tests/            # 后端测试（236 项）
+  tests/            # 后端测试
 frontend/
   src/
     features/       # 功能页面
@@ -99,7 +98,7 @@ frontend/
                         └── MinIO/S3 (文件存储)
 ```
 
-- **AI 分析管线**: 需求洞察 → 问题建模 → 专利检索 → 方案生成 → 评估 → 转化（需求洞察、问题建模已完成后端集成）
+- **AI 分析管线**: 需求洞察 → 问题建模 → 专利检索 → 方案生成 → 评估 → 转化（全流程后端集成）
 - **知识库**: 上传文档 → 分块 → 嵌入 → 向量检索引擎
 - **作业系统**: 异步任务队列，失败重试 3 次 + 指数退避
 - **模型注册表**: 2600+ 模型自动检测，支持 17 个供应商
@@ -131,7 +130,8 @@ docker compose up -d --build
 
 ### 关键安全配置
 
-- JWT Token 通过 httpOnly Cookie 传输（防 XSS），同时支持 `Authorization: Bearer` 请求头
+- JWT Token 通过 `__Host-token` httpOnly Secure Cookie 传输（防 XSS），同时支持 `Authorization: Bearer` 请求头
+- JWT Token Version：每个 Token 携带 `token_version`，每次请求与数据库比对，管理员可一键撤销所有用户 Token
 - API Key 仅从环境变量读取（不存数据库）
 - 操作审计日志（增删改操作写入 `audit_log` 表）
 - 文件上传大小限制（50MB/文件，500MB/批次）

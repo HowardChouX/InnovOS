@@ -68,9 +68,8 @@ class MultiBaseSearchInput(BaseModel):
 
 
 class RestoreBaseInput(BaseModel):
-    sourceBaseId: str
     name: str
-    embeddingModelId: str
+    embeddingModelId: str | None = None
     dimensions: int | None = None
 
 
@@ -380,20 +379,20 @@ async def import_directory(
 @router.post("/{base_id}/restore")
 async def restore_base(base_id: str, body: RestoreBaseInput, user: dict = Depends(get_current_user)):
     """从失败的源知识库恢复：克隆配置并重新导入所有项"""
-    source_base = KnowledgeBaseService.get_by_id(user["id"], body.sourceBaseId)
+    source_base = KnowledgeBaseService.get_by_id(user["id"], base_id)
     if not source_base:
         raise HTTPException(status_code=404, detail="源知识库不存在")
 
     new_base_id = str(uuid.uuid4())
     restore_dto = {
         "name": body.name,
-        "embeddingModelId": body.embeddingModelId,
+        "embeddingModelId": body.embeddingModelId or source_base.get("embeddingModelId"),
         "dimensions": body.dimensions,
     }
-    new_base = KnowledgeBaseService.restore(user["id"], body.sourceBaseId, new_base_id, restore_dto)
+    new_base = KnowledgeBaseService.restore(user["id"], base_id, new_base_id, restore_dto)
 
     # 复制源知识库的所有项
-    items = KnowledgeItemService.get_items_by_base_id(user["id"], body.sourceBaseId)
+    items = KnowledgeItemService.get_items_by_base_id(user["id"], base_id)
     new_items = []
     for item in items:
         new_items.append(

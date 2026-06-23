@@ -1,6 +1,6 @@
 # InnovOS AI 接入开发文档
 
-**版本**：v1.0 | **最后更新**：2026-06-06
+**版本**：v1.1 | **最后更新**：2026-06-23
 
 ---
 
@@ -10,7 +10,7 @@
 
 ```
 前端 UI (React 19)
-  → API 路由 (FastAPI, 如 /api/analysis, /api/keys)
+  → API 路由 (FastAPI, 如 /api/analysis, /api/admin/providers)
     → ModelService (model_service.py) — 3 层配置解析: 知识库级 → 系统设置 → 首个可用 Provider
       → ProviderRegistry (providers_registry.py) — 7 个内置 Provider: deepseek, silicon, dashscope, openai, zhipu, moonshot, ollama
         → KeyManager (key_manager.py) — 从 `AI_{PROVIDER_ID}_API_KEY` 环境变量读取，按 Provider 分组轮询
@@ -18,6 +18,12 @@
             → AIClient (ai_client.py) — OpenAI SDK v2 chat_completion()
               → ZR-IPM 算法引擎 / 目标 AI 模型
 ```
+
+**安全机制增强：**
+
+- **JWT Token 版本（强制登出）**：JWT 载荷中包含 `token_version`（来自 `users.token_version` 字段，INTEGER DEFAULT 0）。每次请求时 `deps.py:get_current_user()` 比对 Token 与数据库版本，不一致则拒绝。管理员可通过 `POST /api/admin/users/{user_id}/revoke-tokens` 递增版本号，立即失效该用户所有 Token。
+- **Cookie 安全加固**：JWT 通过 HttpOnly `__Host-token` cookie 传递（同时支持 `Authorization: Bearer` 头兜底）。`__Host-` 前缀确保 Cookie 仅在当前域名下设置，不可被子域名覆盖，增强 XSS 防护。
+- **CI 质量门禁**：项目使用 `make quality` 作为本地 CI 门禁（ESLint → Ruff → Prettier → tsc → mypy → pytest --cov → 前端 build → bandit → npm audit），提交前必须通过。
 
 **核心组件说明：**
 
@@ -348,13 +354,16 @@ interface AnalysisStore {
 
 ### 5.3 安全机制
 
-| 机制         | 说明                                              |
-| ------------ | ------------------------------------------------- |
-| API Key 来源 | 环境变量 `AI_{PROVIDER_ID}_API_KEY`，不存入数据库 |
-| 密钥管理     | 环境变量管理，代码中不出现硬编码 Key              |
-| 前端脱敏     | 展示时 Key 自动脱敏（`sk-xxxx****`）              |
-| 权限控制     | Key 管理接口仅管理员可访问                        |
-| 传输安全     | JWT Token 鉴权，生产需 HTTPS                      |
+| 机制         | 说明                                                            |
+| ------------ | --------------------------------------------------------------- |
+| API Key 来源 | 环境变量 `AI_{PROVIDER_ID}_API_KEY`，不存入数据库               |
+| 密钥管理     | 环境变量管理，代码中不出现硬编码 Key                            |
+| 前端脱敏     | 展示时 Key 自动脱敏（`sk-xxxx****`）                            |
+| 权限控制     | Key 管理接口仅管理员可访问                                      |
+| Token 版本   | JWT 内含 `token_version`，每次请求比对 DB，不一致则拒绝         |
+| Cookie 安全  | HttpOnly `__Host-token` cookie + `Authorization: Bearer` 双通道 |
+| 传输安全     | JWT Token 鉴权，生产需 HTTPS                                    |
+| CI 门禁      | `make quality` 执行 lint + typecheck + test + build + security  |
 
 ---
 
@@ -399,11 +408,12 @@ AI_DEEPSEEK_API_KEY=sk-zzzzzzzz
 | `backend/app/algorithm/model_runtime.py`            | 模型运行时（/v1 路径管理+超时）           |
 | `backend/app/algorithm/ai_client.py`                | AI 客户端（OpenAI SDK v2 调用）           |
 | `backend/app/algorithm/zr_ipm.py`                   | ZR-IPM 算法引擎                           |
-| `backend/app/api/keys.py`                           | Key 管理 API                              |
+| `backend/app/api/admin/providers.py`                | 供应商管理 API（含 Key 配置）             |
 | `backend/app/api/analysis.py`                       | 分析触发 API                              |
-| `backend/app/tables/pg_schema.py`                   | PostgreSQL 表定义（含 api_keys）          |
+| `backend/app/api/admin/monitor.py`                  | Key 使用统计 + 系统监控（管理员）         |
+| `backend/app/tables/pg_schema.py`                   | PostgreSQL 表定义（含 api_keys、users）   |
 | `frontend/src/features/admin/KeyManagementPage.tsx` | Key 管理页面                              |
 | `frontend/src/features/analysis/AnalysisPage.tsx`   | 问题分析页面                              |
-| `frontend/src/api/keys.ts`                          | Key 管理 API 调用                         |
+| `frontend/src/api/admin/providers.ts`               | 供应商 API 调用（Key/Provider）           |
 | `frontend/src/api/analysis.ts`                      | 分析 API 调用                             |
 | `frontend/src/store/useAnalysisStore.ts`            | 分析状态管理                              |

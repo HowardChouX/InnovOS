@@ -43,7 +43,7 @@ make install                # uv sync + npm install
 | Backend 全局 | ≥ 60%      | `pytest --cov-fail-under=60` |
 | Frontend     | 未设阈值   | `npm test -- --coverage`     |
 
-CI 在 GitHub Actions 中自动执行上述全部检查。`make quality` 在本地模拟 CI 门禁。
+CI 在 GitHub Actions 中自动执行上述全部检查（`.github/workflows/ci.yml`），在 push/PR 时触发 quality gates。`make quality` 在本地模拟 CI 门禁。
 
 Backend auto-reloads via `uvicorn --reload`. API docs at `http://localhost:8000/docs`.
 
@@ -74,6 +74,12 @@ backend/
     seed_data.py          # Idempotent seed_admin_user()
     utils.py              # Utility functions
     api/                  # FastAPI routes (auth, knowledge, admin, sidebar, workflow, etc.)
+                          # auth.py, analysis.py, conversion.py, evaluation.py, feedback.py,
+                          # kb_tools.py, knowledge.py, knowledge_bases.py, modeling.py, models.py,
+                          # notifications.py, patents.py, sidebar.py, solutions.py, tasks.py,
+                          # users.py, workflow.py, workflow_steps/, deps.py
+                          # admin/ — knowledge.py, monitor.py, patent_db.py, providers.py,
+                          #          settings.py, users.py
     algorithm/            # AI core: model_runtime, embedder, reranker, retriever, pipeline, key_manager
     core/                 # Config, security (Pydantic settings, bcrypt)
     crud/                 # Generic CRUD helpers
@@ -99,6 +105,7 @@ frontend/
 - **Model config resolution**: 3-tier fallback — knowledge-base-level → global system settings → first available provider.
 - **API Key management**: Provider-based architecture (inspired by CherryStudio). Keys loaded from environment variables (`AI_{PROVIDER_ID}_API_KEY`), pooled with per-provider round-robin + rate limiting. No database encryption.
 - **Auth**: JWT tokens (24h expiry), bcrypt password hashing. Production requires `INNOVOS_JWT_SECRET` env var. Password minimum 8 characters.
+- **JWT Token Version**: `users` table has a `token_version` column (INTEGER DEFAULT 0). Each JWT includes `token_version` in its payload. On each authenticated request, `deps.py:get_current_user()` compares the token's version with the DB value — if they differ, the token is rejected as revoked. Admin revocations call `UPDATE users SET token_version = token_version + 1 WHERE id = ?` to invalidate all existing tokens.
 - **Admin seeding**: Idempotent — `seed_admin_user()` creates admin only if none exists. Credentials from `INNOVOS_ADMIN_USER`/`INNOVOS_ADMIN_PASSWORD` env vars (default: auto-generated random password logged at startup).
 
 ## Security Features
@@ -111,6 +118,7 @@ frontend/
 - Parameterized SQL queries only (no f-string SQL injection — all dynamic columns whitelisted)
 - Connection pool hygiene: `with db_session() as db:` context manager guaranteed close
 - CORS: Dev allows localhost:5173-5175. Production uses nginx same-origin.
+- JWT tokens transmitted via `__Host-token` httpOnly secure cookie (renamed from `token` for enhanced security), with `Authorization: Bearer` header fallback.
 
 ## Known Gotchas
 

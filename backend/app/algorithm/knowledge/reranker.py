@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import logging
 
+import httpx
+
 logger = logging.getLogger(__name__)
 
 
@@ -65,18 +67,22 @@ class Reranker:
         top_n: int,
     ) -> list[dict]:
         """远程重排 API — 根据供应商类型选择不同的调用方式。"""
+        import httpx
+
         provider_type = self._detect_provider()
 
-        if provider_type == "dashscope":
-            return await self._rerank_dashscope(query, documents, top_n)
-        elif provider_type == "tei":
-            return await self._rerank_tei(query, documents, top_n)
+        async with httpx.AsyncClient(timeout=120) as client:
+            if provider_type == "dashscope":
+                return await self._rerank_dashscope(client, query, documents, top_n)
+            elif provider_type == "tei":
+                return await self._rerank_tei(client, query, documents, top_n)
 
-        # 默认：OpenAI 兼容格式 POST /rerank
-        return await self._rerank_openai_compat(query, documents, top_n)
+            # 默认：OpenAI 兼容格式 POST /rerank
+            return await self._rerank_openai_compat(client, query, documents, top_n)
 
     async def _rerank_openai_compat(
         self,
+        client: httpx.AsyncClient,
         query: str,
         documents: list[str],
         top_n: int,
@@ -90,8 +96,6 @@ class Reranker:
         响应格式：
           {"results": [{"index": 0, "relevance_score": 0.95}, ...]}
         """
-        import httpx
-
         base = self.api_host.rstrip("/")
         if base.endswith("/v1"):
             url = f"{base}/rerank"
@@ -104,20 +108,19 @@ class Reranker:
             "top_n": top_n,
         }
 
-        async with httpx.AsyncClient(timeout=120) as client:
-            resp = await client.post(
-                url,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=body,
-            )
+        resp = await client.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            json=body,
+        )
 
-            if resp.status_code != 200:
-                raise RuntimeError(f"Rerank API error: {resp.status_code} {resp.text[:300]}")
+        if resp.status_code != 200:
+            raise RuntimeError(f"Rerank API error: {resp.status_code} {resp.text[:300]}")
 
-            data = resp.json()
+        data = resp.json()
 
         # 解析响应（兼容多种格式）
         results = data.get("results", data.get("data", []))
@@ -145,13 +148,12 @@ class Reranker:
 
     async def _rerank_dashscope(
         self,
+        client: httpx.AsyncClient,
         query: str,
         documents: list[str],
         top_n: int,
     ) -> list[dict]:
         """阿里百炼 DashScope 重排 API。"""
-        import httpx
-
         url = "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank"
         body = {
             "model": self.model,
@@ -164,20 +166,19 @@ class Reranker:
             },
         }
 
-        async with httpx.AsyncClient(timeout=120) as client:
-            resp = await client.post(
-                url,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=body,
-            )
+        resp = await client.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            json=body,
+        )
 
-            if resp.status_code != 200:
-                raise RuntimeError(f"DashScope Rerank error: {resp.status_code} {resp.text[:300]}")
+        if resp.status_code != 200:
+            raise RuntimeError(f"DashScope Rerank error: {resp.status_code} {resp.text[:300]}")
 
-            data = resp.json()
+        data = resp.json()
 
         results = data.get("output", {}).get("results", [])
         parsed: list[dict] = []
@@ -197,6 +198,7 @@ class Reranker:
 
     async def _rerank_tei(
         self,
+        client: httpx.AsyncClient,
         query: str,
         documents: list[str],
         top_n: int,
@@ -206,8 +208,6 @@ class Reranker:
         格式：POST /rerank
         body: {"query": "...", "texts": [...], "return_text": true}
         """
-        import httpx
-
         url = f"{self.api_host}/rerank"
         body = {
             "query": query,
@@ -215,20 +215,19 @@ class Reranker:
             "return_text": True,
         }
 
-        async with httpx.AsyncClient(timeout=120) as client:
-            resp = await client.post(
-                url,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=body,
-            )
+        resp = await client.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            json=body,
+        )
 
-            if resp.status_code != 200:
-                raise RuntimeError(f"TEI Rerank error: {resp.status_code} {resp.text[:300]}")
+        if resp.status_code != 200:
+            raise RuntimeError(f"TEI Rerank error: {resp.status_code} {resp.text[:300]}")
 
-            data = resp.json()
+        data = resp.json()
 
         results = data if isinstance(data, list) else data.get("results", [])
         parsed: list[dict] = []

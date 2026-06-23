@@ -33,7 +33,10 @@ def get_sidebar_stats(current_user: CurrentUser):
             (uid,),
         ).fetchone()[0]
 
-    patents = db.execute("SELECT COUNT(*) FROM patents").fetchone()[0]
+    if current_user.role == "admin":
+        patents = db.execute("SELECT COUNT(*) FROM patents").fetchone()[0]
+    else:
+        patents = 0  # non-admin users don't see global patent count
 
     db.close()
 

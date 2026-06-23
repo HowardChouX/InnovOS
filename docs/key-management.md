@@ -1,6 +1,6 @@
 # API Key 管理系统开发文档
 
-**版本**：v1.1 | **最后更新**：2026-06-06
+**版本**：v1.2 | **最后更新**：2026-06-23
 
 ---
 
@@ -37,14 +37,16 @@ API Key 管理系统是 InnovOS 的核心基础设施，负责管理 AI 服务�
 │  └──────────────────────┼──────────────────────────┘   │
 │                         │                                │
 │              ┌──────────▼──────────┐                    │
-│              │    keysApi.ts       │                    │
-│              │   (CRUD + 测试)     │                    │
+│              │  api/admin/         │                    │
+│              │  providers.ts       │                    │
+│              │   (CRUD + 检测)     │                    │
 │              └──────────┬──────────┘                    │
 └─────────────────────────┼────────────────────────────────┘
                           │ HTTP / JSON
 ┌─────────────────────────┼────────────────────────────────┐
 │              ┌──────────▼──────────┐                    │
-│              │   providers.py / monitor.py (Routers)  │                    │
+│              │  admin/providers.py  │                    │
+│              │  admin/monitor.py    │                    │
 │              │   仅管理员访问       │                    │
 │              └──────────┬──────────┘                    │
 │                         │                                │
@@ -148,9 +150,11 @@ backend/app/
 │   ├── providers_registry.py # Provider 注册表（7 个内置 Provider）
 │   └── model_service.py    # 模型服务（3 层配置解析）
 ├── api/
-│   └── keys.py             # Key 管理 API（仅管理员）
+│   └── admin/
+│       ├── providers.py    # 供应商管理 API（Key 配置 + 模型发现）
+│       └── monitor.py      # Key 使用统计 + 系统监控
 └── tables/
-    └── pg_schema.py        # PostgreSQL 表定义（含 api_keys）
+    └── pg_schema.py        # PostgreSQL 表定义（含 api_keys、users）
 ```
 
 ### 4.2 Key 来源与环境变量注入
@@ -341,42 +345,37 @@ async def chat_completion(
             key_manager.release()
 ```
 
-### 4.5 API 路由 (`keys.py`)
+### 4.5 API 路由 (`admin/providers.py`)
 
 #### 请求/响应模型
 
 ```python
-class CreateKeyInput(BaseModel):
-    key_name: str = Field(alias="keyName")
-    api_key: str = Field(alias="apiKey")
-    api_base_url: str = Field(default="https://api.deepseek.com", alias="apiBaseUrl")
-    api_model: str = Field(default="", alias="apiModel")
-    priority: int = Field(default=0)
-    max_rpm: int = Field(default=60, alias="maxRpm")
+class AddProviderInput(BaseModel):
+    provider_id: str
+    name: str
+    protocol: str = "openai"
+    api_host: str
+    api_model: str = ""
+    models: list[ModelEntry] = []
+    max_rpm: int = 60
 
-class UpdateKeyInput(BaseModel):
-    key_name: Optional[str] = Field(default=None, alias="keyName")
-    api_key: Optional[str] = Field(default=None, alias="apiKey")
-    api_base_url: Optional[str] = Field(default=None, alias="apiBaseUrl")
-    api_model: Optional[str] = Field(default=None, alias="apiModel")
-    is_active: Optional[bool] = Field(default=None, alias="isActive")
-    priority: Optional[int] = Field(default=None)
-    max_rpm: Optional[int] = Field(default=None, alias="maxRpm")
+class UpdateProviderInput(BaseModel):
+    name: str | None = None
+    api_host: str | None = None
+    api_model: str | None = None
+    models: list[ModelEntry] | None = None
+    is_enabled: bool | None = None
+    max_rpm: int | None = None
 ```
 
 #### 响应脱敏
 
 ```python
-def row_to_dict(row: dict) -> dict:
-    # 取前缀脱敏，不暴露完整 Key
-    plain_key = row.get("api_key", "")
-    masked = plain_key[:7] + "****" if len(plain_key) > 7 else "****"
-    return {
-        "id": row["id"],
-        "keyName": row["key_name"],
-        "apiKey": masked,  # 例: sk-test****
-        ...
-    }
+def mask_api_key(key: str) -> str:
+    """取前缀脱敏，不暴露完整 Key"""
+    return key[:7] + "****" if len(key) > 7 else "****"
+
+# 供应商响应中 hasApiKey / apiKeyMasked 字段自动脱敏
 ```
 
 ---
@@ -389,8 +388,9 @@ def row_to_dict(row: dict) -> dict:
 frontend/src/
 ├── features/admin/
 │   └── KeyManagementPage.tsx    # Key 管理页面
-├── api/
-│   └── keys.ts                  # API 调用
+├── api/admin/
+│   ├── providers.ts             # 供应商/Key API 调用
+│   └── settings.ts              # 系统设置 API 调用
 └── components/ui/
     └── GlassPanel.tsx           # 卡片组件（支持 style prop）
 ```
@@ -400,93 +400,103 @@ frontend/src/
 #### 页面结构
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  API Key 管理                        [+ 添加 Key]    │
-├─────────────────────────────────────────────────────┤
-│  名称    │  Key         │  模型      │  RPM  │ 状态  │ 操作 │
-│  DeepSeek│  sk-xxxx**** │  flash,pro │  12/60│ 启用  │ 测试 │
-│  OpenAI  │  sk-yyyy**** │  gpt-4     │   0/60│ 禁用  │ 测试 │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  供应商管理                                    [+ 添加供应商]     │
+├──────────────────────────────────────────────────────────────────┤
+│  ID       │  名称    │  模型         │  RPM  │ 状态  │ Key  │ 操作 │
+│  deepseek │ DeepSeek │ flash,pro     │ 12/60 │ 启用  │ ✅   │ 测试 │
+│  silicon  │ Silicon  │ deepseek-v4   │  0/60 │ 禁用  │ ❌   │ 测试 │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-#### 创建 Key 弹窗流程
+#### 添加供应商弹窗流程
 
 ```
-1. 填写名称、API Key、API Base URL
-2. 点击"获取模型列表"
-   → 调用 {baseUrl}/v1/models
+1. 填写 Provider ID、名称、API Host、协议
+2. API Key 来自环境变量 AI_{PROVIDER_ID}_API_KEY（不在界面输入）
+3. 点击"检测模型" → 调用 POST /api/admin/providers/{id}/detect-models
+   → 从供应商 API 获取可用模型列表
    → 展示模型列表（带勾选框）
-3. 多选所需模型
-4. 设置优先级和 RPM
-5. 点击"创建" → 后端写入 api_keys 表（元数据记录）
+4. 多选所需模型，设置 RPM
+5. 点击"创建" → 后端写入 model_providers 表
 ```
 
-#### 核心状态
+#### 核心状态（供应商管理模式）
 
 ```typescript
+interface Provider {
+  providerId: string;
+  name: string;
+  apiHost: string;
+  hasApiKey: boolean;
+  apiKeyMasked?: string;
+  apiModel?: string;
+  models: ModelEntry[];
+  isEnabled: boolean;
+  maxRpm?: number;
+  currentRpm?: number;
+  requestCount?: number;
+}
+
 interface KeyManagementPageState {
-  keys: ApiKey[]; // Key 列表
-  loading: boolean; // 加载状态
-  showCreate: boolean; // 显示创建弹窗
-  models: ModelInfo[]; // 可用模型列表
-  modelsLoading: boolean; // 模型加载状态
-  selectedModels: string[]; // 已选模型
-  createError: string; // 创建错误
-  creating: boolean; // 创建中
-  newKey: {
-    // 新 Key 数据
-    keyName: string;
-    apiKey: string;
-    apiBaseUrl: string;
-    apiModel: string;
-    priority: number;
-    maxRpm: number;
-  };
+  providers: Provider[]; // 供应商列表
+  loading: boolean;
+  showAdd: boolean;
+  models: ModelEntry[];
+  modelsLoading: boolean;
+  selectedModels: string[];
+  error: string;
+  saving: boolean;
 }
 ```
 
 ### 5.3 API 调用层
 
 ```typescript
-export const keysApi = {
-  async list(): Promise<ApiKey[]> {
-    const res = await apiRequest<{ data: ApiKey[] }>('/api/keys');
-    return res.data;
-  },
+export const providersApi = {
+  listBuiltin: (): Promise<{ data: Provider[] }> =>
+    apiRequest<{ data: Provider[] }>('/api/admin/providers/builtin'),
 
-  async create(input: {
-    keyName: string;
-    apiKey: string;
-    apiBaseUrl: string;
-    apiModel: string;
-    priority?: number;
-    maxRpm?: number;
-  }): Promise<ApiKey> {
-    const res = await apiRequest<{ data: ApiKey }>('/api/keys', {
+  add: (data: {
+    provider_id: string;
+    name: string;
+    protocol?: string;
+    api_host: string;
+    api_model?: string;
+    models?: ModelEntry[];
+    max_rpm?: number;
+  }) =>
+    apiRequest('/api/admin/providers', {
       method: 'POST',
-      body: JSON.stringify(input),
-    });
-    return res.data;
-  },
+      body: JSON.stringify(data),
+    }),
 
-  async update(id: number, input: Partial<ApiKey>): Promise<ApiKey> {
-    const res = await apiRequest<{ data: ApiKey }>(`/api/keys/${id}`, {
+  update: (
+    providerId: string,
+    data: {
+      name?: string;
+      api_host?: string;
+      api_model?: string;
+      is_enabled?: boolean;
+      max_rpm?: number;
+    },
+  ) =>
+    apiRequest(`/api/admin/providers/${providerId}`, {
       method: 'PUT',
-      body: JSON.stringify(input),
-    });
-    return res.data;
-  },
+      body: JSON.stringify(data),
+    }),
 
-  async delete(id: number): Promise<void> {
-    await apiRequest(`/api/keys/${id}`, { method: 'DELETE' });
-  },
+  delete: (providerId: string) =>
+    apiRequest(`/api/admin/providers/${providerId}`, { method: 'DELETE' }),
 
-  async test(id: number): Promise<{ message: string; response?: string }> {
-    const res = await apiRequest<{ message: string; response?: string }>(`/api/keys/${id}/test`, {
+  check: (providerId: string, model?: string) =>
+    apiRequest(`/api/admin/providers/${providerId}/check`, {
       method: 'POST',
-    });
-    return res;
-  },
+      body: JSON.stringify(model ? { model } : {}),
+    }),
+
+  detectModels: (providerId: string) =>
+    apiRequest(`/api/admin/providers/${providerId}/detect-models`, { method: 'POST' }),
 };
 ```
 
@@ -494,67 +504,66 @@ export const keysApi = {
 
 ## 6. API 接口
 
-### 6.1 获取 Key 列表
+### 6.1 获取供应商列表
 
 ```
-GET /api/keys
+GET /api/admin/providers
 Authorization: Bearer <admin_token>
 
 Response 200:
 {
   "data": [
     {
-      "id": 1,
-      "keyName": "DeepSeek-1",
-      "apiKey": "sk-xxxx****",
-      "apiBaseUrl": "https://api.deepseek.com",
+      "providerId": "deepseek",
+      "name": "DeepSeek",
+      "apiHost": "https://api.deepseek.com",
+      "hasApiKey": true,
+      "apiKeyMasked": "sk-xxxx****",
       "apiModel": "deepseek-v4-flash,deepseek-v4-pro",
-      "isActive": true,
-      "priority": 0,
+      "isEnabled": true,
       "maxRpm": 60,
       "currentRpm": 12,
-      "requestCount": 156,
-      "lastUsedAt": "2026-06-06T10:00:00",
-      "createdAt": "2026-06-06T08:00:00"
+      "requestCount": 156
     }
   ],
   "message": "success"
 }
 ```
 
-### 6.2 创建 Key
+### 6.2 添加供应商
 
 ```
-POST /api/keys
+POST /api/admin/providers
 Authorization: Bearer <admin_token>
 Content-Type: application/json
 
 {
-  "keyName": "DeepSeek-1",
-  "apiKey": "sk-xxxxxxxxxxxxxxxx",
-  "apiBaseUrl": "https://api.deepseek.com",
-  "apiModel": "deepseek-v4-flash,deepseek-v4-pro",
-  "priority": 0,
-  "maxRpm": 60
+  "provider_id": "deepseek",
+  "name": "DeepSeek",
+  "protocol": "openai",
+  "api_host": "https://api.deepseek.com",
+  "api_model": "deepseek-chat",
+  "models": [],
+  "max_rpm": 60
 }
 
 Response 200:
 {
   "data": { ... },
-  "message": "创建成功"
+  "message": "供应商已添加"
 }
 ```
 
-### 6.3 更新 Key
+### 6.3 更新供应商
 
 ```
-PUT /api/keys/{key_id}
+PUT /api/admin/providers/{provider_id}
 Authorization: Bearer <admin_token>
 Content-Type: application/json
 
 {
-  "isActive": false,
-  "maxRpm": 30
+  "api_model": "deepseek-v4-flash",
+  "max_rpm": 30
 }
 
 Response 200:
@@ -564,10 +573,10 @@ Response 200:
 }
 ```
 
-### 6.4 删除 Key
+### 6.4 删除供应商
 
 ```
-DELETE /api/keys/{key_id}
+DELETE /api/admin/providers/{provider_id}
 Authorization: Bearer <admin_token>
 
 Response 200:
@@ -576,16 +585,36 @@ Response 200:
 }
 ```
 
-### 6.5 测试 Key
+### 6.5 测试连接
 
 ```
-POST /api/keys/{key_id}/test
+POST /api/admin/providers/{provider_id}/check
 Authorization: Bearer <admin_token>
 
 Response 200:
 {
-  "message": "测试成功",
-  "response": "连接成功"
+  "data": { "status": "ok", "latency_ms": 320, "model": "deepseek-chat" },
+  "message": "ok"
+}
+```
+
+### 6.6 Key 使用统计（监控）
+
+```
+GET /api/admin/monitor/keys
+Authorization: Bearer <admin_token>
+
+Response 200:
+{
+  "data": {
+    "totalKeys": 5,
+    "activeKeys": 3,
+    "totalRequests": 15420,
+    "keyUsage": [
+      { "id": 1, "name": "DeepSeek-1", "requests": 8500, "rpm": 12, "maxRpm": 60, "isActive": true }
+    ]
+  },
+  "message": "success"
 }
 ```
 
@@ -653,20 +682,24 @@ async def get_key_for_request():
 
 Key 管理采用以下安全策略：
 
-| 层级     | 机制        | 说明                                                 |
-| -------- | ----------- | ---------------------------------------------------- |
-| Key 来源 | 环境变量    | `AI_{PROVIDER_ID}_API_KEY`，代码中不出现硬编码       |
-| 前端脱敏 | 自动截断    | 展示时 `sk-xxxx****`                                 |
-| 数据库   | 元数据有限  | `api_keys` 表仅存储配置元数据，真实 Key 来自环境变量 |
-| 传输安全 | JWT + HTTPS | API 调用需 JWT 鉴权，生产环境强制 HTTPS              |
+| 层级        | 机制              | 说明                                                          |
+| ----------- | ----------------- | ------------------------------------------------------------- |
+| Key 来源    | 环境变量          | `AI_{PROVIDER_ID}_API_KEY`，代码中不出现硬编码                |
+| 前端脱敏    | 自动截断          | 展示时 `sk-xxxx****`                                          |
+| 数据库      | 元数据有限        | `api_keys` 表仅存储配置元数据，真实 Key 来自环境变量          |
+| Token 版本  | JWT token_version | JWT 包含 `users.token_version`，请求时比对，不一致则拒绝      |
+| Cookie 安全 | `__Host-token`    | JWT 通过 HttpOnly `__Host-token` cookie + `Bearer` 头双通道   |
+| 传输安全    | JWT + HTTPS       | API 调用需 JWT 鉴权，生产环境强制 HTTPS                       |
+| 强制登出    | 管理员 revoke     | `POST /api/admin/users/{id}/revoke-tokens` 递增版本号立即失效 |
 
 **安全边界：** Key 仅在后端进程内存中存在，不落盘、不进入日志、不返回前端。
 
 ### 8.2 权限控制
 
-- 所有 Key 管理接口需要管理员权限（`require_admin`）
-- 前端侧边栏仅管理员可见 "Key管理" 入口
-- 路由 `/admin/keys` 仅管理员可访问
+- 所有供应商/Key 管理接口需要管理员权限（`require_admin`）
+- 前端侧边栏仅管理员可见 "供应管理" 入口
+- 路由 `/api/admin/providers` 仅管理员可访问
+- Key 使用统计位于 `/api/admin/monitor/keys`（仅管理员）
 
 ### 8.3 传输安全
 
@@ -779,11 +812,11 @@ npm run dev
 ### 11.2 调试命令
 
 ```bash
-# 检查 Key 状态
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/keys
+# 检查供应商列表
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/admin/providers
 
-# 测试 Key 连接
-curl -X POST -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/keys/1/test
+# 查看 Key 使用统计
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/admin/monitor/keys
 
 # 检查环境变量是否设置
 echo ${AI_SILICON_API_KEY:+已设置}  # 输出"已设置"或空

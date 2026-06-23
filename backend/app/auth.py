@@ -39,12 +39,11 @@ def create_access_token(data: dict[str, Any]) -> str:
 
 def set_token_cookie(response: Response, token: str) -> None:
     """Set JWT as httpOnly secure cookie."""
-    is_production = settings.ENVIRONMENT == "production"
     response.set_cookie(
-        key="token",
+        key="__Host-token",
         value=token,
         httponly=True,
-        secure=is_production,
+        secure=True,
         samesite="lax",
         max_age=ACCESS_TOKEN_EXPIRE_HOURS * 3600,
         path="/",
@@ -53,7 +52,7 @@ def set_token_cookie(response: Response, token: str) -> None:
 
 def clear_token_cookie(response: Response) -> None:
     """Clear the token cookie (logout)."""
-    response.set_cookie(key="token", value="", httponly=True, max_age=0, path="/")
+    response.set_cookie(key="__Host-token", value="", httponly=True, secure=True, max_age=0, path="/")
 
 
 def _verify_admin_credentials(username: str, password: str) -> bool:
@@ -95,7 +94,7 @@ def get_current_user(
     if credentials:
         token = credentials.credentials
     if not token:
-        token = request.cookies.get("token")
+        token = request.cookies.get("__Host-token")
     if not token:
         raise HTTPException(status_code=401, detail="未登录")
 
@@ -114,6 +113,7 @@ def get_current_user(
             "id": 0,
             "username": payload.get("username", "admin"),
             "role": "admin",
+            "email": "",
             "created_at": "",
         }
 

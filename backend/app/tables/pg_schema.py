@@ -71,6 +71,13 @@ def init_users(db):
             ("is_active", "INTEGER DEFAULT 1"),
         ],
     )
+    _ensure_columns(
+        db,
+        "users",
+        [
+            ("token_version", "INTEGER DEFAULT 0"),
+        ],
+    )
 
 
 def seed_admin_user(db):

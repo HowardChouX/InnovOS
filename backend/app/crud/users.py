@@ -20,7 +20,7 @@ def get_user_by_username(*, db, username: str) -> User | None:
 def create_user(*, db, user_in: UserRegister) -> User:
     """Create a new user with hashed password."""
     row = db.execute(
-        "INSERT INTO users (username, password_hash) VALUES (?, ?) RETURNING id, username, password_hash, role, email, is_active, created_at",
+        "INSERT INTO users (username, password_hash) VALUES (?, ?) RETURNING id, username, password_hash, role, email, is_active, token_version, created_at",
         (user_in.username, get_password_hash(user_in.password)),
     ).fetchone()
     db.commit()

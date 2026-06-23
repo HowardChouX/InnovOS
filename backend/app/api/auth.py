@@ -51,7 +51,7 @@ def register(
         request.client.host if request.client else "",
     )
 
-    token = create_access_token({"user_id": uid, "role": user.role})
+    token = create_access_token({"user_id": uid, "role": user.role, "token_version": user.token_version})
     set_token_cookie(response, token)
     return {
         "access_token": token,
@@ -83,6 +83,7 @@ def login(
                 "user_id": 0,
                 "role": "admin",
                 "username": username,
+                "token_version": 0,
             }
         )
         set_token_cookie(response, token)
@@ -97,7 +98,7 @@ def login(
         )
         return {
             "access_token": token,
-            "user": {"id": 0, "username": username, "role": "admin", "created_at": ""},
+            "user": {"id": 0, "username": username, "role": "admin", "email": "", "created_at": ""},
         }
 
     # 普通用户：通过 psycopg2 raw SQL 验证
@@ -118,7 +119,7 @@ def login(
         request.client.host if request.client else "",
     )
 
-    token = create_access_token({"user_id": uid, "role": user.role})
+    token = create_access_token({"user_id": uid, "role": user.role, "token_version": user.token_version})
     set_token_cookie(response, token)
     return {
         "access_token": token,

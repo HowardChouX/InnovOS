@@ -81,14 +81,13 @@ class ModelService:
         db = get_db()
         cursor = db.execute(
             """INSERT INTO model_providers
-               (provider_id, name, protocol, api_host, api_key_encrypted, api_model, models, max_rpm, is_enabled)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""",
+               (provider_id, name, protocol, api_host, api_model, models, max_rpm, is_enabled)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""",
             (
                 data["provider_id"],
                 data["name"],
                 data.get("protocol", "openai"),
                 data["api_host"],
-                "",  # api_key_encrypted 留空，密钥来自环境变量
                 data.get("api_model", ""),
                 json.dumps(data.get("models", [])),
                 data.get("max_rpm", 60),

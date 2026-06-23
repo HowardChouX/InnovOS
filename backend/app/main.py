@@ -35,7 +35,7 @@ from app.middleware import (
     RequestLoggingMiddleware,
     SecurityHeadersMiddleware,
 )
-from app.rate_limit import api_limiter, auth_limiter, get_client_ip, register_limiter
+from app.rate_limit_redis import api_limiter, auth_limiter, get_client_ip, register_limiter
 
 logger = logging.getLogger(__name__)
 

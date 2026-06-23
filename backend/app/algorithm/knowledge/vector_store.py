@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Any
 
 from app.database import get_db
 
@@ -97,7 +98,7 @@ class VectorStore:
         """
         db = get_db()
         try:
-            return self._search_pg(base_id, query_vector, top_k, query_text, mode, alpha)
+            return self._search_pg(db, base_id, query_vector, top_k, query_text, mode, alpha)
         except Exception:
             logger.exception("向量检索失败")
             return []
@@ -106,6 +107,7 @@ class VectorStore:
 
     def _search_pg(
         self,
+        db: Any,
         base_id: str,
         query_vector: list[float],
         top_k: int,
@@ -115,7 +117,6 @@ class VectorStore:
     ) -> list[dict]:
         """PostgreSQL + pgvector 环境下用 <=> 算子，可选混合检索（余弦 + ts_rank 全文检索）。"""
         vec_json = json.dumps(query_vector)
-        db = get_db()
 
         if mode == "hybrid" and alpha > 0 and query_text:
             # 混合检索：余弦相似度 + PostgreSQL 全文检索 ts_rank
@@ -130,7 +131,6 @@ class VectorStore:
                     LIMIT %s""",
                 (vec_json, query_text, base_id, vec_json, top_k * 2),
             ).fetchall()
-            db.close()
 
             if not rows:
                 return []
@@ -168,7 +168,6 @@ class VectorStore:
                     LIMIT %s""",
                 (vec_json, base_id, vec_json, top_k),
             ).fetchall()
-            db.close()
             return [dict(r) for r in rows]
 
     def count(self, base_id: str | None = None) -> int:

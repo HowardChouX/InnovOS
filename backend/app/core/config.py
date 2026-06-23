@@ -14,7 +14,6 @@ from pydantic import (
     AnyUrl,
     BeforeValidator,
     Field,
-    computed_field,
     model_validator,
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -45,7 +44,6 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: Annotated[list[AnyUrl] | str, BeforeValidator(parse_cors)] = []
 
     @property
-    @computed_field
     def all_cors_origins(self) -> list[str]:
         return [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS]
 
@@ -99,6 +97,18 @@ class Settings(BaseSettings):
         self._check_default_secret("SECRET_KEY", self.SECRET_KEY)
         self._check_default_secret("POSTGRES_PASSWORD", self.POSTGRES_PASSWORD)
         self._check_default_secret("FIRST_SUPERUSER_PASSWORD", self.FIRST_SUPERUSER_PASSWORD)
+        return self
+
+    @model_validator(mode="after")
+    def _enforce_production_settings(self) -> Settings:
+        if self.ENVIRONMENT == "production":
+            if not self.POSTGRES_PASSWORD:
+                raise ValueError("POSTGRES_PASSWORD must be set in production")
+            if not self.BACKEND_CORS_ORIGINS:
+                raise ValueError(
+                    "BACKEND_CORS_ORIGINS must be configured in production. "
+                    "Set to ['https://yourdomain.com'] or configure nginx to handle CORS."
+                )
         return self
 
 

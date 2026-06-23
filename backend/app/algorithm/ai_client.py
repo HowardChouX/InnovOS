@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import random
+import re
 from typing import Any
 
 import httpx
@@ -121,7 +122,6 @@ async def _chat_with_model(
 
     last_error = None
     for attempt in range(max_retries):
-        await key_manager.acquire()
         try:
             from app.algorithm.model_runtime import ModelRuntime
 
@@ -145,7 +145,11 @@ async def _chat_with_model(
                     kwargs["response_format"] = {"type": "json_object"}
 
                 resp = client.chat.completions.create(**kwargs)
+                if not resp.choices:
+                    raise RuntimeError(f"AI response has no choices: {resp}")
                 content = resp.choices[0].message.content
+                if not content:
+                    raise RuntimeError("AI response content is empty")
 
                 if response_format is dict:
                     return json.loads(content)
@@ -157,8 +161,6 @@ async def _chat_with_model(
                 await asyncio.sleep(1)
                 continue
             raise
-        finally:
-            key_manager.release()
 
     raise RuntimeError(f"AI调用失败: {last_error}")
 
@@ -175,7 +177,6 @@ async def _chat_with_key_manager(
     last_error = None
 
     for attempt in range(max_retries):
-        await key_manager.acquire()
         key_config = None
         try:
             key_config = await key_manager.get_key_for_request(provider_id)
@@ -202,7 +203,11 @@ async def _chat_with_key_manager(
                     kwargs["response_format"] = {"type": "json_object"}
 
                 resp = client.chat.completions.create(**kwargs)
+                if not resp.choices:
+                    raise RuntimeError(f"AI response has no choices: {resp}")
                 content = resp.choices[0].message.content
+                if not content:
+                    raise RuntimeError("AI response content is empty")
 
                 if response_format is dict:
                     return json.loads(content)
@@ -214,7 +219,7 @@ async def _chat_with_key_manager(
 
             # 环境变量模式：不再标记 Key 失败（无法禁用环境变量中的 Key）
             # 遇到限流或鉴权错误，等待后重试
-            if "429" in error_msg or "rate" in error_msg or "too many" in error_msg:
+            if re.search(r'\b429\b', error_msg) or re.search(r'\brate\s*limit\b', error_msg, re.IGNORECASE) or re.search(r'\btoo\s*many\b', error_msg, re.IGNORECASE):
                 await asyncio.sleep(2)
                 if attempt < max_retries - 1:
                     continue
@@ -224,8 +229,5 @@ async def _chat_with_key_manager(
                 await asyncio.sleep(1)
                 continue
             raise
-
-        finally:
-            key_manager.release()
 
     raise RuntimeError(f"AI调用失败: {last_error}")

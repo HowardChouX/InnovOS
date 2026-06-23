@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import logging
 
+import httpx
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,38 +47,37 @@ class Embedder:
 
         分批发送（每批最多 8 条），因为 Qwen 等模型 API 超过 8 条时 index 会重复。
         """
-        import httpx
-
         # 每批最多 8 条（Qwen/Qwen3-VL-Embedding-8B 限制）
         BATCH_SIZE = 8
         url = self._embedding_url()
 
-        async def _embed_batch(batch: list[str]) -> list[list[float]]:
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(
-                    url,
-                    headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
-                    json={"input": batch, "model": self.model},
-                )
-                if resp.status_code != 200:
-                    raise RuntimeError(f"嵌入模型 API 返回 {resp.status_code}: {resp.text[:200]}")
-                data = resp.json()
-                items = data.get("data", [])
-                if not items:
-                    raise RuntimeError("嵌入模型 API 返回空数据")
-                # 同一批内按 index 排序（Qwen 响应固定 0..N-1）
-                items.sort(key=lambda x: x.get("index", 0))
-                return [item["embedding"] for item in items]
-
-        all_embeddings: list[list[float]] = []
-        for i in range(0, len(texts), BATCH_SIZE):
-            batch = texts[i : i + BATCH_SIZE]
-            batch_embeddings = await _embed_batch(batch)
-            all_embeddings.extend(batch_embeddings)
+        async with httpx.AsyncClient(timeout=60) as client:
+            all_embeddings: list[list[float]] = []
+            for i in range(0, len(texts), BATCH_SIZE):
+                batch = texts[i : i + BATCH_SIZE]
+                batch_embeddings = await self._embed_batch(client, url, batch)
+                all_embeddings.extend(batch_embeddings)
 
         if all_embeddings and len(all_embeddings[0]) > 0:
             self._dim = len(all_embeddings[0])
         return all_embeddings
+
+    async def _embed_batch(self, client: httpx.AsyncClient, url: str, batch: list[str]) -> list[list[float]]:
+        """嵌入单个批次，复用传入的 httpx 客户端。"""
+        resp = await client.post(
+            url,
+            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+            json={"input": batch, "model": self.model},
+        )
+        if resp.status_code != 200:
+            raise RuntimeError(f"嵌入模型 API 返回 {resp.status_code}: {resp.text[:200]}")
+        data = resp.json()
+        items = data.get("data", [])
+        if not items:
+            raise RuntimeError("嵌入模型 API 返回空数据")
+        # 同一批内按 index 排序（Qwen 响应固定 0..N-1）
+        items.sort(key=lambda x: x.get("index", 0))
+        return [item["embedding"] for item in items]
 
     @property
     def dimension(self) -> int:

@@ -54,6 +54,11 @@ class DemandPortraitAnalyzer:
             return_exceptions=True,
         )
 
+        analyzer_names = ["resource", "ifr", "nine_screens", "goldfish", "stc"]
+        for idx, name in enumerate(analyzer_names):
+            if isinstance(results[idx], Exception):
+                logger.error(f"{name} analyzer failed: {results[idx]}")
+
         resource_result = results[0] if not isinstance(results[0], Exception) else None
         ifr_result = results[1] if not isinstance(results[1], Exception) else None
         nine_screens_result = results[2] if not isinstance(results[2], Exception) else None

@@ -1,8 +1,8 @@
 # InnovOS 开发文档
 
-**版本**：v4.0 | **更新**：2026-06-22
+**版本**：v4.1 | **更新**：2026-06-23
 
-> **状态**：本文档记录项目当前实际状态（v4.0），功能模块按 ✅ 已实现 / ❌ 待实现 标注。部分规划功能尚未完成。
+> **状态**：本文档记录项目当前实际状态（v4.1），功能模块按 ✅ 已实现 / ❌ 待实现 标注。部分规划功能尚未完成。
 
 ---
 
@@ -10,7 +10,7 @@
 
 ```
 InnovOS
-├── 使用指南 ❌
+├── 使用指南 ✅
 ├── 通知
 ├── 账户
 └── 侧边栏
@@ -53,14 +53,14 @@ InnovOS
 
 ### 2.3 待实现：撤销发送
 
-| 项           | 文件                                           | 变更                                                                       |
-| ------------ | ---------------------------------------------- | -------------------------------------------------------------------------- |
-| 表增加字段   | `backend/app/tables/pg_schema.py`              | `ALTER TABLE notifications ADD COLUMN is_recalled INTEGER DEFAULT 0`       |
-| 新增端点     | `backend/app/api/notifications.py`             | `DELETE /api/notifications/{id}/recall`（Admin，软删除设 `is_recalled=1`） |
-| 修改列表查询 | `backend/app/api/notifications.py`             | `list_notifications` 排除 `is_recalled=1` 的记录                           |
-| 新增已发列表 | `backend/app/api/notifications.py`             | `GET /api/notifications/sent`（Admin，含撤销选项）                         |
-| 前端 API     | `frontend/src/api/notifications.ts`            | 新增 `recall(id)` 和 `getSentNotifications()`                              |
-| 前端 UI      | `frontend/src/components/layout/AppLayout.tsx` | 通知面板增加「已发送」Tab + 每条通知的「撤销」按钮                         |
+| 项           | 文件                                           | 变更                                                                    |
+| ------------ | ---------------------------------------------- | ----------------------------------------------------------------------- |
+| 表增加字段   | `backend/app/tables/pg_schema.py`              | `ALTER TABLE notifications ADD COLUMN is_recalled INTEGER DEFAULT 0`    |
+| 新增端点     | `backend/app/api/notifications.py`             | `PUT /api/notifications/{id}/recall`（Admin，软删除设 `is_recalled=1`） |
+| 修改列表查询 | `backend/app/api/notifications.py`             | `list_notifications` 排除 `is_recalled=1` 的记录                        |
+| 新增已发列表 | `backend/app/api/notifications.py`             | `GET /api/notifications/sent`（Admin，含撤销选项）                      |
+| 前端 API     | `frontend/src/api/notifications.ts`            | 新增 `recall(id)` 和 `getSentNotifications()`                           |
+| 前端 UI      | `frontend/src/components/layout/AppLayout.tsx` | 通知面板增加「已发送」Tab + 每条通知的「撤销」按钮                      |
 
 ---
 
@@ -78,16 +78,16 @@ InnovOS
 └── 数据绑定账户 ⏳ 待实现
 ```
 
-### 3.2 账户设置 ❌ 待实现
+### 3.2 账户设置 ⚠️ 部分待实现
 
-| 项       | 文件                                                    | 变更                                                     |
-| -------- | ------------------------------------------------------- | -------------------------------------------------------- |
-| 新增端点 | `backend/app/api/auth.py`                               | `PUT /api/auth/profile`（修改用户名）                    |
-| 新增端点 | `backend/app/api/auth.py`                               | `PUT /api/auth/password`（修改密码，验证当前密码）       |
-| 前端 API | `frontend/src/api/auth.ts`                              | 新增 `updateProfile()` 和 `changePassword()`             |
-| 新增页面 | `frontend/src/features/account/AccountSettingsPage.tsx` | 显示用户名/角色/创建时间 + 修改用户名表单 + 修改密码表单 |
-| 新增路由 | `frontend/src/routes/index.tsx`                         | `{ path: 'account', element: <AccountSettingsPage /> }`  |
-| 用户菜单 | `frontend/src/components/layout/AppLayout.tsx`          | 下拉菜单增加「账户设置」入口                             |
+| 项       | 文件                                                    | 变更                                                         | 状态 |
+| -------- | ------------------------------------------------------- | ------------------------------------------------------------ | ---- |
+| 新增端点 | `backend/app/api/users.py`                              | `PUT /api/users/me`（修改Email）                             | ✅   |
+| 新增端点 | `backend/app/api/users.py`                              | `PUT /api/users/me/password`（修改密码，验证当前密码）       | ✅   |
+| 前端 API | `frontend/src/api/profile.ts`                           | 新增 `updateProfile(email)` 和 `changePassword(current/new)` | ✅   |
+| 新增页面 | `frontend/src/features/account/AccountSettingsPage.tsx` | 显示用户名/角色/创建时间 + 修改邮箱表单 + 修改密码表单       | ❌   |
+| 新增路由 | `frontend/src/routes/index.tsx`                         | `{ path: 'account', element: <AccountSettingsPage /> }`      | ❌   |
+| 用户菜单 | `frontend/src/components/layout/AppLayout.tsx`          | 下拉菜单增加「账户设置」入口                                 | ❌   |
 
 ### 3.3 手机号注册 / 密码找回（预留）
 
@@ -355,13 +355,12 @@ Key管理 Admin → 管理员管理添加 aikey  ✅ 已实现
 
 ```
 backend/app/
-├── main.py              # FastAPI 入口 + startup/shutdown + 18 Router 挂载
+├── main.py              # FastAPI 入口 + startup/shutdown + 19 Router 挂载 + seed_admin_user()
 ├── auth.py              # JWT 认证（24h 过期，bcrypt，min 8 字符）
 ├── middleware.py         # SecurityHeaders + RequestID + GlobalException + RequestLogging
-├── rate_limit.py        # 内存滑动窗口限流（120/min API，10/min 登录）
+├── rate_limit_redis.py  # Redis 滑动窗口限流（120/min API，10/min 登录，3/5min 注册）
 ├── logging_config.py    # JSON 结构化日志（ENV=production）
 ├── database.py          # PostgreSQL 连接池（psycopg2，max 50）+ db_session()
-├── seed_data.py         # idempotent seed_admin_user()，环境变量管理员凭据
 ├── utils.py             # 工具函数
 ├── api/                 # 路由层（20+ Router）
 │   ├── auth.py          # /api/auth（登录/注册/me）
@@ -407,6 +406,7 @@ backend/app/
 │   ├── patent_search_engine.py # 专利搜索引擎
 │   ├── patent_search.py # 专利搜索
 │   ├── analyzers/       # 专项分析器
+│   │   ├── __init__.py
 │   │   ├── demand_portrait.py
 │   │   ├── problem_modeling.py
 │   │   ├── evolution_analyzer.py
@@ -414,10 +414,10 @@ backend/app/
 │   │   ├── ifr_generator.py
 │   │   ├── resource_analyzer.py
 │   │   └── thinking_tools/
-│   │       ├── goldfish.py        # 金鱼法
-│   │       ├── nine_screens.py    # 九屏幕分析
-│   │       ├── stc_operator.py    # STC 算子
-│   │       └── resource_analyzer.py # 七维度资源分析
+│   │       ├── __init__.py
+│   │       ├── goldfish_analyzer.py   # 金鱼法
+│   │       ├── nine_screens.py        # 九屏幕分析
+│   │       └── stc_operator.py        # STC 算子
 │   └── knowledge/       # 知识库引擎
 │       ├── chunker.py
 │       ├── embedder.py
@@ -530,41 +530,38 @@ frontend/src/
 
 ---
 
-## 十二、API 端点总览（18 个 Router）
+## 十二、API 端点总览（19 个 Router）
 
 注册于 `backend/app/main.py`，当前实际端点：
 
-| Router          | 前缀                   | 主要端点                                                   | 状态 |
-| --------------- | ---------------------- | ---------------------------------------------------------- | ---- |
-| auth            | `/api/auth`            | `POST /login`, `POST /register`, `GET /me`                 | ✅   |
-| tasks           | `/api/tasks`           | CRUD                                                       | ✅   |
-| analysis        | `/api/analysis`        | `POST /analyze`（6-Agent）                                 | ✅   |
-| patents         | `/api/patents`         | 搜索 + 统计 + Admin CRUD + 批量导入                        | ✅   |
-| solutions       | `/api/solutions`       | CRUD + 评分                                                | ✅   |
-| workflow        | `/api/workflow`        | 工作流管理                                                 | ✅   |
-| workflow_steps  | `/api/workflow-steps`  | 步骤状态管理                                               | ✅   |
-| evaluation      | `/api/evaluation`      | `POST /evaluate`, `GET /latest`, `GET /history`            | ✅   |
-| feedback        | `/api/feedback`        | CRUD                                                       | ✅   |
-| notifications   | `/api/notifications`   | CRUD + 批量发送 + 已读 + 清空                              | ✅   |
-| conversion      | `/api/conversion`      | `GET /{task_id}`, `POST /{solution_id}/check-infringement` | ✅   |
-| sidebar         | `/api/sidebar`         | 侧边栏数据                                                 | ✅   |
-| knowledge       | `/api/knowledge`       | 上传 + 搜索 + 分块管理 + CRUD                              | ✅   |
-| knowledge_bases | `/api/knowledge-bases` | 知识库 CRUD + 目录导入 + 重建索引                          | ✅   |
-| kb_tools        | `/api/kb-tools`        | 知识库搜索工具                                             | ✅   |
-| models          | `/api/models`          | 模型注册表查询                                             | ✅   |
-| modeling        | `/api/modeling`        | 建模分析                                                   | ✅   |
-| admin           | `/api/admin`           | keys / users / monitor / patent-db / settings              | ✅   |
+| Router          | 前缀                   | 主要端点                                                       | 状态 |
+| --------------- | ---------------------- | -------------------------------------------------------------- | ---- |
+| auth            | `/api/auth`            | `POST /login`, `POST /register`, `GET /me`                     | ✅   |
+| tasks           | `/api/tasks`           | CRUD                                                           | ✅   |
+| analysis        | `/api/analysis`        | `POST /analyze`（6-Agent）                                     | ✅   |
+| patents         | `/api/patents`         | 搜索 + 统计 + Admin CRUD + 批量导入                            | ✅   |
+| solutions       | `/api/solutions`       | CRUD + 评分                                                    | ✅   |
+| workflow        | `/api/workflow`        | 工作流管理                                                     | ✅   |
+| workflow_steps  | `/api/workflow-steps`  | 步骤状态管理                                                   | ✅   |
+| evaluation      | `/api/evaluation`      | `POST /evaluate`, `GET /latest`, `GET /history`                | ✅   |
+| feedback        | `/api/feedback`        | CRUD                                                           | ✅   |
+| notifications   | `/api/notifications`   | CRUD + 批量发送 + 已读 + 清空 + 撤销 + 已发送列表              | ✅   |
+| conversion      | `/api/conversion`      | `GET /{task_id}`, `POST /{solution_id}/check-infringement`     | ✅   |
+| sidebar         | `/api/sidebar`         | 侧边栏数据                                                     | ✅   |
+| knowledge       | `/api/knowledge`       | 上传 + 搜索 + 分块管理 + CRUD                                  | ✅   |
+| knowledge_bases | `/api/knowledge-bases` | 知识库 CRUD + 目录导入 + 重建索引                              | ✅   |
+| kb_tools        | `/api/kb-tools`        | 知识库搜索工具                                                 | ✅   |
+| models          | `/api/models`          | 模型注册表查询                                                 | ✅   |
+| modeling        | `/api/modeling`        | 建模分析                                                       | ✅   |
+| users           | `/api/users`           | `GET /me`, `PUT /me`（邮箱）, `PUT /me/password`               | ✅   |
+| admin           | `/api/admin`           | providers / knowledge / users / monitor / patent-db / settings | ✅   |
 
 **待实现端点：**
 
-| Router        | 端点                                    | 说明             |
-| ------------- | --------------------------------------- | ---------------- |
-| auth          | `PUT /api/auth/profile`                 | 修改用户名 ❌    |
-| auth          | `PUT /api/auth/password`                | 修改密码 ❌      |
-| notifications | `DELETE /api/notifications/{id}/recall` | 撤销发送 ❌      |
-| notifications | `GET /api/notifications/sent`           | 已发送列表 ❌    |
-| knowledge     | `POST /api/knowledge/ai-search`         | AI 结构化搜索 ❌ |
-| solutions     | `GET /api/solutions/history`            | 历史方案汇总 ❌  |
+| Router    | 端点                            | 说明             |
+| --------- | ------------------------------- | ---------------- |
+| knowledge | `POST /api/knowledge/ai-search` | AI 结构化搜索 ❌ |
+| solutions | `GET /api/solutions/history`    | 历史方案汇总 ❌  |
 
 ---
 
@@ -574,7 +571,7 @@ frontend/src/
 
 - [x] 后端：创建 `algorithm/base.py` 分析器基类
 - [x] 后端：从 `zr_ipm.py` 拆分 `algorithm/analyzers/` 专项分析器（9 个分析器 + thinking_tools）
-- [ ] 后端：抽取提示词模板（待创建 algorithm/prompts/ 目录）
+- [ ] 后端：抽取提示词模板（algorithm/prompts/ 目录已创建，文件待填充）
 - [x] 后端：创建 `services/` 业务逻辑层（9 个服务模块）
 - [x] 后端：创建 `algorithm/file_parser.py` + `algorithm/knowledge/chunker.py`
 - [ ] 前端：创建 `pages/` 目录，从 `features/` 迁移页面组件（保持 `features/` 架构）
@@ -590,8 +587,8 @@ frontend/src/
 
 ### Phase 3：账户 + 通知
 
-- [ ] 后端：auth 增加 profile/password 端点 ❌
-- [ ] 后端：notifications 增加 is_recalled + recall 端点 ❌
+- [x] 后端：users 增加 profile/password 端点（/api/users/me） ✅
+- [x] 后端：notifications 增加 is_recalled + recall 端点 ✅
 - [ ] 前端：新建 `AccountSettingsPage.tsx` ❌
 - [ ] 前端：通知面板增加撤销功能 ❌
 
@@ -636,9 +633,9 @@ make dev       # 启动开发环境（PostgreSQL → 后端 :8000 → 前端 :51
 make stop      # 停止开发环境
 make build     # 前端生产构建
 make test      # 运行测试（uv run pytest + npm test）
-make lint      # 代码检查（Ruff + mypy + ESLint）
+make lint      # 代码检查（ESLint + Ruff + Ruff format + Prettier）
 make format    # 自动格式化
-make security  # 安全扫描（Bandit + safety）
+make security  # 安全扫描（Bandit + npm audit）
 make db-backup # 数据库备份（pg_dump）
 ```
 
@@ -654,6 +651,6 @@ make db-backup # 数据库备份（pg_dump）
 
 ---
 
-**文档版本**：v4.0  
-**最后更新**：2026-06-22  
+**文档版本**：v4.1  
+**最后更新**：2026-06-23  
 **公司**：济南一竖光年人工智能科技有限公司

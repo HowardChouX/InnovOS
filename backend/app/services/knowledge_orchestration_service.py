@@ -8,7 +8,6 @@ Knowledge Orchestration Service — 完全复现 CherryStudio KnowledgeOrchestra
 - 崩溃恢复
 """
 
-import json
 import logging
 import re
 
@@ -143,20 +142,14 @@ class KnowledgeOrchestrationService:
         if item["status"] != "completed":
             raise ValueError("Knowledge item must be completed before listing chunks")
 
-        # 从 item.data 中提取 fileEntryId（对应 knowledge_docs.id）
-        data = json.loads(item["data"]) if isinstance(item["data"], str) else item.get("data", {})
-        doc_id = data.get("fileEntryId")
-        if not doc_id:
-            return []
-
         db = get_db()
         try:
             rows = db.execute(
                 """SELECT id, chunk_index, text
                    FROM knowledge_vectors
-                   WHERE user_id=? AND doc_id=?
+                   WHERE user_id=? AND item_id=?
                    ORDER BY chunk_index""",
-                (user_id, doc_id),
+                (user_id, item_id),
             ).fetchall()
             return [{"id": r["id"], "chunkIndex": r["chunk_index"], "text": r["text"]} for r in rows]
         finally:
@@ -169,17 +162,12 @@ class KnowledgeOrchestrationService:
         if not item:
             raise ValueError(f"Knowledge item not found: {item_id}")
 
-        data = json.loads(item["data"]) if isinstance(item["data"], str) else item.get("data", {})
-        doc_id = data.get("fileEntryId")
-        if not doc_id:
-            return
-
         db = get_db()
         try:
             db.execute(
                 """DELETE FROM knowledge_vectors
-                   WHERE user_id=? AND doc_id=? AND id=?""",
-                (user_id, doc_id, int(chunk_id)),
+                   WHERE user_id=? AND item_id=? AND id=?""",
+                (user_id, item_id, int(chunk_id)),
             )
             db.commit()
         finally:

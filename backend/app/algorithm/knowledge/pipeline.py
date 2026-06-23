@@ -232,7 +232,7 @@ class KnowledgePipeline:
 
 # 获取指定供应商的嵌入模型 API 配置
 def get_embedding_api_config(provider_id: str = "") -> dict:
-    """从已配置的模型服务中获取嵌入模型 API 配置（密钥从环境变量读取）。"""
+    """⚠️ 未使用 — 嵌入配置已在 _load_model_configs 中解析。保留用于向后兼容。"""
     from app.algorithm.model_service import _get_provider_api_key
     from app.database import get_db
 

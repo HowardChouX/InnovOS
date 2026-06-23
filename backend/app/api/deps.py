@@ -31,7 +31,7 @@ def _extract_token(
     if credentials:
         return credentials.credentials
     # Cookie fallback — httpOnly 'token' cookie set by login/register
-    return request.cookies.get("token")
+    return request.cookies.get("__Host-token")
 
 
 def get_current_user(
@@ -61,7 +61,10 @@ def get_current_user(
     # Admin user (user_id=0 or sub="0", validated against .env)
     role = token_data.role or payload.get("role", "user")
     uid_str = token_data.sub or str(payload.get("user_id", ""))
+    token_version = payload.get("token_version", 0)
     if role == "admin" and uid_str == "0":
+        if token_version != 0:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="令牌已被撤销")
         return User(
             id=0,
             username=payload.get("username", "admin"),
@@ -80,6 +83,8 @@ def get_current_user(
     user = User(**row)
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="用户已被禁用")
+    if user.token_version != token_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="令牌已被撤销")
     return user
 
 
