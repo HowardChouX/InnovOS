@@ -20,8 +20,8 @@ export const TYPE_ICON_MAP: Record<string, string> = {
   directory: 'fa-regular fa-folder',
 };
 
-export function getItemTitle(item: { id: string; data?: Record<string, unknown> }): string {
-  if (item.data && 'source' in item.data)
+export function getItemTitle(item: { id: string; data?: unknown }): string {
+  if (item.data && typeof item.data === 'object' && 'source' in item.data)
     return String((item.data as Record<string, unknown>).source ?? '');
   return item.id.slice(0, 8);
 }

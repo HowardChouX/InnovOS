@@ -4,6 +4,7 @@ import type {
   KnowledgeBaseListItem,
   KnowledgeItem,
   KnowledgeGroup,
+  KnowledgeSearchResult,
   OffsetPaginationResponse,
 } from '../types/knowledge';
 
@@ -151,7 +152,7 @@ export const knowledgeApi = {
     q: string;
     base_id?: string;
     limit?: number;
-  }): Promise<{ data: unknown[]; total: number }> {
+  }): Promise<{ data: KnowledgeSearchResult[]; total: number }> {
     const sp = new URLSearchParams();
     sp.set('q', params.q);
     if (params.base_id) sp.set('base_id', params.base_id);
