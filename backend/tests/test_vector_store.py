@@ -41,7 +41,6 @@ def _patch_get_db(monkeypatch, mock_db):
     """
     monkeypatch.setattr("app.database.get_db", lambda: mock_db)
     monkeypatch.setattr("app.algorithm.knowledge.vector_store.get_db", lambda: mock_db)
-    monkeypatch.setattr("app.database.is_postgres", lambda: False)
 
 
 def _make_row(id_: int, item_id: str, chunk_idx: int, text: str,

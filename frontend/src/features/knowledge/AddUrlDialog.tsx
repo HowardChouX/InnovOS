@@ -58,9 +58,15 @@ export function AddUrlDialog({ open, onClose }: Props) {
     setError('');
 
     try {
-      // 逐个添加
-      for (const url of urls) {
-        await addItem('url', { source: url, url });
+      // 并行添加
+      const results = await Promise.allSettled(
+        urls.map((url) => addItem('url', { source: url, url })),
+      );
+      const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      if (failed > 0) {
+        setError(`${succeeded} 个添加成功, ${failed} 个失败`);
+        if (succeeded === 0) return; // don't close if all failed
       }
       onClose();
     } catch (e: unknown) {

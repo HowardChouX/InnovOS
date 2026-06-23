@@ -39,6 +39,9 @@ htmlcov/
 # ── OS ──
 .DS_Store
 Thumbs.db
+
+# SQLite artifacts
+**/file::memory:
 *.log
 
 # ── Project specific ──

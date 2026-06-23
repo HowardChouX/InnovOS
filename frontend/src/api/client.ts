@@ -32,7 +32,13 @@ export async function apiRequest<T>(
   const data = text ? JSON.parse(text) : {};
   if (!res.ok) {
     if (res.status === 401) {
-      window.location.href = '/login';
+      // Clear auth state first, then redirect with a small delay to let stores reset
+      const { useAuthStore } = await import('../store/useAuthStore');
+      useAuthStore.getState().logout?.();
+      // Small delay to allow React to process the state change before navigation
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
     }
     throw new Error(data.detail || '请求失败');
   }

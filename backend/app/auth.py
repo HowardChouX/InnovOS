@@ -1,10 +1,5 @@
 """
 Authentication & authorization utilities.
-"""
-
-import hmac
-"""
-Authentication & authorization utilities.
 
 PROVISIONAL — kept for backward compatibility with 25+ existing modules.
 NEW code should import from app.api.deps (SessionDep, CurrentUser, etc.).
@@ -71,8 +66,7 @@ def _verify_admin_credentials(username: str, password: str) -> bool:
     admin_user = settings.FIRST_SUPERUSER or ""
     admin_pass = settings.FIRST_SUPERUSER_PASSWORD or ""
     # 常量时间比较防止时序攻击
-    return (hmac.compare_digest(username, admin_user) and
-            hmac.compare_digest(password, admin_pass))
+    return hmac.compare_digest(username, admin_user) and hmac.compare_digest(password, admin_pass)
 
 
 def _user_to_dict(user: User) -> dict[str, Any]:

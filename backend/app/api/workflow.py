@@ -162,7 +162,7 @@ def create_workflow(task_id: int, user: dict = Depends(get_current_user)):
     }
 
 
-@router.put("/{task_id}/step")
+@router.patch("/{task_id}/step")
 def update_workflow_step(task_id: int, body: UpdateStepInput, user: dict = Depends(get_current_user)):
     db = get_db()
     task = db.execute("SELECT id FROM tasks WHERE id=? AND user_id=?", (task_id, user["id"])).fetchone()

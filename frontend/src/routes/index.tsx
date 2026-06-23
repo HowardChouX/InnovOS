@@ -24,44 +24,45 @@ export const routes: RouteObject[] = [
   { path: '/register', element: <RegisterPage /> },
   {
     path: '/',
-    element: (
-      <ProtectedRoute>
-        <AppLayout />
-      </ProtectedRoute>
-    ),
+    element: <ProtectedRoute />,
     children: [
-      { index: true, element: <DashboardPage /> },
-      { path: 'patents', element: <PatentSearchPage /> },
-      { path: 'knowledge', element: <KnowledgeBasePage /> },
-      { path: 'history', element: <PatentConversionPage /> },
-      { path: 'history-solutions', element: <PatentConversionPage /> },
-      { path: 'workflow/demand', element: <PlaceholderPage title="需求画像" /> },
-      { path: 'workflow/modeling', element: <PlaceholderPage title="问题建模" /> },
-      { path: 'guide', element: <GuidePage /> },
-      { path: 'profile', element: <ProfilePage /> },
       {
-        path: 'admin/keys',
-        element: (
-          <AdminRoute>
-            <KeyManagementPage />
-          </AdminRoute>
-        ),
-      },
-      {
-        path: 'admin/users',
-        element: (
-          <AdminRoute>
-            <UserManagementPage />
-          </AdminRoute>
-        ),
-      },
-      {
-        path: 'admin/patents',
-        element: (
-          <AdminRoute>
-            <PatentDbPage />
-          </AdminRoute>
-        ),
+        element: <AppLayout />,
+        children: [
+          { index: true, element: <DashboardPage /> },
+          { path: 'patents', element: <PatentSearchPage /> },
+          { path: 'knowledge', element: <KnowledgeBasePage /> },
+          { path: 'history', element: <PatentConversionPage /> },
+          { path: 'history-solutions', element: <PatentConversionPage /> },
+          { path: 'workflow/demand', element: <PlaceholderPage title="需求画像" /> },
+          { path: 'workflow/modeling', element: <PlaceholderPage title="问题建模" /> },
+          { path: 'guide', element: <GuidePage /> },
+          { path: 'profile', element: <ProfilePage /> },
+          {
+            path: 'admin/keys',
+            element: (
+              <AdminRoute>
+                <KeyManagementPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: 'admin/users',
+            element: (
+              <AdminRoute>
+                <UserManagementPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: 'admin/patents',
+            element: (
+              <AdminRoute>
+                <PatentDbPage />
+              </AdminRoute>
+            ),
+          },
+        ],
       },
     ],
   },

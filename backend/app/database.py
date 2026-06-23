@@ -7,7 +7,7 @@ its own connection. The get_db()/db_session() pattern already provides per-call
 connections, which is correct. However, sharing a connection across concurrent
 coroutines within the same call is unsafe.
 
-Compatible with existing sqlite3-based code patterns:
+Usage pattern:
   db = get_db()
   db.execute("SELECT * FROM users WHERE id=?", (uid,))    # ? auto-converted to %s for PG
   row = db.execute(...).fetchone() / .fetchall()           # dict-like rows → row["col"]
@@ -32,10 +32,6 @@ logger = logging.getLogger(__name__)
 DATABASE_URL = settings.DATABASE_URL or ""
 
 _QMARK = re.compile(r"\?")
-
-
-def is_postgres() -> bool:
-    return True  # PostgreSQL only now
 
 
 class _Row(dict):

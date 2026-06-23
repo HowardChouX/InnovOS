@@ -129,9 +129,19 @@ export function AddKnowledgeItemDialog({ open, onClose }: Props) {
     setUploading(true);
     try {
       if (activeTab === 'file' && files.length > 0) {
-        for (const file of files) await uploadFile(file);
-        clearAll();
-        onClose();
+        const results = await Promise.allSettled(files.map((file) => uploadFile(file)));
+        const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+        const failed = results.filter((r) => r.status === 'rejected').length;
+        if (failed > 0) {
+          setError(`${succeeded} 个上传成功, ${failed} 个失败`);
+          if (succeeded > 0) {
+            clearAll();
+            onClose();
+          }
+        } else {
+          clearAll();
+          onClose();
+        }
       } else if (activeTab === 'url' && url.trim()) {
         await addItem('url', { source: url, url });
         clearAll();

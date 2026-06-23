@@ -227,21 +227,21 @@ async def search_knowledge(user: dict = Depends(get_current_user), q: str = "", 
     )
     db.close()
 
-    data = [
-        {
-            "id": str(r["id"]),
-            "title": r["title"],
-            "content": r["content"],
-            "category": r["category"],
-            "tags": json.loads(r["tags"]),
-            "source": r["source"],
-            "docType": r["doc_type"],
-            "relevance": 0,
-            "updatedAt": utc_iso(r["updated_at"]),
-        }
-        for r in rows
-    ]
-    return {"data": data, "total": len(data), "message": "success", "code": 200}
+    normalized = []
+    for r in rows:
+        normalized.append(
+            {
+                "chunkId": str(r["id"]),
+                "pageContent": r.get("content", "") or r.get("title", ""),
+                "score": 0.0,
+                "metadata": {
+                    "source": r.get("doc_type", "text"),
+                    "chunkIndex": 0,
+                    "tokenCount": len((r.get("content", "") or "").split()),
+                },
+            }
+        )
+    return {"data": normalized, "total": len(normalized), "message": "success", "code": 200}
 
 
 # ─── 文件下载 ─────────────────────────────────────────

@@ -128,7 +128,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
     pollTimer = setInterval(poll, 3000);
   },
   stopPolling: () => {
-    if (pollTimer) {
+    if (pollTimer !== null) {
       clearInterval(pollTimer);
       pollTimer = null;
     }

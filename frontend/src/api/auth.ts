@@ -9,7 +9,7 @@ interface AuthUser {
 }
 
 interface AuthResponse {
-  access_token: string;
+  // access_token removed - cookie-based auth
   user: AuthUser;
 }
 

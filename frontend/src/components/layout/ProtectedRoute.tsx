@@ -1,16 +1,8 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const user = useAuthStore((s) => s.user);
-  const loading = useAuthStore((s) => s.loading);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (loading) return;
-    if (!user) navigate('/login', { replace: true });
-  }, [loading, user, navigate]);
+export function ProtectedRoute() {
+  const { user, loading } = useAuthStore();
 
   if (loading) {
     return (
@@ -20,7 +12,9 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
-  return <>{children}</>;
+  return <Outlet />;
 }

@@ -16,6 +16,7 @@ export interface AgentStep {
 
 export interface WorkflowState {
   id: string;
+  // taskId is numeric (backend uses int path params), but stored as string for route consistency
   taskId: string;
   status: 'idle' | 'running' | 'completed' | 'failed';
   steps: AgentStep[];
