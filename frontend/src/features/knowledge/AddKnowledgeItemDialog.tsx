@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useKnowledgeStore } from '../../store/useKnowledgeStore';
+import { uploadFileWithFallback } from '../../api/knowledge-upload';
 import NoteEditorDialog from './NoteEditorDialog';
 
 const SOURCE_TABS = [
@@ -38,7 +39,7 @@ export function AddKnowledgeItemDialog({ open, onClose }: Props) {
   } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const dirRef = useRef<HTMLInputElement>(null);
-  const { uploadFile, addItem, importDirectory } = useKnowledgeStore();
+  const { addItem, importDirectory, selectedBaseId } = useKnowledgeStore();
 
   const isSupported = (name: string) => {
     const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
@@ -129,7 +130,9 @@ export function AddKnowledgeItemDialog({ open, onClose }: Props) {
     setUploading(true);
     try {
       if (activeTab === 'file' && files.length > 0) {
-        const results = await Promise.allSettled(files.map((file) => uploadFile(file)));
+        const results = await Promise.allSettled(
+          files.map((file) => uploadFileWithFallback(file, selectedBaseId)),
+        );
         const succeeded = results.filter((r) => r.status === 'fulfilled').length;
         const failed = results.filter((r) => r.status === 'rejected').length;
         if (failed > 0) {

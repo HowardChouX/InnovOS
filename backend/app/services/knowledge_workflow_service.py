@@ -3,7 +3,7 @@ Knowledge Workflow Service — 完全复现 CherryStudio KnowledgeWorkflowServic
 
 职责：
 - 编排添加/删除/重新索引的多步工作流
-- 在 SQLite 中创建项，转换生命周期状态
+- 在 PostgreSQL 中创建项，转换生命周期状态
 - 通过 JobManager 调度作业
 - 目录导入：处理上传的文件列表
 """

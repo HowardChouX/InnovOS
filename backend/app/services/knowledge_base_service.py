@@ -2,7 +2,7 @@
 Knowledge Base Service — 完全复现 CherryStudio KnowledgeBaseService
 
 职责：
-- 持久化 SQLite 支持的知识库元数据
+- 持久化知识库元数据（PostgreSQL）
 - 持久化 knowledge_base.status 和 error
 - 持久化 knowledge_base.group_id 和 dimensions
 - 验证配置 (chunkOverlap < chunkSize, hybridAlpha + hybrid search)

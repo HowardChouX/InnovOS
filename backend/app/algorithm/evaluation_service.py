@@ -50,7 +50,7 @@ async def evaluate_solution(solution_id: int, user_id: int) -> dict:
                       t.title as task_title, t.description as task_description
                FROM solutions s
                JOIN tasks t ON s.task_id = t.id
-               WHERE s.id=? AND s.user_id=?""",
+               WHERE s.id=? AND t.user_id=?""",
             (solution_id, user_id),
         ).fetchone()
     finally:

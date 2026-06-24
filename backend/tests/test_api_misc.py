@@ -64,8 +64,25 @@ class MockDB:
         """Strip table alias prefix (e.g. 's.task_id' → 'task_id')."""
         return col.split(".")[-1] if "." in col else col
 
+    @staticmethod
+    def _extract_func(col: str) -> tuple[str, str | None]:
+        """Extract SQL function name and inner column.
+        Returns (inner_col, func_name). E.g. 'date(created_at)' → ('created_at', 'date').
+        Also handles table prefix: 'date(s.created_at)' → ('created_at', 'date').
+        Also handles PostgreSQL ::type cast: 'created_at::date' → ('created_at', 'date')."""
+        c = col.split(".")[-1] if "." in col else col  # strip table alias first
+        m = re.match(r'(\w+)\((\w+)\)', c)
+        if m:
+            return m.group(2), m.group(1).lower()
+        # Handle PostgreSQL ::type cast syntax (e.g. created_at::date)
+        cast_m = re.match(r'(\w+)::(\w+)', c)
+        if cast_m:
+            return cast_m.group(1), cast_m.group(2).lower()
+        return c, None
+
     def _where_conditions(self, sql: str) -> list:
-        """Parse WHERE clause into list of condition groups (OR-separated)."""
+        """Parse WHERE clause into list of condition groups (OR-of-ANDs).
+        Returns list of groups, each group is list of (col, op, is_param, val, func) tuples."""
         if "WHERE" not in sql.upper():
             return []
         where_part = sql.split("WHERE", 1)[1].strip()
@@ -80,42 +97,68 @@ class MockDB:
                 if not clause:
                     continue
                 if " LIKE " in clause.upper():
-                    col = self._strip_alias(clause.split()[0].strip().lower())
+                    raw = self._strip_alias(clause.split()[0].strip().lower())
+                    col, func = self._extract_func(raw)
                     val_part = clause.upper().split(" LIKE ")[1].strip()
                     if val_part == "?":
-                        conditions.append((col, "LIKE", True, None))
+                        conditions.append((col, "LIKE", True, None, func))
                     else:
-                        conditions.append((col, "LIKE", False, val_part.strip("'\"")))
+                        conditions.append((col, "LIKE", False, val_part.strip("'\""), func))
                 elif " IN " in clause.upper():
-                    col = self._strip_alias(clause.split()[0].strip().lower())
+                    raw = self._strip_alias(clause.split()[0].strip().lower())
+                    col, func = self._extract_func(raw)
                     in_part = clause.upper().split(" IN ")[1]
                     num_q = in_part.count("?")
-                    conditions.append((col, "IN", True, num_q))
+                    conditions.append((col, "IN", True, num_q, func))
                 elif "=?" in clause or "= ?" in clause:
                     norm = clause.replace("= ?", "=?")
-                    col = self._strip_alias(norm.split("=?")[0].strip().lower())
+                    raw = self._strip_alias(norm.split("=?")[0].strip().lower())
+                    col, func = self._extract_func(raw)
                     right = norm.split("=?")[1].strip() if "=?" in norm else ""
                     if right == "" or right == "?":
-                        conditions.append((col, "=", True, None))
+                        conditions.append((col, "=", True, None, func))
                     else:
                         try:
-                            conditions.append((col, "=", False, int(right)))
+                            conditions.append((col, "=", False, int(right), func))
                         except ValueError:
-                            conditions.append((col, "=", False, right.strip("'\"")))
+                            conditions.append((col, "=", False, right.strip("'\""), func))
                 elif "=" in clause:
-                    col, val_str = clause.split("=", 1)
-                    col = self._strip_alias(col.strip().lower())
+                    raw_raw, val_str = clause.split("=", 1)
+                    raw = self._strip_alias(raw_raw.strip().lower())
+                    col, func = self._extract_func(raw)
                     val_str = val_str.strip()
                     if val_str.startswith("'"):
-                        conditions.append((col, "=", False, val_str.strip("'")))
+                        conditions.append((col, "=", False, val_str.strip("'"), func))
                     else:
                         try:
-                            conditions.append((col, "=", False, int(val_str)))
+                            conditions.append((col, "=", False, int(val_str), func))
                         except ValueError:
-                            conditions.append((col, "=", False, val_str))
+                            conditions.append((col, "=", False, val_str, func))
             if conditions:
                 result.append(conditions)
         return result
+
+    @staticmethod
+    def _apply_func(value, func: str | None):
+        """Apply SQL function to a value for comparison."""
+        if func is None or value is None:
+            return value
+        if func == "date":
+            if isinstance(value, str):
+                return value[:10]
+            return value
+        return value
+
+    @staticmethod
+    def _match_value(row_val: object, expected: object) -> bool:
+        """Match row value against expected, handling date/timestamp comparisons."""
+        if row_val == expected:
+            return True
+        # Handle date(ts_col) comparison: "2026-06-24 00:00:00" ≈ "2026-06-24"
+        if isinstance(expected, str) and isinstance(row_val, str):
+            if " " not in expected and " " in row_val and row_val.startswith(expected):
+                return True
+        return False
 
     def _filter_rows(self, table: str, condition_groups: list,
                      params: list) -> tuple[list, int]:
@@ -128,12 +171,14 @@ class MockDB:
         matched_ids = set()
         for group in condition_groups:
             group_rows = list(all_rows)
-            for col, op, is_param, val in group:
+            for cond in group:
+                col, op, is_param, val = cond[:4]
+                func = cond[4] if len(cond) > 4 else None
                 if op == "=":
                     actual = params[pi] if is_param else val
                     if is_param:
                         pi += 1
-                    group_rows = [r for r in group_rows if r.get(col) == actual]
+                    group_rows = [r for r in group_rows if self._match_value(self._apply_func(r.get(col), func), actual)]
                 elif op == "LIKE":
                     pattern = params[pi] if is_param else val
                     if is_param:
@@ -185,7 +230,11 @@ class MockDB:
             c = c.strip()
             if "." in c:
                 c = c.split(".")[1]
-            cols.append(c.lower().rstrip(" as"))
+            col_name = c.lower().strip()
+            # Strip trailing " as alias" if present
+            if col_name.endswith(" as"):
+                col_name = col_name[:-4].strip()
+            cols.append(col_name)
         return cols
 
     def _insert_cols(self, sql: str) -> list[str]:
@@ -269,10 +318,14 @@ class MockDB:
             rows = rows[offset:(offset + limit) if limit else None]
 
         cols = self._select_cols(sql)
-        if cols != ["*"]:
-            self._last_result = [MockRow({c: r.get(c) for c in cols}) for r in rows]
+        if "*" in cols:
+            explicit = [c for c in cols if c != "*"]
+            if explicit:
+                self._last_result = [MockRow({**r, **{c: r.get(c) for c in explicit}}) for r in rows]
+            else:
+                self._last_result = [MockRow(r.copy()) for r in rows]
         else:
-            self._last_result = [MockRow(r.copy()) for r in rows]
+            self._last_result = [MockRow({c: r.get(c) for c in cols}) for r in rows]
 
     def _exec_join(self, sql: str, params: list) -> None:
         m = re.search(
@@ -291,8 +344,8 @@ class MockDB:
         for r1 in self._tables[t1].values():
             for r2 in self._tables[t2].values():
                 if r1.get(t1_col) == r2.get(t2_col):
-                    merged = r1.copy()
-                    merged.update(r2)
+                    merged = r2.copy()
+                    merged.update(r1)
                     all_joined.append(merged)
                     break
 
@@ -307,12 +360,14 @@ class MockDB:
             matched_ids = set()
             for group in conditions:
                 filtered = list(all_joined)
-                for col, op, is_param, val in group:
+                for cond in group:
+                    col, op, is_param, val = cond[:4]
+                    func = cond[4] if len(cond) > 4 else None
                     if op == "=":
                         actual = params[pi] if is_param else val
                         if is_param:
                             pi += 1
-                        filtered = [r for r in filtered if r.get(col) == actual]
+                        filtered = [r for r in filtered if self._match_value(self._apply_func(r.get(col), func), actual)]
                     elif op == "LIKE":
                         pattern = params[pi] if is_param else val
                         if is_param:
@@ -329,10 +384,15 @@ class MockDB:
             joined = all_joined
 
         cols = self._select_cols(sql)
-        if cols != ["*"]:
-            self._last_result = [MockRow({c: r.get(c) for c in cols}) for r in joined]
+        if "*" in cols:
+            # s.* or * expands to all columns; add any explicit columns too
+            explicit = [c for c in cols if c != "*"]
+            if explicit:
+                self._last_result = [MockRow({**r, **{c: r.get(c) for c in explicit}}) for r in joined]
+            else:
+                self._last_result = [MockRow(r.copy()) for r in joined]
         else:
-            self._last_result = [MockRow(r.copy()) for r in joined]
+            self._last_result = [MockRow({c: r.get(c) for c in cols}) for r in joined]
 
     def _exec_insert(self, sql: str, params: list) -> None:
         table = self._table_name(sql)
@@ -387,6 +447,9 @@ class MockDB:
         return self._last_result
 
     def commit(self):
+        pass
+
+    def rollback(self):
         pass
 
     def close(self):
@@ -776,6 +839,10 @@ class TestCheckInfringement:
             "app.algorithm.ai_client.chat_completion",
             mock_chat_completion,
         )
+        monkeypatch.setattr(
+            "app.api.conversion.chat_completion",
+            mock_chat_completion,
+        )
 
         from app.api.conversion import router
         app = FastAPI()
@@ -893,22 +960,6 @@ class TestCheckInfringement:
 # ══════════════════════════════════════════════════════════════
 
 
-# Helper: a realistic User object for the CurrentUser dependency
-def _make_user(user_id: int = 1, role: str = "user"):
-    """Create a minimal User model instance for dependency override."""
-    from app.models.user import User
-    return User(
-        id=user_id,
-        username="testuser",
-        password_hash="x",
-        role=role,
-        email="",
-        is_active=1,
-        token_version=0,
-        created_at="2024-01-01 00:00:00",
-    )
-
-
 class TestSidebarStats:
     """GET /api/sidebar/stats"""
 
@@ -917,23 +968,14 @@ class TestSidebarStats:
         _patch_all_get_db(monkeypatch, mock_db, "app.api.sidebar")
 
         from app.api.sidebar import router
-        from app.api.deps import get_current_user
 
         app = FastAPI()
         app.include_router(router)
-
-        # Override get_current_user — will be set per-test before requests
         return app, TestClient(app)
-
-    def _set_current_user(self, client, user):
-        """Override the get_current_user dependency in the test app."""
-        app, test_client = client
-        from app.api.deps import get_current_user
-        # Accept any positional/keyword args to match original dependency signature
-        app.dependency_overrides[get_current_user] = lambda *a, **kw: user
 
     def test_stats_regular_user(self, client, mock_db):
         """Regular user sees only their own task stats."""
+        _seed_user(mock_db, user_id=1)
         mock_db._tables["tasks"] = {
             1: {"id": 1, "user_id": 1, "title": "T1",
                 "status": "completed", "created_at": datetime_today()},
@@ -944,9 +986,9 @@ class TestSidebarStats:
         }
         mock_db._next_ids["tasks"] = 4
 
-        self._set_current_user(client, _make_user(user_id=1, role="user"))
-
-        resp = client[1].get("/api/sidebar/stats")
+        resp = client[1].get("/api/sidebar/stats", headers={
+            "Authorization": f"Bearer {_user_token(1)}",
+        })
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert data["data"]["todayTasks"] == 1  # only user 1's today tasks
@@ -956,6 +998,7 @@ class TestSidebarStats:
 
     def test_stats_admin(self, client, mock_db):
         """Admin sees global task stats and patent count."""
+        _seed_user(mock_db, user_id=0, role="admin")
         mock_db._tables["tasks"] = {
             1: {"id": 1, "user_id": 1, "title": "T1",
                 "status": "completed", "created_at": datetime_today()},
@@ -973,9 +1016,9 @@ class TestSidebarStats:
         }
         mock_db._next_ids["patents"] = 2
 
-        self._set_current_user(client, _make_user(user_id=0, role="admin"))
-
-        resp = client[1].get("/api/sidebar/stats")
+        resp = client[1].get("/api/sidebar/stats", headers={
+            "Authorization": f"Bearer {_user_token(0, 'admin')}",
+        })
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert data["data"]["todayTasks"] == 2  # all tasks today
@@ -1021,7 +1064,7 @@ class TestHealth:
         data = resp.json()
         # Overall status should be at least 'healthy' or possibly 'degraded'
         # depending on disk/memory, but should always return
-        assert "overall" in data
+        assert "status" in data
         assert "checks" in data
         assert "database" in data["checks"]
         assert data["checks"]["database"]["status"] == "ok"

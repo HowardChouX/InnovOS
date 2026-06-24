@@ -40,13 +40,10 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# SQLite artifacts
-**/file::memory:
 *.log
 
 # ── Project specific ──
 backend/data/uploads/
-backend/storage/patents/
 *.db
 .zshenv
 *.zshenv

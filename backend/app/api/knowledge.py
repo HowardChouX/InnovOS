@@ -100,6 +100,131 @@ async def upload_file(file: UploadFile = File(...), base_id: str = Form(""), use
     return {"data": item, "message": "导入成功", "code": 200}
 
 
+# ─── Presigned URL 直传 S3 ────────────────────────────
+
+
+@router.get("/upload-url")
+async def get_upload_url(
+    filename: str,
+    base_id: str = "",
+    content_type: str = "application/octet-stream",
+    user: dict = Depends(get_current_user),
+):
+    """获取预签名上传 URL（浏览器直传 S3，不经过后端）。
+
+    流程：
+    1. 前端调用本接口 → 获得 uploadUrl + itemId
+    2. 前端 PUT 文件到 uploadUrl（直传 S3）
+    3. 前端调用 confirm-upload → 后端启动异步处理
+
+    如果 S3 未配置则返回 400，前端应回退到 POST /api/knowledge/upload。
+    """
+    if not file_storage.enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="对象存储未配置，请使用传统上传方式或先配置 MinIO/S3",
+        )
+
+    result = await file_storage.generate_upload_url(filename, content_type)
+    if result is None:
+        raise HTTPException(status_code=500, detail="生成上传链接失败")
+
+    # 预创建 knowledge_item，状态为 "uploading"
+    import uuid
+
+    item_id = str(uuid.uuid4())
+    if base_id:
+        item_data = {
+            "source": filename,
+            "s3Key": result["key"],
+        }
+        KnowledgeItemService.create(
+            user["id"],
+            base_id,
+            {
+                "id": item_id,
+                "type": "file",
+                "data": item_data,
+                "status": "uploading",
+            },
+        )
+
+    return {
+        "data": {
+            "uploadUrl": result["url"],
+            "objectKey": result["key"],
+            "itemId": item_id,
+        },
+        "message": "success",
+        "code": 200,
+    }
+
+
+class ConfirmUploadInput(BaseModel):
+    baseId: str
+    itemId: str
+    objectKey: str
+    filename: str
+
+
+@router.post("/confirm-upload")
+async def confirm_upload(body: ConfirmUploadInput, user: dict = Depends(get_current_user)):
+    """确认 S3 直传完成，开始后台处理。"""
+    base_id = body.baseId
+    item_id = body.itemId
+    object_key = body.objectKey
+    filename = body.filename
+
+    item_data = {
+        "source": filename,
+        "path": object_key,
+        "s3Key": object_key,
+    }
+    db = get_db()
+    try:
+        existing = db.execute(
+            "SELECT id FROM knowledge_items WHERE id=? AND user_id=?",
+            (item_id, user["id"]),
+        ).fetchone()
+        if existing:
+            db.execute(
+                "UPDATE knowledge_items SET data=?, status='processing', updated_at=? WHERE id=?",
+                (json.dumps(item_data), _now_iso(), item_id),
+            )
+        else:
+            KnowledgeItemService.create(
+                user["id"],
+                base_id,
+                {
+                    "id": item_id,
+                    "type": "file",
+                    "data": item_data,
+                    "status": "processing",
+                },
+            )
+        db.commit()
+    finally:
+        db.close()
+
+    from app.services.knowledge_orchestration_service import knowledge_orchestration_service
+
+    await knowledge_orchestration_service.job_manager.enqueue(
+        JOB_TYPE_INDEX_DOCUMENTS,
+        {"baseId": base_id, "itemId": item_id},
+        queue=knowledge_queue_name(base_id),
+        idempotency_key=knowledge_idempotency_key("add", base_id, item_id),
+    )
+    logger.info("S3 文件 %s 已入队异步索引: item_id=%s", filename, item_id)
+
+    return {"data": {"id": item_id}, "message": "上传确认成功，后台处理中", "code": 200}
+
+
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
 # ─── 知识项 CRUD ─────────────────────────────────────
 
 

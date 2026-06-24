@@ -9,7 +9,6 @@ import asyncio
 import logging
 import os
 import shutil
-import subprocess
 import time
 
 from fastapi import FastAPI, Request
@@ -104,30 +103,24 @@ async def rate_limit_middleware(request: Request, call_next):
 
 @app_.on_event("startup")
 async def startup():
-    """启动时运行数据库迁移、初始化模型注册表、知识库作业系统 + 专利向量表"""
-    # 1. 运行 Alembic 数据库迁移（替代之前的手动 init_db）
+    """启动时初始化数据库、初始化模型注册表、知识库作业系统 + 专利向量表"""
+    # 1. 初始化数据库表
     try:
-        result = await asyncio.to_thread(
-            lambda: subprocess.run(
-                ["alembic", "upgrade", "head"],
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-        )
-        if result.returncode == 0:
-            logger.info("数据库迁移完成")
-        else:
-            logger.error(f"数据库迁移失败: {result.stderr}")
-            raise RuntimeError(f"Alembic migration failed: {result.stderr}")
-    except subprocess.TimeoutExpired:
-        logger.error("数据库迁移超时（60秒）")
-        raise
+        from app.database import init_db
+
+        await asyncio.to_thread(init_db)
+        logger.info("数据库初始化完成")
     except Exception as e:
         logger.error(f"数据库初始化失败: {e}")
         raise
 
-    # 1.5 注入 admin 用户记录（id=0），确保 FK 约束对 env 管理员可用
+    # 2. 加载模型注册表
+    from app.algorithm.model_registry import model_registry
+
+    await asyncio.to_thread(model_registry.load)
+    logger.info("模型注册表已加载")
+
+    # 3. 注入 admin 用户记录（id=0），确保 FK 约束对 env 管理员可用
     try:
         from app.tables.pg_schema import seed_admin_user
 
@@ -138,19 +131,18 @@ async def startup():
     except Exception as e:
         logger.warning(f"注入管理员用户失败（非致命）: {e}")
 
-    # 2. 加载模型注册表
-    from app.algorithm.model_registry import model_registry
-
-    await asyncio.to_thread(model_registry.load)
-    logger.info("模型注册表已加载")
-
     # 4. 初始化知识库作业系统
     from app.services.knowledge_orchestration_service import knowledge_orchestration_service
 
     await knowledge_orchestration_service.start()
     logger.info("知识库作业系统已启动")
 
-    # 5. 建专利向量表并重建所有向量（用 title + abstract）
+    # 5. 启动自动快照备份服务
+    from app.services.backup_service import backup_service
+
+    await backup_service.start()
+
+    # 6. 建专利向量表并重建所有向量（用 title + abstract）
     try:
         from app.algorithm.patent_search_engine import get_patent_search_engine, init_patent_vectors_table
 
@@ -188,6 +180,11 @@ async def shutdown():
             logger.info("PostgreSQL connection pool closed")
         except Exception as e:
             logger.warning("Error closing PG pool: %s", e)
+    # 停止自动快照备份服务
+    from app.services.backup_service import backup_service
+
+    await backup_service.stop()
+
     # 取消所有后台任务
     pending_tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
     for t in pending_tasks:

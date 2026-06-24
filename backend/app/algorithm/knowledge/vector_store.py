@@ -46,10 +46,10 @@ class VectorStore:
 
         db = get_db()
         try:
-            # 1. 删除该 item 的所有旧向量
+            # 1. 删除该 item 的所有旧向量（同时按 user_id 隔离）
             db.execute(
-                "DELETE FROM knowledge_vectors WHERE item_id = %s",
-                (item_id,),
+                "DELETE FROM knowledge_vectors WHERE item_id = %s AND user_id = %s",
+                (item_id, self.user_id),
             )
 
             # 2. 插入新向量
@@ -126,10 +126,11 @@ class VectorStore:
                           ts_rank(to_tsvector('simple', COALESCE(text, '')), plainto_tsquery('simple', %s)) AS text_score
                     FROM knowledge_vectors
                     WHERE base_id = %s
+                      AND user_id = %s
                       AND embedding IS NOT NULL
                     ORDER BY embedding <=> %s::vector
                     LIMIT %s""",
-                (vec_json, query_text, base_id, vec_json, top_k * 2),
+                (vec_json, query_text, base_id, self.user_id, vec_json, top_k * 2),
             ).fetchall()
 
             if not rows:
@@ -163,10 +164,11 @@ class VectorStore:
                           1 - (embedding <=> %s::vector) AS score
                     FROM knowledge_vectors
                     WHERE base_id = %s
+                      AND user_id = %s
                       AND embedding IS NOT NULL
                     ORDER BY embedding <=> %s::vector
                     LIMIT %s""",
-                (vec_json, base_id, vec_json, top_k),
+                (vec_json, base_id, self.user_id, vec_json, top_k),
             ).fetchall()
             return [dict(r) for r in rows]
 
@@ -175,8 +177,8 @@ class VectorStore:
         try:
             if base_id:
                 row = db.execute(
-                    "SELECT COUNT(*) AS cnt FROM knowledge_vectors WHERE base_id = %s",
-                    (base_id,),
+                    "SELECT COUNT(*) AS cnt FROM knowledge_vectors WHERE base_id = %s AND user_id = %s",
+                    (base_id, self.user_id),
                 ).fetchone()
             else:
                 row = db.execute(
@@ -193,8 +195,8 @@ class VectorStore:
         try:
             if base_id:
                 db.execute(
-                    "DELETE FROM knowledge_vectors WHERE base_id = %s",
-                    (base_id,),
+                    "DELETE FROM knowledge_vectors WHERE base_id = %s AND user_id = %s",
+                    (base_id, self.user_id),
                 )
             else:
                 db.execute(
@@ -213,8 +215,8 @@ class VectorStore:
         db = get_db()
         try:
             db.execute(
-                "DELETE FROM knowledge_vectors WHERE item_id = %s",
-                (item_id,),
+                "DELETE FROM knowledge_vectors WHERE item_id = %s AND user_id = %s",
+                (item_id, self.user_id),
             )
             db.commit()
             logger.debug(f"已删除 item={item_id} 的向量")
@@ -232,8 +234,8 @@ class VectorStore:
         try:
             placeholders = ",".join("%s" for _ in item_ids)
             db.execute(
-                f"DELETE FROM knowledge_vectors WHERE item_id IN ({placeholders})",
-                tuple(item_ids),
+                f"DELETE FROM knowledge_vectors WHERE item_id IN ({placeholders}) AND user_id = %s",
+                (*item_ids, self.user_id),
             )
             db.commit()
         except Exception:

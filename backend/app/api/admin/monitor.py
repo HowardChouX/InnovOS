@@ -73,8 +73,8 @@ def get_task_stats(current_user: CurrentUser):
     if current_user.role == "admin":
         by_status = db.execute("SELECT status, COUNT(*) as cnt FROM tasks GROUP BY status").fetchall()
         recent = db.execute(
-            "SELECT date(created_at) as d, COUNT(*) as cnt FROM tasks "
-            "WHERE created_at >= ? GROUP BY date(created_at) ORDER BY d",
+            "SELECT created_at::date as d, COUNT(*) as cnt FROM tasks "
+            "WHERE created_at >= ? GROUP BY created_at::date ORDER BY d",
             (cutoff,),
         ).fetchall()
     else:
@@ -83,8 +83,8 @@ def get_task_stats(current_user: CurrentUser):
             "SELECT status, COUNT(*) as cnt FROM tasks WHERE user_id=? GROUP BY status", (uid,)
         ).fetchall()
         recent = db.execute(
-            "SELECT date(created_at) as d, COUNT(*) as cnt FROM tasks "
-            "WHERE user_id=? AND created_at >= ? GROUP BY date(created_at) ORDER BY d",
+            "SELECT created_at::date as d, COUNT(*) as cnt FROM tasks "
+            "WHERE user_id=? AND created_at >= ? GROUP BY created_at::date ORDER BY d",
             (uid, cutoff),
         ).fetchall()
 

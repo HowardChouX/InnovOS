@@ -151,59 +151,83 @@ class MockDB:
             where["__or__"] = or_groups
         return where
 
+    @staticmethod
+    def _strip_cast(col: str) -> str:
+        """Strip PostgreSQL ::type cast suffix from column name.
+        E.g. 'created_at::date' → 'created_at'."""
+        if "::" in col:
+            col = col.split("::")[0]
+        return col
+
     def _parse_simple_condition(self, expr: str, params, start_idx: int) -> tuple | None:
         """Parse a single condition like col=? or col LIKE ?.
         Returns (column_or_key, value, consumed_count) or None if no match.
-        Column may be a plain string or (\"__gt__\", col) tuple for > constraints."""
+        Column may be a plain string or ("__gt__", col) tuple for > constraints."""
         expr = expr.strip()
         # col LIKE ? (param-based) — keep % wildcard in value for substring matching
-        like_m = re.match(r"(\w+(?:\.\w+)?)\s+LIKE\s+\?", expr, re.IGNORECASE)
+        like_m = re.match(r"(\w+(?:\.\w+)?(?:::\w+)?)\s+LIKE\s+\?", expr, re.IGNORECASE)
         if like_m:
-            col = like_m.group(1)
+            col = self._strip_cast(like_m.group(1))
             if "." in col:
                 col = col.split(".")[-1]
             if params is not None and start_idx < len(params):
                 return (col, params[start_idx], 1)
             return (col, "", 0)
         # col=? / col = ? (param-based)
-        eq_m = re.match(r"(\w+(?:\.\w+)?)\s*=\s*\?", expr)
+        eq_m = re.match(r"(\w+(?:\.\w+)?(?:::\w+)?)\s*=\s*\?", expr)
         if eq_m:
-            col = eq_m.group(1)
+            col = self._strip_cast(eq_m.group(1))
             if "." in col:
                 col = col.split(".")[-1]
             if params is not None and start_idx < len(params):
                 return (col, params[start_idx], 1)
             return (col, None, 0)
         # col='literal' (hardcoded string)
-        lit_m = re.match(r"(\w+(?:\.\w+)?)\s*=\s*'([^']*)'", expr)
+        lit_m = re.match(r"(\w+(?:\.\w+)?(?:::\w+)?)\s*=\s*'([^']*)'", expr)
         if lit_m:
-            col = lit_m.group(1)
+            col = self._strip_cast(lit_m.group(1))
             if "." in col:
                 col = col.split(".")[-1]
             return (col, lit_m.group(2), 0)
         # col=NUMBER (unquoted numeric literal)
-        num_m = re.match(r"(\w+(?:\.\w+)?)\s*=\s*(\d+)", expr)
+        num_m = re.match(r"(\w+(?:\.\w+)?(?:::\w+)?)\s*=\s*(\d+)", expr)
         if num_m:
-            col = num_m.group(1)
+            col = self._strip_cast(num_m.group(1))
             if "." in col:
                 col = col.split(".")[-1]
             return (col, int(num_m.group(2)), 0)
         # col > NUMBER (unquoted numeric comparison)
-        gt_num_m = re.match(r"(\w+(?:\.\w+)?)\s*>\s*(\d+)", expr)
+        gt_num_m = re.match(r"(\w+(?:\.\w+)?(?:::\w+)?)\s*>\s*(\d+)", expr)
         if gt_num_m:
-            col = gt_num_m.group(1)
+            col = self._strip_cast(gt_num_m.group(1))
             if "." in col:
                 col = col.split(".")[-1]
             return (("__gt__", col), int(gt_num_m.group(2)), 0)
         # col > ? (param-based)
-        gt_m = re.match(r"(\w+(?:\.\w+)?)\s*>\s*\?", expr)
+        gt_m = re.match(r"(\w+(?:\.\w+)?(?:::\w+)?)\s*>\s*\?", expr)
         if gt_m:
-            col = gt_m.group(1)
+            col = self._strip_cast(gt_m.group(1))
             if "." in col:
                 col = col.split(".")[-1]
             if params is not None and start_idx < len(params):
                 return (("__gt__", col), params[start_idx], 1)
             return (("__gt__", col), 0, 0)
+        # col >= ? (param-based)
+        gte_m = re.match(r"(\w+(?:\.\w+)?(?:::\w+)?)\s*>=\s*\?", expr)
+        if gte_m:
+            col = self._strip_cast(gte_m.group(1))
+            if "." in col:
+                col = col.split(".")[-1]
+            if params is not None and start_idx < len(params):
+                return (col, params[start_idx], 1)
+            return (col, None, 0)
+        # col >= NUMBER (unquoted numeric literal)
+        gte_num_m = re.match(r"(\w+(?:\.\w+)?(?:::\w+)?)\s*>=\s*(\d+)", expr)
+        if gte_num_m:
+            col = self._strip_cast(gte_num_m.group(1))
+            if "." in col:
+                col = col.split(".")[-1]
+            return (col, int(gte_num_m.group(2)), 0)
         return None
 
     def _apply_where(self, rows: list[dict], where: dict) -> list[dict]:
@@ -344,16 +368,19 @@ class MockDB:
         if agg_func:
             if "GROUP BY" in sql.upper():
                 gb_m = re.search(
-                    r"GROUP\s+BY\s+((?:\w+(?:\s*\([^)]*\s*\))?(?:\s*,\s*)?)+)",
+                    r"GROUP\s+BY\s+((?:\w+(?:::\w+)?(?:\s*\([^)]*\s*\))?(?:\s*,\s*)?)+)",
                     sql, re.IGNORECASE,
                 )
                 if gb_m:
                     gb_expr = gb_m.group(1).split(",")[0].strip()
                     # Extract actual column name from function call: date(created_at) → created_at
+                    # Also handle PostgreSQL ::type cast: created_at::date → created_at
                     gb_name = gb_expr
                     if "(" in gb_expr:
                         inner = gb_expr.split("(")[1]
                         gb_name = inner.rstrip(")") if ")" in inner else inner
+                    elif "::" in gb_expr:
+                        gb_name = gb_expr.split("::")[0]
                     else:
                         gb_name = gb_expr
 

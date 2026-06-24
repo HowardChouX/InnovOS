@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useKnowledgeStore } from '../../store/useKnowledgeStore';
 import type { KnowledgeItem, KnowledgeTabKey } from '../../types/knowledge';
+import { uploadFileWithFallback } from '../../api/knowledge-upload';
 import NoteEditorDialog from './NoteEditorDialog';
 import { AddUrlDialog } from './AddUrlDialog';
 import { STATUS_MAP, TYPE_ICON_MAP, getItemTitle } from './utils/statusStyles';
@@ -25,8 +26,8 @@ export function KnowledgeDetail() {
     openRecallTest,
     openItemChunks,
     deleteItem,
-    uploadFile,
     fetchItems,
+    fetchBases,
   } = useKnowledgeStore();
   const base = bases.find((b) => b.id === selectedBaseId);
 
@@ -36,6 +37,18 @@ export function KnowledgeDetail() {
   const [fileInputKey, setFileInputKey] = useState(0);
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
   const [urlDialogOpen, setUrlDialogOpen] = useState(false);
+
+  // Upload handler with presigned URL fallback
+  const handleUploadFile = useCallback(
+    async (file: File) => {
+      await uploadFileWithFallback(file, selectedBaseId);
+      if (selectedBaseId) {
+        await fetchItems(selectedBaseId);
+        await fetchBases();
+      }
+    },
+    [selectedBaseId, fetchItems, fetchBases],
+  );
 
   // ── Polling for in-progress items ──
   const hasActiveItems = items.some((item) =>
@@ -53,10 +66,10 @@ export function KnowledgeDetail() {
   const triggerFilePicker = () => fileInputRef.current?.click();
   const handleFileSelect = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      for (const file of Array.from(e.target.files || [])) await uploadFile(file);
+      for (const file of Array.from(e.target.files || [])) await handleUploadFile(file);
       setFileInputKey((k) => k + 1);
     },
-    [uploadFile],
+    [handleUploadFile],
   );
 
   // ── URL tab: open dialog ──
@@ -69,9 +82,9 @@ export function KnowledgeDetail() {
   const handleDrop = useCallback(
     async (e: React.DragEvent) => {
       e.preventDefault();
-      for (const file of Array.from(e.dataTransfer.files)) await uploadFile(file);
+      for (const file of Array.from(e.dataTransfer.files)) await handleUploadFile(file);
     },
-    [uploadFile],
+    [handleUploadFile],
   );
 
   if (!base) return null;

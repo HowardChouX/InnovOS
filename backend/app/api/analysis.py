@@ -821,15 +821,35 @@ async def run_analysis_background(
 
                 if eval_result and "scores" in eval_result:
                     scores = eval_result["scores"]
+                    overall = eval_result.get("overall", 0)
+                    # Compute average of all dimension scores for evolution_alignment
+                    dim_scores_list = []
+                    for _, sd in scores.items():
+                        if isinstance(sd, dict):
+                            dim_scores_list.append(sd.get("score", 0))
+                        else:
+                            dim_scores_list.append(sd)
+                    avg_score = sum(dim_scores_list) / len(dim_scores_list) if dim_scores_list else 0
+
                     for dim, score_data in scores.items():
                         if isinstance(score_data, dict):
                             score_val = score_data.get("score", 0)
                         else:
                             score_val = score_data
                         db.execute(
-                            """INSERT INTO evaluations (solution_id, user_id, dimension, score, details, status)
-                               VALUES (?, ?, ?, ?, ?, ?)""",
-                            (sol_id, user_id, dim, score_val, json.dumps(eval_result), "completed"),
+                            """INSERT INTO evaluations
+                               (solution_id, user_id, dimension, score, details, status,
+                                root_cause_cut, original_contradiction_resolved,
+                                new_contradictions, function_deficits_filled,
+                                new_harmful_interactions, ifr_distance, ifr_gap_description,
+                                ifr_parameters_achieved, overall_verdict, evolution_alignment,
+                                aligned_laws, misaligned_laws, maturity, confidence)
+                               VALUES (?, ?, ?, ?, ?, 'completed',
+                                       0, 0, '[]', '[]', '[]', 'medium', '', '[]',
+                                       CASE WHEN ? >= 70 THEN 'passed' ELSE 'failed' END,
+                                       ?, '[]', '[]', '概念阶段', ?)""",
+                            (sol_id, user_id, dim, score_val, json.dumps(eval_result),
+                             overall, avg_score, None),
                         )
 
             # 增量更新：评估分数

@@ -1,6 +1,8 @@
 import type { KnowledgeItem, KnowledgeItemType } from '../../../../types/knowledge';
 import type { ChangeEvent } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { useKnowledgeStore } from '../../../../store/useKnowledgeStore';
+import { uploadFileWithFallback } from '../../../../api/knowledge-upload';
 import KnowledgePanelShell from '../../components/KnowledgePanelShell';
 import DataSourcePanelHeader from './DataSourcePanelHeader';
 import KnowledgeItemList from './KnowledgeItemList';
@@ -74,6 +76,7 @@ export default function DataSourcePanel({
   const [pendingDeleteItem, setPendingDeleteItem] = useState<KnowledgeItem | null>(null);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const selectedBaseId = useKnowledgeStore((s) => s.selectedBaseId);
 
   const visibleItems = useMemo(
     () => items.filter((item) => matchesSearch(item, searchQuery)),
@@ -149,11 +152,22 @@ export default function DataSourcePanel({
     setPendingDeleteItem(null);
   };
 
-  const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     event.target.value = '';
-    if (files.length > 0) {
-      onAdd('file', files);
+    if (files.length === 0) return;
+    for (const file of files) {
+      try {
+        await uploadFileWithFallback(file, selectedBaseId);
+      } catch (error) {
+        setErrorMessage(`上传失败: ${error instanceof Error ? error.message : String(error)}`);
+        return;
+      }
+    }
+    // Refresh after uploads
+    const { fetchItems } = useKnowledgeStore.getState();
+    if (selectedBaseId) {
+      await fetchItems(selectedBaseId);
     }
   };
 

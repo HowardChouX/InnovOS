@@ -100,10 +100,21 @@ class MockDB:
     _TABLE_RE = re.compile(
         r'(?:DELETE\s+FROM|INTO|UPDATE|FROM)\s+(\w+)', re.IGNORECASE
     )
+    _JOIN_TABLE_RE = re.compile(
+        r'FROM\s+(\w+)\s+\w+\s+JOIN\s+(\w+)\s+\w+\s+ON\s+\w+\.(\w+)\s*=\s*\w+\.(\w+)', re.IGNORECASE
+    )
 
     def _parse_table(self, sql: str) -> str | None:
+        if " JOIN " in sql.upper():
+            return self._parse_table_join(sql)
         m = self._TABLE_RE.search(sql)
         return m.group(1).lower() if m else None
+
+    def _parse_table_join(self, sql: str) -> str | None:
+        m = self._JOIN_TABLE_RE.search(sql)
+        if m:
+            return m.group(1).lower()
+        return None
 
     def _extract_where_text(self, sql: str) -> tuple[str, str]:
         """Return (where_clause_text, trailing_clause)."""
@@ -168,6 +179,7 @@ class MockDB:
 
     def _row_matches(self, row: dict, conditions: list[tuple]) -> bool:
         for op, col, val in conditions:
+            col = col.split(".")[-1]  # strip table alias: t.user_id → user_id
             rv = row.get(col)
             if op == "EQ":
                 if rv is None or str(rv) != str(val):
@@ -312,10 +324,13 @@ class MockDB:
             tbl[rid] = row
             self._last_insert_id = rid
 
-            ret_m = re.search(r"RETURNING\s+(\w+)", sql, re.IGNORECASE)
+            ret_m = re.search(r"RETURNING\s+(\*|\w+(?:,\s*\w+)*)", sql, re.IGNORECASE)
             if ret_m:
-                ret_col = ret_m.group(1).strip()
-                self._last_result = [MockRow({ret_col: row.get(ret_col)})]
+                ret_cols = ret_m.group(1).strip()
+                if ret_cols == "*":
+                    self._last_result = [MockRow(row.copy())]
+                else:
+                    self._last_result = [MockRow({c.strip(): row.get(c.strip()) for c in ret_cols.split(",")})]
             else:
                 self._last_result = []
 
@@ -509,6 +524,11 @@ def _seed_solution(
     }
     if mock_db._ids.get("solutions", 0) <= solution_id:
         mock_db._ids["solutions"] = solution_id + 1
+    # Ensure a matching tasks row exists for JOIN-based user_id checks
+    task_tbl = mock_db._ensure_table("tasks")
+    if task_id not in task_tbl:
+        _seed_task(mock_db, task_id=task_id, user_id=user_id)
+        mock_db._ids["tasks"] = max(mock_db._ids.get("tasks", 0), task_id + 1)
     return solution_id
 
 

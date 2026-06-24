@@ -2,7 +2,7 @@
 name = "innovos-backend"
 version = "0.1.0"
 description = "InnovOS 创新智能操作系统后端"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 dependencies = [
     "redis>=5.2.0",
     "fastapi>=0.115.0",
@@ -27,7 +27,6 @@ dependencies = [
     "lxml>=5.0.0",
     "pdf2image>=1.17.0",
     "pillow>=12.2.0",
-    "alembic>=1.18.4",
 ]
 
 [project.optional-dependencies]
@@ -105,7 +104,7 @@ quote-style = "double"
 
 # ── Mypy ──────────────────────────────────────────────
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.13"
 # strict = true  # 暂不启用 - 代码库需大面积类型注解
 warn_unused_configs = true
 warn_redundant_casts = true

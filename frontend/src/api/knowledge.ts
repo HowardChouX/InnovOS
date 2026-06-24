@@ -110,7 +110,42 @@ export const knowledgeApi = {
     await apiRequest(`/api/knowledge/items/${itemId}`, { method: 'DELETE' });
   },
 
-  // ─── 文件上传 ────────────────────────────────────────
+  // ─── 文件上传（Presigned URL 直传 S3）────────────────
+  async getUploadUrl(
+    filename: string,
+    baseId?: string,
+    contentType?: string,
+  ): Promise<{
+    uploadUrl: string;
+    objectKey: string;
+    itemId: string;
+  } | null> {
+    const sp = new URLSearchParams({ filename });
+    if (baseId) sp.set('base_id', baseId);
+    if (contentType) sp.set('content_type', contentType);
+    try {
+      const res = await apiRequest<{
+        data: { uploadUrl: string; objectKey: string; itemId: string };
+      }>(`/api/knowledge/upload-url?${sp}`);
+      return res.data;
+    } catch {
+      return null; // S3 not configured — fall back to direct upload
+    }
+  },
+
+  async confirmUpload(data: {
+    baseId: string;
+    itemId: string;
+    objectKey: string;
+    filename: string;
+  }): Promise<{ data: { id: string } }> {
+    return apiRequest('/api/knowledge/confirm-upload', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /** 传统直连上传（S3 不可用时回退） */
   async uploadFile(file: File, baseId?: string): Promise<{ data: UploadResponse }> {
     const formData = new FormData();
     formData.append('file', file);

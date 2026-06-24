@@ -5,7 +5,7 @@ Admin users are validated against .env vars (no DB record).
 Regular users are stored in the `users` table.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # ═══════════════════════════════════════════════════════════════
 #  Data model
@@ -23,6 +23,11 @@ class User(BaseModel):
     is_active: int = 1
     token_version: int = 0
     created_at: str | None = None
+
+    @field_validator("token_version", mode="before")
+    @classmethod
+    def coerce_token_version(cls, v):
+        return 0 if v is None else v
 
 
 # ═══════════════════════════════════════════════════════════════

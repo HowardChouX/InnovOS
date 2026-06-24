@@ -41,7 +41,7 @@ async def evaluate_solution(solution_id: int, user: dict = Depends(get_current_u
     """对方案进行 AI 四维评估"""
     db = get_db()
     sol = db.execute(
-        "SELECT id FROM solutions WHERE id=? AND user_id=?",
+        "SELECT s.id FROM solutions s JOIN tasks t ON s.task_id = t.id WHERE s.id=? AND t.user_id=?",
         (solution_id, user["id"]),
     ).fetchone()
     if not sol:

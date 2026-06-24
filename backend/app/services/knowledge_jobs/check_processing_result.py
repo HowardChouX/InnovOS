@@ -10,6 +10,7 @@ On failure after max attempts, marks item as failed.
 
 import json
 import logging
+import os
 
 from app.algorithm.knowledge.pipeline import KnowledgePipeline
 from app.algorithm.knowledge.processors import file_processor_registry
@@ -97,6 +98,9 @@ class CheckProcessingResultHandler(JobHandler):
         chunk_count = await pipeline.index_item(item_id, result["content"])
         logger.info("External processed item %s indexed (%d chunks)", item_id, chunk_count)
 
+        # ── 原始文件解析完毕，删除本地临时文件 ──
+        _delete_local_upload_file(item.get("data", {}))
+
         signal.throw_if_aborted()
 
         await self._set_status_under_lock(base_id, user_id, item_id, "completed")
@@ -146,3 +150,27 @@ def _mark_item_failed(job_id: str, error: str | None) -> None:
         KnowledgeItemService.update_status(user_id, item_id, "failed", error or "External processing failed")
     finally:
         db.close()
+
+
+def _delete_local_upload_file(item_data: dict | str) -> None:
+    """删除上传的原始文件（本地文件系统路径），S3/http 路径跳过。"""
+    if isinstance(item_data, str):
+        try:
+            item_data = json.loads(item_data)
+        except (json.JSONDecodeError, TypeError):
+            return
+    if not isinstance(item_data, dict):
+        return
+    file_path = item_data.get("path") or item_data.get("source", "")
+    if not file_path or file_path.startswith(("http://", "https://", "s3://")):
+        return
+    if not os.path.exists(file_path):
+        return
+    try:
+        os.remove(file_path)
+        logger.info("已删除上传文件: %s", file_path)
+        parent = os.path.dirname(file_path)
+        if os.path.isdir(parent) and not os.listdir(parent):
+            os.rmdir(parent)
+    except Exception as e:
+        logger.warning("删除上传文件失败 %s: %s", file_path, e)

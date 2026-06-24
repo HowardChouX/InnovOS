@@ -15,19 +15,18 @@ def create_feedback(body: FeedbackCreate, user: dict = Depends(get_current_user)
 
     db = get_db()
     sol = db.execute(
-        "SELECT id FROM solutions WHERE id=? AND user_id=?",
+        "SELECT s.id FROM solutions s JOIN tasks t ON s.task_id = t.id WHERE s.id=? AND t.user_id=?",
         (body.solution_id, user["id"]),
     ).fetchone()
     if not sol:
         db.close()
         raise HTTPException(status_code=404, detail="Solution not found")
 
-    db.execute(
-        "INSERT INTO feedbacks (user_id, solution_id, rating, feedback_type, comments) VALUES (?,?,?,?,?)",
+    row = db.execute(
+        "INSERT INTO feedbacks (user_id, solution_id, rating, feedback_type, comments) VALUES (?,?,?,?,?) RETURNING *",
         (user["id"], body.solution_id, body.rating, body.feedback_type, body.comments),
-    )
+    ).fetchone()
     db.commit()
-    row = db.execute("SELECT * FROM feedbacks WHERE id = last_insert_rowid()").fetchone()
     db.close()
     return {
         "data": {

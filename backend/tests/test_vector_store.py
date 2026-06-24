@@ -14,10 +14,9 @@ from unittest.mock import MagicMock
 
 @pytest.fixture
 def mock_numpy(monkeypatch):
-    """Mock numpy so that ``import numpy as np`` inside ``_search_sqlite`` works.
+    """Mock numpy for cosine similarity calculations.
 
-    The mock provides just enough functionality for cosine similarity:
-    ``np.array``, ``np.linalg.norm``, ``np.dot``, and ``np.float32``.
+    Provides ``np.array``, ``np.linalg.norm``, ``np.dot``, and ``np.float32``.
     """
     mock_np = MagicMock()
     # Return a real list so we can compute dot products below
@@ -103,7 +102,7 @@ def test_replace_by_external_id_inserts_vectors(monkeypatch, mock_db):
 
     # Verify DELETE was called with correct item_id
     delete_entry = mock_db.cursor.history[0]
-    assert delete_entry[1] == ("item_1",)
+    assert delete_entry[1] == ("item_1", 1)
 
 
 def test_replace_by_external_id_empty_clears_vectors(monkeypatch, mock_db):
@@ -135,7 +134,7 @@ def test_delete_by_external_id_removes_vectors(monkeypatch, mock_db):
     assert "item_id = %s" in mock_db.all_sql[0]
 
     delete_entry = mock_db.cursor.history[0]
-    assert delete_entry[1] == ("item_42",)
+    assert delete_entry[1] == ("item_42", 1)
 
 
 # ════════════════════════════════════════════════════════════════
@@ -366,7 +365,7 @@ def test_delete_by_external_ids_uses_IN_clause(monkeypatch, mock_db):
         "Expected IN clause with 3 comma-separated placeholders"
 
     delete_entry = mock_db.cursor.history[0]
-    assert delete_entry[1] == ("id1", "id2", "id3")
+    assert delete_entry[1] == ("id1", "id2", "id3", 1)
 
 
 def test_delete_by_external_ids_empty_list_does_nothing(monkeypatch, mock_db):

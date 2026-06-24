@@ -15,13 +15,13 @@ def get_sidebar_stats(current_user: CurrentUser):
     today = datetime.now().strftime("%Y-%m-%d")
 
     if current_user.role == "admin":
-        today_tasks = db.execute("SELECT COUNT(*) FROM tasks WHERE date(created_at)=?", (today,)).fetchone()[0]
+        today_tasks = db.execute("SELECT COUNT(*) FROM tasks WHERE created_at::date=?", (today,)).fetchone()[0]
         completed = db.execute("SELECT COUNT(*) FROM tasks WHERE status='completed'").fetchone()[0]
         analyzing = db.execute("SELECT COUNT(*) FROM tasks WHERE status='analyzing'").fetchone()[0]
     else:
         uid = current_user.id
         today_tasks = db.execute(
-            "SELECT COUNT(*) FROM tasks WHERE user_id=? AND date(created_at)=?",
+            "SELECT COUNT(*) FROM tasks WHERE user_id=? AND created_at::date=?",
             (uid, today),
         ).fetchone()[0]
         completed = db.execute(

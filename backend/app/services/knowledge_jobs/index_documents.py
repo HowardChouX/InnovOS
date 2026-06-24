@@ -15,6 +15,7 @@ import os
 from app.algorithm.knowledge.pipeline import KnowledgePipeline
 from app.algorithm.knowledge.processors import file_processor_registry
 from app.database import get_db
+from app.services.file_storage_service import file_storage
 from app.services.knowledge_item_service import KnowledgeItemService
 from app.services.knowledge_job_manager import (
     JOB_TYPE_CHECK_PROCESSING_RESULT,
@@ -71,47 +72,97 @@ class IndexDocumentsHandler(JobHandler):
         if item_type == "file":
             file_path = data.get("path") or data.get("source", "")
             file_name = data.get("originalName") or os.path.basename(file_path)
+            s3_key = data.get("s3Key") if isinstance(data, dict) else None
 
+            # ── S3 文件：从对象存储下载到临时路径 ──
+            temp_path: str | None = None
             if not file_path or not os.path.exists(file_path):
-                logger.warning("File not found for item %s: %s", item_id, file_path)
-                await self._set_status_under_lock(base_id, user_id, item_id, "failed", "File not found")
-                return
+                if s3_key and file_storage.enabled:
+                    content = await file_storage.download(s3_key)
+                    if content is None:
+                        logger.warning("S3 download failed for item %s: key=%s", item_id, s3_key)
+                        await self._set_status_under_lock(
+                            base_id, user_id, item_id, "failed", "S3 file download failed"
+                        )
+                        return
+                    import tempfile
 
-            # Resolve file processor (全局设置 → KB 设置 → 默认)
-            db = get_db()
-            try:
-                base_row = db.execute(
-                    "SELECT file_processor_id FROM knowledge_bases WHERE id=? AND user_id=?",
-                    (base_id, user_id),
-                ).fetchone()
-                # 检查全局设置
-                global_row = db.execute(
-                    "SELECT value FROM system_settings WHERE key=?",
-                    ("file_processor",),
-                ).fetchone()
-            finally:
-                db.close()
-
-            processor_id = base_row["file_processor_id"] if base_row and base_row["file_processor_id"] else None
-            if not processor_id and global_row and global_row["value"]:
-                processor_id = global_row["value"]
-            processor = file_processor_registry.get(processor_id)
-
-            if processor.is_async():
-                # External file processor — async path
-                try:
-                    task_id = await processor.submit(file_path)
-                except Exception as e:
-                    logger.error("Failed to submit file to external processor: %s", e)
-                    await self._set_status_under_lock(
-                        base_id, user_id, item_id, "failed", f"External processor submission failed: {e}"
-                    )
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file_name)[1]) as tf:
+                        tf.write(content)
+                        temp_path = tf.name
+                    file_path = temp_path
+                    logger.info("Downloaded S3 file to temp: %s", temp_path)
+                else:
+                    logger.warning("File not found for item %s: %s", item_id, file_path)
+                    await self._set_status_under_lock(base_id, user_id, item_id, "failed", "File not found")
                     return
 
-                # Store task info in item data
+            try:
+                # Resolve file processor (全局设置 → KB 设置 → 默认)
+                db = get_db()
+                try:
+                    base_row = db.execute(
+                        "SELECT file_processor_id FROM knowledge_bases WHERE id=? AND user_id=?",
+                        (base_id, user_id),
+                    ).fetchone()
+                    global_row = db.execute(
+                        "SELECT value FROM system_settings WHERE key=?",
+                        ("file_processor",),
+                    ).fetchone()
+                finally:
+                    db.close()
+
+                processor_id = base_row["file_processor_id"] if base_row and base_row["file_processor_id"] else None
+                if not processor_id and global_row and global_row["value"]:
+                    processor_id = global_row["value"]
+                processor = file_processor_registry.get(processor_id)
+
+                if processor.is_async():
+                    # External file processor — async path
+                    try:
+                        task_id = await processor.submit(file_path)
+                    except Exception as e:
+                        logger.error("Failed to submit file to external processor: %s", e)
+                        await self._set_status_under_lock(
+                            base_id, user_id, item_id, "failed", f"External processor submission failed: {e}"
+                        )
+                        return
+
+                    item_data = data.copy()
+                    item_data["externalTaskId"] = task_id
+                    item_data["externalProcessorId"] = processor_id
+                    db = get_db()
+                    try:
+                        db.execute(
+                            "UPDATE knowledge_items SET data=?, updated_at=? WHERE id=?",
+                            (json.dumps(item_data), _now_iso(), item_id),
+                        )
+                        db.commit()
+                    finally:
+                        db.close()
+
+                    await self.job_manager.enqueue(
+                        JOB_TYPE_CHECK_PROCESSING_RESULT,
+                        {
+                            "baseId": base_id,
+                            "itemId": item_id,
+                            "taskId": task_id,
+                            "processorId": processor_id,
+                            "attempt": 0,
+                        },
+                        queue=knowledge_queue_name(base_id),
+                        idempotency_key=knowledge_idempotency_key("check-processing", base_id, item_id),
+                    )
+                    logger.info("Submitted file %s to external processor %s: task=%s", file_name, processor_id, task_id)
+                    return
+
+                # Sync processor path — parse file first
+                result = await processor.process(file_path, file_name)
+
+                # Save parsed content to item data
                 item_data = data.copy()
-                item_data["externalTaskId"] = task_id
-                item_data["externalProcessorId"] = processor_id
+                item_data["parsedContent"] = result["content"]
+                item_data["parsedTitle"] = result.get("title", file_name)
                 db = get_db()
                 try:
                     db.execute(
@@ -122,45 +173,17 @@ class IndexDocumentsHandler(JobHandler):
                 finally:
                     db.close()
 
-                # Enqueue polling job
-                await self.job_manager.enqueue(
-                    JOB_TYPE_CHECK_PROCESSING_RESULT,
-                    {
-                        "baseId": base_id,
-                        "itemId": item_id,
-                        "taskId": task_id,
-                        "processorId": processor_id,
-                        "attempt": 0,
-                    },
-                    queue=knowledge_queue_name(base_id),
-                    idempotency_key=knowledge_idempotency_key("check-processing", base_id, item_id),
-                )
-                logger.info("Submitted file %s to external processor %s: task=%s", file_name, processor_id, task_id)
-                return  # Don't mark completed yet — polling job will
-
-            # Sync processor path — parse file first
-            result = await processor.process(file_path, file_name)
-
-            # Save parsed content to item data
-            item_data = data.copy()
-            item_data["parsedContent"] = result["content"]
-            item_data["parsedTitle"] = result.get("title", file_name)
-            db = get_db()
-            try:
-                db.execute(
-                    "UPDATE knowledge_items SET data=?, updated_at=? WHERE id=?",
-                    (json.dumps(item_data), _now_iso(), item_id),
-                )
-                db.commit()
+                chunk_count = await pipeline.index_item(item_id, result["content"])
+                logger.info("File item %s indexed (%d chunks)", item_id, chunk_count)
             finally:
-                db.close()
-
-            # Embedding is REQUIRED — if embedding model is unavailable or fails,
-            # exception propagates → job retries → on_settled marks item 'failed'
-            # (CherryStudio behavior: embedding failure → item fails → user reindexes)
-            chunk_count = await pipeline.index_item(item_id, result["content"])
-            logger.info("File item %s indexed (%d chunks)", item_id, chunk_count)
-
+                # ── 清理临时文件（S3 下载）和本地上传文件 ──
+                if temp_path and os.path.exists(temp_path):
+                    try:
+                        os.remove(temp_path)
+                        logger.info("已删除临时文件: %s", temp_path)
+                    except Exception as e:
+                        logger.warning("删除临时文件失败 %s: %s", temp_path, e)
+                _delete_local_upload_file(data)
         elif item_type == "note":
             text = data.get("text") or data.get("content") or ""
             # Embedding is REQUIRED — if it fails, exception propagates → job retries → marks failed
@@ -280,6 +303,31 @@ def _mark_item_failed(job_id: str, error: str | None) -> None:
         KnowledgeItemService.update_status(user_id, item_id, "failed", error or "Job failed")
     finally:
         db.close()
+
+
+def _delete_local_upload_file(item_data: dict | str) -> None:
+    """删除上传的原始文件（本地文件系统路径），S3/http 路径跳过。"""
+    if isinstance(item_data, str):
+        try:
+            item_data = json.loads(item_data)
+        except (json.JSONDecodeError, TypeError):
+            return
+    if not isinstance(item_data, dict):
+        return
+    file_path = item_data.get("path") or item_data.get("source", "")
+    if not file_path or file_path.startswith(("http://", "https://", "s3://")):
+        return
+    if not os.path.exists(file_path):
+        return
+    try:
+        os.remove(file_path)
+        logger.info("已删除上传文件: %s", file_path)
+        # 如果父目录为空则一并删除（uploads/{user}/{base_id}/{item_id}/）
+        parent = os.path.dirname(file_path)
+        if os.path.isdir(parent) and not os.listdir(parent):
+            os.rmdir(parent)
+    except Exception as e:
+        logger.warning("删除上传文件失败 %s: %s", file_path, e)
 
 
 def _now_iso() -> str:

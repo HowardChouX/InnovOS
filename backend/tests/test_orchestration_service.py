@@ -43,7 +43,7 @@ async def test_list_item_chunks_returns_chunks_for_completed_item(orch, mock_db)
     vec_sql = next((s for s in mock_db.all_sql if "knowledge_vectors" in s), "")
     assert "knowledge_vectors" in vec_sql
     assert "user_id" in vec_sql
-    assert "doc_id" in vec_sql
+    assert "item_id" in vec_sql
 
 
 @pytest.mark.asyncio

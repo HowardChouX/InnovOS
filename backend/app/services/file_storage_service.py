@@ -190,6 +190,42 @@ class FileStorageService:
             logger.exception(f"生成下载 URL 失败: key={key} {e}")
             return None
 
+    async def generate_upload_url(
+        self,
+        filename: str,
+        content_type: str = "application/octet-stream",
+        expires: int = 3600,
+    ) -> dict | None:
+        """生成预签名上传 URL（浏览器直传 S3）。
+
+        Args:
+            filename: 上传文件名
+            content_type: 文件 MIME 类型
+            expires: URL 过期时间（秒），默认 1 小时
+
+        Returns:
+            {"url": str, "key": str} 或 None（S3 未配置时）
+        """
+        if not self.enabled:
+            return None
+        import uuid
+
+        key = f"uploads/{uuid.uuid4()}/{os.path.basename(filename)}"
+        try:
+            url = self._s3.generate_presigned_url(
+                "put_object",
+                Params={
+                    "Bucket": self._bucket,
+                    "Key": key,
+                    "ContentType": content_type,
+                },
+                ExpiresIn=expires,
+            )
+            return {"url": url, "key": key}
+        except Exception as e:
+            logger.exception(f"生成上传 URL 失败: {e}")
+            return None
+
     async def get_public_url(self, key: str) -> str | None:
         """获取公开访问 URL（如果配置了 PUBLIC_URL + 公开 bucket）。
 

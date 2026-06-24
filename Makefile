@@ -125,7 +125,7 @@ docker-clean:
 # ══════════════════════════════════════════════
 
 db-backup:
-	@bash backend/scripts/backup_db.sh
+	@uv run python -c "import asyncio; from app.services.backup_service import backup_service; asyncio.run(backup_service.run_now())"
 
 db-restore:
 	@if [ -z "$(file)" ]; then echo "Usage: make db-restore file=backup.sql.gz"; exit 1; fi

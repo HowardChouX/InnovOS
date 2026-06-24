@@ -211,39 +211,18 @@ async def import_directory(
     if not base_owner:
         raise HTTPException(status_code=404, detail="知识库不存在")
 
-    # 过滤支持的文件类型，跳过隐藏文件
+    # 过滤支持的文件类型（解析器可处理的文本类格式），跳过隐藏文件
     supported_extensions = {
         ".pdf",
         ".docx",
+        ".doc",
         ".txt",
         ".md",
         ".csv",
-        ".xlsx",
-        ".pptx",
         ".json",
         ".xml",
         ".html",
         ".htm",
-        ".epub",
-        ".png",
-        ".jpg",
-        ".jpeg",
-        ".gif",
-        ".bmp",
-        ".webp",
-        ".svg",
-        ".mp4",
-        ".avi",
-        ".mov",
-        ".wmv",
-        ".flv",
-        ".mkv",
-        ".webm",
-        ".zip",
-        ".gz",
-        ".tar",
-        ".7z",
-        ".rar",
     }
     valid_files = []
     for f in files:
@@ -257,11 +236,11 @@ async def import_directory(
             valid_files.append(f)
         else:
             raise HTTPException(
-                status_code=400, detail=f"不支持的文件格式: {f.filename}（仅允许文档、图片、视频、压缩包等安全格式）"
+                status_code=400, detail=f"不支持的文件格式: {f.filename}（仅支持: PDF、DOCX、DOC、TXT、MD、CSV、JSON、XML、HTML、HTM）"
             )
 
     if not valid_files:
-        raise HTTPException(status_code=400, detail="没有支持的文件格式（仅允许文档、图片、视频、压缩包等安全格式）")
+        raise HTTPException(status_code=400, detail="没有支持的文件格式（仅支持: PDF、DOCX、DOC、TXT、MD、CSV、JSON、XML、HTML、HTM）")
 
     # 创建持久化目录：uploads/{user_id}/{base_id}/{item_id}/
     item_id = str(uuid.uuid4())

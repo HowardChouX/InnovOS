@@ -171,7 +171,10 @@ def init_patents(db):
             publication_date TEXT DEFAULT '',
             patent_number TEXT DEFAULT '',
             ipc_codes TEXT DEFAULT '[]',
-            relevance_score INTEGER DEFAULT 0
+            relevance_score INTEGER DEFAULT 0,
+            publication_number TEXT DEFAULT '',
+            claims TEXT DEFAULT '',
+            description TEXT DEFAULT ''
         );
     """)
 
@@ -601,14 +604,28 @@ def init_all_tables(db):
     db.execute("CREATE EXTENSION IF NOT EXISTS vector;")
     logger.info("pgvector extension ready")
     init_users(db)
+    _ensure_columns(db, "users", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_tasks(db)
     init_analyses(db)
     _ensure_columns(db, "analyses", [("created_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
+    _ensure_columns(db, "analyses", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_solutions(db)
     _ensure_columns(db, "solutions", [("created_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
+    _ensure_columns(db, "solutions", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_workflows(db)
+    _ensure_columns(db, "workflows", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_patents(db)
     _ensure_columns(db, "patents", [("created_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
+    _ensure_columns(
+        db,
+        "patents",
+        [
+            ("publication_number", "TEXT DEFAULT ''"),
+            ("claims", "TEXT DEFAULT ''"),
+            ("description", "TEXT DEFAULT ''"),
+        ],
+    )
+    _ensure_columns(db, "patents", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     # ── UNIQUE index on patent_number ──
     try:
         db.execute("""
@@ -620,11 +637,17 @@ def init_all_tables(db):
         logger.warning(f"  无法创建 patent_number 索引: {e}")
 
     init_patent_vectors(db)
+    _ensure_columns(db, "patent_vectors", [("created_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_evaluations(db)
+    _ensure_columns(db, "evaluations", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_feedbacks(db)
+    _ensure_columns(db, "feedbacks", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_audit_log(db)
+    _ensure_columns(db, "audit_log", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_api_keys(db)
+    _ensure_columns(db, "api_keys", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_notifications(db)
+    _ensure_columns(db, "notifications", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_knowledge_bases(db)
     init_knowledge_items(db)
     init_knowledge_groups(db)
@@ -646,8 +669,10 @@ def init_all_tables(db):
 
     init_problem_modelings(db)
     _ensure_columns(db, "problem_modelings", [("created_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
+    _ensure_columns(db, "problem_modelings", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_system_settings(db)
     init_model_providers(db)
+    _ensure_columns(db, "model_providers", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     # ── Drop deprecated columns ───────────────────────────
     try:
         db.execute("ALTER TABLE model_providers DROP COLUMN IF EXISTS api_key_encrypted")
@@ -656,6 +681,14 @@ def init_all_tables(db):
         logger.warning(f"  无法移除 api_key_encrypted: {e}")
 
     init_models(db)
+    _ensure_columns(
+        db,
+        "models",
+        [
+            ("created_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))"),
+            ("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))"),
+        ],
+    )
 
     # ── Foreign Key constraints ──────────────────────────────────
     logger.info("Adding foreign key constraints...")
@@ -687,19 +720,15 @@ def init_all_tables(db):
             db.execute("ROLLBACK TO SAVEPOINT sp_fk")
             logger.debug(f"FK {fk_name} already exists")
 
-    # ── FK: knowledge_items.group_id → knowledge_groups.id ──
+    # ── FK: knowledge_items.group_id (removed — column is also used for tree parent UUIDs) ──
     try:
-        db.execute("SAVEPOINT sp_fk_group")
-        db.execute("""
-            ALTER TABLE knowledge_items
-            ADD CONSTRAINT fk_ki_group
-            FOREIGN KEY (group_id) REFERENCES knowledge_groups(id) ON DELETE SET NULL
-        """)
-        db.execute("RELEASE SAVEPOINT sp_fk_group")
-        logger.info("  + 添加 FK: knowledge_items.group_id → knowledge_groups")
+        db.execute("SAVEPOINT sp_drop_fk_group")
+        db.execute("ALTER TABLE knowledge_items DROP CONSTRAINT IF EXISTS fk_ki_group")
+        db.execute("RELEASE SAVEPOINT sp_drop_fk_group")
+        logger.info("  - Removed FK fk_ki_group (group_id is not always knowledge_groups.id)")
     except Exception:
-        db.execute("ROLLBACK TO SAVEPOINT sp_fk_group")
-        logger.debug("  FK knowledge_items.group_id 已存在")
+        db.execute("ROLLBACK TO SAVEPOINT sp_drop_fk_group")
+        logger.debug("  FK fk_ki_group did not exist")
 
     # ── Performance indexes ──────────────────────────────────────
     logger.info("Creating performance indexes...")
@@ -714,6 +743,13 @@ def init_all_tables(db):
         "CREATE INDEX IF NOT EXISTS idx_knowledge_bases_user_id ON knowledge_bases(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_knowledge_items_base_id ON knowledge_items(base_id)",
         "CREATE INDEX IF NOT EXISTS idx_knowledge_items_status ON knowledge_items(status)",
+        "CREATE INDEX IF NOT EXISTS idx_workflows_task_id ON workflows(task_id)",
+        "CREATE INDEX IF NOT EXISTS idx_evaluations_solution_user ON evaluations(solution_id, user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_feedbacks_solution_user ON feedbacks(solution_id, user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_problem_modelings_task_id ON problem_modelings(task_id)",
+        "CREATE INDEX IF NOT EXISTS idx_knowledge_groups_user_id ON knowledge_groups(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_knowledge_docs_user_active ON knowledge_docs(user_id, is_active)",
+        "CREATE INDEX IF NOT EXISTS idx_patents_relevance_score ON patents(relevance_score DESC)",
     ]
 
     for idx_sql in indexes:
@@ -724,5 +760,46 @@ def init_all_tables(db):
         except Exception as e:
             db.execute("ROLLBACK TO SAVEPOINT sp_idx")
             logger.warning(f"Index creation skipped: {e}")
+
+    # ── BOOLEAN column type migration ─────────────────────────────
+    # 将 INTEGER 0/1 列迁移为原生 BOOLEAN 类型
+    logger.info("Migrating INTEGER → BOOLEAN columns...")
+
+    # is_active 列迁移（多个表）
+    try:
+        db.execute("SAVEPOINT sp_bool_migrate")
+        db.execute("ALTER TABLE users ALTER COLUMN is_active TYPE BOOLEAN USING is_active::boolean")
+        db.execute("ALTER TABLE tasks ALTER COLUMN is_active TYPE BOOLEAN USING is_active::boolean")
+        db.execute("ALTER TABLE notifications ALTER COLUMN is_active TYPE BOOLEAN USING is_active::boolean")
+        db.execute("ALTER TABLE knowledge_items ALTER COLUMN is_active TYPE BOOLEAN USING is_active::boolean")
+        db.execute("ALTER TABLE knowledge_docs ALTER COLUMN is_active TYPE BOOLEAN USING is_active::boolean")
+        db.execute("ALTER TABLE knowledge_bases ALTER COLUMN is_active TYPE BOOLEAN USING is_active::boolean")
+        db.execute("RELEASE SAVEPOINT sp_bool_migrate")
+        logger.info("  + 迁移 is_active INTEGER → BOOLEAN")
+    except Exception as e:
+        db.execute("ROLLBACK TO SAVEPOINT sp_bool_migrate")
+        logger.debug(f"  is_active 已为 BOOLEAN 或无法迁移: {e}")
+
+    # notifications 其他布尔列
+    try:
+        db.execute("SAVEPOINT sp_bool_notif")
+        db.execute("ALTER TABLE notifications ALTER COLUMN is_read TYPE BOOLEAN USING is_read::boolean")
+        db.execute("ALTER TABLE notifications ALTER COLUMN is_recalled TYPE BOOLEAN USING is_recalled::boolean")
+        db.execute("RELEASE SAVEPOINT sp_bool_notif")
+        logger.info("  + 迁移 notifications is_read/is_recalled INTEGER → BOOLEAN")
+    except Exception as e:
+        db.execute("ROLLBACK TO SAVEPOINT sp_bool_notif")
+        logger.debug(f"  notifications 布尔列无法迁移: {e}")
+
+    # evaluations 布尔列
+    try:
+        db.execute("SAVEPOINT sp_bool_eval")
+        db.execute("ALTER TABLE evaluations ALTER COLUMN root_cause_cut TYPE BOOLEAN USING root_cause_cut::boolean")
+        db.execute("ALTER TABLE evaluations ALTER COLUMN original_contradiction_resolved TYPE BOOLEAN USING original_contradiction_resolved::boolean")
+        db.execute("RELEASE SAVEPOINT sp_bool_eval")
+        logger.info("  + 迁移 evaluations 布尔列 INTEGER → BOOLEAN")
+    except Exception as e:
+        db.execute("ROLLBACK TO SAVEPOINT sp_bool_eval")
+        logger.debug(f"  evaluations 布尔列无法迁移: {e}")
 
     logger.info("Schema migration complete")
