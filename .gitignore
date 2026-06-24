@@ -50,6 +50,10 @@ backend/storage/patents/
 *.db
 .zshenv
 *.zshenv
+.claude/
+.mimocode/
+graphify-out/
+.opencode/
 
 # ── Pre-commit / Hooks ──
 .husky/_
