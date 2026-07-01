@@ -24,25 +24,25 @@ def chunk_document(
     if separators is None:
         separators = ["\n\n", "\n", "。", "！", "？", ".", "!", "?", " "]
 
-    raw_chunks = _recursive_split(content, separators, 0)
+    raw_chunks = _recursive_split(content, separators, 0, chunk_size)
     merged = _merge_chunks(raw_chunks, chunk_size)
     overlapped = _add_overlap(merged, chunk_overlap)
     return [{"text": t.strip(), "index": i} for i, t in enumerate(overlapped) if t.strip()]
 
 
-def _recursive_split(text: str, separators: list[str], depth: int) -> list[str]:
-    """递归按分隔符拆分文本。"""
-    if depth >= len(separators) or len(text) <= 512:
+def _recursive_split(text: str, separators: list[str], depth: int, max_chars: int = 512) -> list[str]:
+    """递归按分隔符拆分文本，分片超过 max_chars 时继续用下一级分隔符切分。"""
+    if depth >= len(separators) or len(text) <= max_chars:
         return [text]
 
     sep = separators[depth]
     parts = text.split(sep)
     result = []
     for part in parts:
-        if len(part) <= 512:
+        if len(part) <= max_chars:
             result.append(part)
         else:
-            result.extend(_recursive_split(part, separators, depth + 1))
+            result.extend(_recursive_split(part, separators, depth + 1, max_chars))
     # 用原分隔符拼接回去，保留语义边界
     if len(result) > 1:
         return [result[0]] + [sep + r for r in result[1:]]

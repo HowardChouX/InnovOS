@@ -1331,7 +1331,7 @@ function RagGlobalConfig() {
           'hybrid_alpha',
           'threshold',
           'document_count',
-          'file_processor',
+          'dimensions',
         ]) {
           v[key] = (raw as unknown as Record<string, string | null>)[key] ?? '';
         }
@@ -1395,19 +1395,20 @@ function RagGlobalConfig() {
             <option value="">默认</option>
             <option value="hybrid">混合检索</option>
             <option value="vector">纯向量检索</option>
-            <option value="bm25">关键词检索</option>
           </select>
         </div>
-        <div style={ragFieldStyle}>
-          <span style={ragLabelStyle}>混合权重</span>
-          <input
-            style={ragInputStyle}
-            value={values.hybrid_alpha ?? ''}
-            onChange={(e) => set('hybrid_alpha', e.target.value)}
-            placeholder="0.3"
-          />
-          <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>0-1</span>
-        </div>
+        {values.search_mode === 'hybrid' && (
+          <div style={ragFieldStyle}>
+            <span style={ragLabelStyle}>混合权重</span>
+            <input
+              style={ragInputStyle}
+              value={values.hybrid_alpha ?? ''}
+              onChange={(e) => set('hybrid_alpha', e.target.value)}
+              placeholder="0.3"
+            />
+            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>0-1</span>
+          </div>
+        )}
         <div style={ragFieldStyle}>
           <span style={ragLabelStyle}>相关阈值</span>
           <input
@@ -1429,15 +1430,14 @@ function RagGlobalConfig() {
           <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>条</span>
         </div>
         <div style={ragFieldStyle}>
-          <span style={ragLabelStyle}>文件处理器</span>
-          <select
-            style={ragSelectStyle}
-            value={values.file_processor ?? ''}
-            onChange={(e) => set('file_processor', e.target.value)}
-          >
-            <option value="">默认</option>
-            <option value="default">DefaultFileProcessor</option>
-          </select>
+          <span style={ragLabelStyle}>向量维度</span>
+          <input
+            style={ragInputStyle}
+            value={values.dimensions ?? ''}
+            onChange={(e) => set('dimensions', e.target.value)}
+            placeholder="自动检测"
+          />
+          <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>空=自动</span>
         </div>
       </div>
       <button

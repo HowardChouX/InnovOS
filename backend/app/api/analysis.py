@@ -727,7 +727,7 @@ async def run_analysis_background(
                             ratings_list = agent5_out.get("ratings", [])
                             if ratings_list:
                                 for r in ratings_list:
-                                    idx = r.get("demandId", "")
+                                    idx = str(r.get("demandId", ""))
                                     score = r.get("score", 0)
                                     if idx.isdigit() and score > 0:
                                         patent_ratings[int(idx)] = score
@@ -1162,5 +1162,65 @@ async def proceed_workflow(task_id: int, body: ProceedInput | None = None, user:
     return {
         "data": {"status": "proceeding"},
         "message": "继续执行后续步骤",
+        "code": 200,
+    }
+
+
+@router.post("/{task_id}/retry")
+async def retry_workflow(task_id: int, user: dict = Depends(get_current_user)):
+    """重试失败的步骤，从失败处重新执行"""
+    db = get_db()
+    task = db.execute("SELECT * FROM tasks WHERE id=? AND user_id=?", (task_id, user["id"])).fetchone()
+    if not task:
+        db.close()
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    wf = db.execute("SELECT * FROM workflows WHERE task_id=?", (task_id,)).fetchone()
+    if not wf:
+        db.close()
+        raise HTTPException(status_code=400, detail="工作流未启动")
+
+    steps = json.loads(wf["steps"])
+    failed_step = None
+    for step in steps:
+        if step["status"] == "failed":
+            failed_step = step
+            break
+
+    if not failed_step:
+        db.close()
+        raise HTTPException(status_code=400, detail="没有失败的步骤需要重试")
+
+    reset = False
+    for step in steps:
+        if step["agent_id"] == failed_step["agent_id"]:
+            reset = True
+        if reset:
+            step["status"] = "pending"
+            step["started_at"] = None
+            step["completed_at"] = None
+            step["duration"] = None
+            step["output"] = None
+
+    db.execute(
+        "UPDATE workflows SET status='running', steps=? WHERE task_id=?",
+        (json.dumps(steps), task_id),
+    )
+    db.execute(
+        "UPDATE tasks SET status='analyzing', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
+        (task_id,),
+    )
+    db.commit()
+    db.close()
+
+    remaining = asyncio.create_task(
+        run_analysis_background(task_id, user["id"], task["description"], start_from=failed_step["agent_id"])
+    )
+    _background_tasks.add(remaining)
+    remaining.add_done_callback(_background_tasks.discard)
+
+    return {
+        "data": {"status": "retrying", "retryFrom": failed_step["agent_id"]},
+        "message": "正在重试",
         "code": 200,
     }

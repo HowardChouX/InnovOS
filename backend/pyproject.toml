@@ -27,6 +27,12 @@ dependencies = [
     "lxml>=5.0.0",
     "pdf2image>=1.17.0",
     "pillow>=12.2.0",
+    "docling>=2.0.0",
+    "rapidocr-onnxruntime>=1.4.0",
+    "jieba>=0.42.0",
+    "rank-bm25>=0.2.2",
+    "torch>=2.5.0",
+    "torchvision>=0.27.0",
 ]
 
 [project.optional-dependencies]

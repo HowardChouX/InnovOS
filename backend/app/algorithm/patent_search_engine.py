@@ -57,7 +57,8 @@ def init_patent_vectors_table():
         CREATE TABLE IF NOT EXISTS patent_vectors (
             patent_id INTEGER PRIMARY KEY REFERENCES patents(id) ON DELETE CASCADE,
             embedding halfvec({PATENT_VECTOR_DIM}),
-            updated_at TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))
+            updated_at TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')),
+            created_at TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))
         )
     """)
     db.commit()
@@ -149,30 +150,24 @@ class PatentSearchEngine:
         q_vec = q_vec[:PATENT_VECTOR_DIM]
         q_json = json.dumps(q_vec)
 
-        import psycopg2
-
-        from app.database import DATABASE_URL
-
-        conn = psycopg2.connect(DATABASE_URL)
+        db = get_db()
         try:
-            cur = conn.cursor()
-            cur.execute(
+            rows = db.execute(
                 f"""SELECT p.id, p.title, p.abstract, p.description, p.patent_number, p.applicants,
-                          1 - (pv.embedding <=> %s::halfvec({PATENT_VECTOR_DIM})) AS relevance
+                           1 - (pv.embedding <=> %s::halfvec({PATENT_VECTOR_DIM})) AS relevance
                    FROM patent_vectors pv
                    JOIN patents p ON p.id = pv.patent_id
                    WHERE pv.embedding IS NOT NULL
                    ORDER BY pv.embedding <=> %s::halfvec({PATENT_VECTOR_DIM})
                    LIMIT %s""",
                 (q_json, q_json, top_k),
-            )
-            columns = [desc[0] for desc in cur.description]
-            return [dict(zip(columns, row, strict=False)) for row in cur.fetchall()]
+            ).fetchall()
+            return rows
         except Exception as e:
             logger.error(f"向量搜索失败: {e}")
             return []
         finally:
-            conn.close()
+            db.close()
 
     async def search(self, query: str, top_k: int = 5) -> list[dict]:
         """语义搜索专利 — 直接用原始查询进行向量搜索"""

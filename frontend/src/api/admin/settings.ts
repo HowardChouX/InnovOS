@@ -33,7 +33,7 @@ export interface RagConfig {
   hybrid_alpha: string | null;
   threshold: string | null;
   document_count: string | null;
-  file_processor: string | null;
+  dimensions: string | null;
 }
 
 export const settingsApi = {

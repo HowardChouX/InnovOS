@@ -199,29 +199,33 @@ async def test_process_text_default_type(pipeline):
 async def test_index_item_calls_retriever(pipeline):
     """index_item 调用 get_retriever 并返回分块数。"""
     with patch.object(pipeline, "_load_model_configs") as mock_load:
-        with patch("app.algorithm.knowledge.retriever.get_retriever") as mock_get_ret:
-            mock_retriever = AsyncMock()
-            mock_retriever.index_item = AsyncMock(return_value=5)
-            mock_get_ret.return_value = mock_retriever
+        with patch.object(pipeline, "_load_chunk_config", return_value={"chunk_size": 512, "chunk_overlap": 64}):
+            with patch("app.algorithm.knowledge.retriever.get_retriever") as mock_get_ret:
+                mock_retriever = AsyncMock()
+                mock_retriever.index_item = AsyncMock(return_value=5)
+                mock_get_ret.return_value = mock_retriever
 
-            result = await pipeline.index_item("item-1", "索引内容")
+                result = await pipeline.index_item("item-1", "索引内容")
 
     assert result == 5
     mock_load.assert_called_once()
-    mock_retriever.index_item.assert_awaited_once_with("base-1", "item-1", "索引内容")
+    mock_retriever.index_item.assert_awaited_once_with(
+        "base-1", "item-1", "索引内容", chunk_size=512, chunk_overlap=64
+    )
 
 
 @pytest.mark.asyncio
 async def test_index_item_propagates_error(pipeline):
     """index_item 异常冒泡。"""
     with patch.object(pipeline, "_load_model_configs"):
-        with patch("app.algorithm.knowledge.retriever.get_retriever") as mock_get_ret:
-            mock_retriever = AsyncMock()
-            mock_retriever.index_item = AsyncMock(side_effect=RuntimeError("API 失败"))
-            mock_get_ret.return_value = mock_retriever
+        with patch.object(pipeline, "_load_chunk_config", return_value={"chunk_size": 512, "chunk_overlap": 64}):
+            with patch("app.algorithm.knowledge.retriever.get_retriever") as mock_get_ret:
+                mock_retriever = AsyncMock()
+                mock_retriever.index_item = AsyncMock(side_effect=RuntimeError("API 失败"))
+                mock_get_ret.return_value = mock_retriever
 
-            with pytest.raises(RuntimeError, match="API 失败"):
-                await pipeline.index_item("item-1", "内容")
+                with pytest.raises(RuntimeError, match="API 失败"):
+                    await pipeline.index_item("item-1", "内容")
 
 
 # ─── search ────────────────────────────────────────────────────

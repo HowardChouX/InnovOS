@@ -7,7 +7,7 @@ class TestEmbedderInit:
         from app.algorithm.knowledge.embedder import Embedder
         emb = Embedder()
         assert emb.model == "BAAI/bge-large-zh-v1.5"
-        assert emb.dimension == 1024
+        assert emb.dimension == 0  # auto-detect from API, not yet called
         assert emb.api_key == ""
         assert emb.api_host == ""
 
@@ -97,4 +97,4 @@ class TestEmbed:
         from app.algorithm.knowledge.embedder import Embedder
         emb = Embedder()
         assert isinstance(emb.dimension, int)
-        assert emb.dimension > 0
+        assert emb.dimension >= 0  # auto-detect from API, 0 before first call

@@ -150,24 +150,6 @@ class TestParsePdf:
 
         assert "文字层提取失败" in result["content"]
 
-    def test_deepseek_ocr_mode_success(self, monkeypatch):
-        mock_ocr = MagicMock(return_value="OCR text result")
-        monkeypatch.setattr("app.algorithm.file_parser._ocr_deepseek", mock_ocr)
-
-        from app.algorithm.file_parser import _parse_pdf
-        result = _parse_pdf("/fake/test.pdf", mode="deepseek")
-
-        assert result["content"] == "OCR text result"
-        assert result["type"] == "pdf_ocr"
-
-    def test_deepseek_ocr_failure_raises(self, monkeypatch):
-        monkeypatch.setattr("app.algorithm.file_parser._ocr_deepseek", lambda p: None)
-
-        from app.algorithm.file_parser import _parse_pdf
-
-        with pytest.raises(RuntimeError, match="DeepSeek-OCR 失败"):
-            _parse_pdf("/fake/test.pdf", mode="deepseek")
-
 
 # ═══════════════════════════════════════════════════════════════════
 # _try_pypdf2 / _try_pdfminer — 底层 PDF 库

@@ -179,18 +179,6 @@ def init_patents(db):
     """)
 
 
-def init_patent_vectors(db):
-    """专利向量表 — 存储语义搜索所需的嵌入向量"""
-    db.execute(f"""
-        CREATE TABLE IF NOT EXISTS patent_vectors (
-            patent_id INTEGER PRIMARY KEY REFERENCES patents(id) ON DELETE CASCADE,
-            embedding vector(4096),
-            updated_at TEXT DEFAULT ({_ddl_now()})
-        )
-    """)
-    logger.info("表 patent_vectors 已初始化")
-
-
 def init_evaluations(db):
     pk = _ddl_int_pk()
     now = _ddl_now()
@@ -636,8 +624,6 @@ def init_all_tables(db):
     except Exception as e:
         logger.warning(f"  无法创建 patent_number 索引: {e}")
 
-    init_patent_vectors(db)
-    _ensure_columns(db, "patent_vectors", [("created_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_evaluations(db)
     _ensure_columns(db, "evaluations", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_feedbacks(db)

@@ -52,7 +52,7 @@ export function PatentDbPage() {
   const [form, setForm] = useState<Patent>({ ...EMPTY_PATENT });
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadMode, setUploadMode] = useState<'pdfminer' | 'deepseek'>('pdfminer');
+  const [uploadMode, setUploadMode] = useState<'auto' | 'pdfminer'>('auto');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -164,7 +164,7 @@ export function PatentDbPage() {
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  const modeLabel = { pdfminer: 'PDFMINER', deepseek: 'DeepSeek-OCR' } as const;
+  const modeLabel = { auto: '自动', pdfminer: 'PDFMINER', docling: 'DOCLING' } as const;
 
   const pageTotal = Math.ceil(total / 20);
 
@@ -252,7 +252,7 @@ export function PatentDbPage() {
           <i className="fa-solid fa-upload" />
           {uploading ? '处理中...' : '上传 PDF'}
         </button>
-        {['pdfminer', 'deepseek'].map((m) => (
+        {['auto', 'pdfminer', 'docling'].map((m) => (
           <button
             key={m}
             onClick={() => setUploadMode(m as typeof uploadMode)}

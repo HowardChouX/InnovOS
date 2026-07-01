@@ -78,7 +78,7 @@ def test_replace_by_external_id_inserts_vectors(monkeypatch, mock_db):
 
     from app.algorithm.knowledge.vector_store import VectorStore
 
-    vs = VectorStore(user_id=1, dimensions=1024)
+    vs = VectorStore(user_id=1)
 
     vectors = [[0.1, 0.2], [0.3, 0.4]]
     metadata = [
@@ -111,7 +111,7 @@ def test_replace_by_external_id_empty_clears_vectors(monkeypatch, mock_db):
 
     from app.algorithm.knowledge.vector_store import VectorStore
 
-    vs = VectorStore(user_id=1, dimensions=1024)
+    vs = VectorStore(user_id=1)
     vs.replace_by_external_id("base_1", "item_1", [], [])
 
     # Only DELETE should be recorded (no INSERT)
@@ -126,7 +126,7 @@ def test_delete_by_external_id_removes_vectors(monkeypatch, mock_db):
 
     from app.algorithm.knowledge.vector_store import VectorStore
 
-    vs = VectorStore(user_id=1, dimensions=1024)
+    vs = VectorStore(user_id=1)
     vs.delete_by_external_id("item_42")
 
     assert len(mock_db.all_sql) == 1
@@ -155,7 +155,7 @@ def test_search_vector_mode_cosine_only(monkeypatch, mock_db):
         {"id": 3, "item_id": "c", "chunk_index": 0, "text": "text c", "score": -0.8},
     ]
 
-    vs = VectorStore(user_id=1, dimensions=3)
+    vs = VectorStore(user_id=1)
     results = vs.search(
         base_id="base_1",
         query_vector=[1.0, 0.0, 0.0],
@@ -185,7 +185,7 @@ def test_search_hybrid_mode_blends_scores(monkeypatch, mock_db):
         _make_hybrid_row(2, "b", 0, "hello world greetings", cosine_score=0.5, text_score=1.0),
     ]
 
-    vs = VectorStore(user_id=1, dimensions=3)
+    vs = VectorStore(user_id=1)
 
     # --- hybrid mode ---
     hybrid_results = vs.search(
@@ -232,7 +232,7 @@ def test_search_empty_base_returns_empty(monkeypatch, mock_db, mock_numpy):
 
     mock_db.cursor._fetchall_result = []
 
-    vs = VectorStore(user_id=1, dimensions=2)
+    vs = VectorStore(user_id=1)
     results = vs.search(
         base_id="empty_base",
         query_vector=[1.0, 0.0],
@@ -260,7 +260,7 @@ def test_hybrid_keyword_matching(monkeypatch, mock_db):
         _make_hybrid_row(3, "c", 0, "no match at all", cosine_score=0.5, text_score=0.0),
     ]
 
-    vs = VectorStore(user_id=1, dimensions=3)
+    vs = VectorStore(user_id=1)
     results = vs.search(
         base_id="base_1",
         query_vector=[1.0, 0.0, 0.0],
@@ -296,7 +296,7 @@ def test_hybrid_alpha_zero_equals_vector(monkeypatch, mock_db):
         {"id": 1, "item_id": "a", "chunk_index": 0, "text": "some text", "score": 0.9},
         {"id": 2, "item_id": "b", "chunk_index": 0, "text": "hello world", "score": 0.5},
     ]
-    vs = VectorStore(user_id=1, dimensions=2)
+    vs = VectorStore(user_id=1)
 
     vector_results = vs.search(
         base_id="base_1", query_vector=[1.0, 0.0], top_k=5, mode="vector",
@@ -324,7 +324,7 @@ def test_search_count_queries(monkeypatch, mock_db):
 
     mock_db.cursor._fetchone_result = {"cnt": 7}
 
-    vs = VectorStore(user_id=1, dimensions=1024)
+    vs = VectorStore(user_id=1)
 
     # — count by base_id —
     count = vs.count(base_id="base_1")
@@ -354,7 +354,7 @@ def test_delete_by_external_ids_uses_IN_clause(monkeypatch, mock_db):
 
     from app.algorithm.knowledge.vector_store import VectorStore
 
-    vs = VectorStore(user_id=1, dimensions=1024)
+    vs = VectorStore(user_id=1)
     vs.delete_by_external_ids(["id1", "id2", "id3"])
 
     assert len(mock_db.all_sql) == 1
@@ -374,7 +374,7 @@ def test_delete_by_external_ids_empty_list_does_nothing(monkeypatch, mock_db):
 
     from app.algorithm.knowledge.vector_store import VectorStore
 
-    vs = VectorStore(user_id=1, dimensions=1024)
+    vs = VectorStore(user_id=1)
     vs.delete_by_external_ids([])
 
     assert mock_db.all_sql == [], "No SQL should be executed for empty list"

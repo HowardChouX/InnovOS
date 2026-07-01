@@ -10,6 +10,7 @@ import logging
 import os
 import shutil
 import time
+from typing import cast
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -131,7 +132,31 @@ async def startup():
     except Exception as e:
         logger.warning(f"注入管理员用户失败（非致命）: {e}")
 
-    # 4. 初始化知识库作业系统
+    # 4. 自动种子化有环境变量 API Key 的内置供应商
+    try:
+        from app.algorithm.providers_registry import BUILTIN_PROVIDERS
+        from app.algorithm.model_service import _has_provider_api_key, model_service
+
+        db = get_db()
+        existing = {r["provider_id"] for r in db.execute("SELECT provider_id FROM model_providers").fetchall()}
+        for pid, raw_info in BUILTIN_PROVIDERS.items():
+            if pid in existing or not _has_provider_api_key(pid):
+                continue
+            info = cast(dict, raw_info)
+            db.execute(
+                """INSERT INTO model_providers
+                   (provider_id, name, protocol, api_host, models, max_rpm, is_enabled)
+                   VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING""",
+                (pid, info["name"], info["protocol"], info["api_host"], "[]", 60, 1),
+            )
+            logger.info("自动种子化供应商: %s（%s）", pid, info["name"])
+        db.commit()
+        db.close()
+        logger.info("内置供应商种子化完成")
+    except Exception as e:
+        logger.warning(f"种子化供应商失败（非致命）: {e}")
+
+    # 5. 初始化知识库作业系统
     from app.services.knowledge_orchestration_service import knowledge_orchestration_service
 
     await knowledge_orchestration_service.start()
@@ -142,28 +167,26 @@ async def startup():
 
     await backup_service.start()
 
-    # 6. 建专利向量表并重建所有向量（用 title + abstract）
+    # 6. 建专利向量表并重建所有向量
     try:
         from app.algorithm.patent_search_engine import get_patent_search_engine, init_patent_vectors_table
 
         init_patent_vectors_table()
         engine = get_patent_search_engine()
         if engine.embedder:
-            # 清除旧向量并重建
             db = get_db()
             db.execute("DELETE FROM patent_vectors")
             db.commit()
             count = await engine.backfill()
             logger.info("Patent vectors rebuilt", extra={"count": count})
-            # 创建 HNSW 索引（仅 PostgreSQL，halfvec 支持 4096 维）
-            if True:
-                db.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_patent_embedding_hnsw
-                    ON patent_vectors USING hnsw (embedding halfvec_cosine_ops)
-                    WITH (m = 16, ef_construction = 200)
-                """)
-                db.commit()
-                logger.info("HNSW index created")
+            # 创建 HNSW 索引（halfvec 支持 ≤4000 维）
+            db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_patent_embedding_hnsw
+                ON patent_vectors USING hnsw (embedding halfvec_cosine_ops)
+                WITH (m = 16, ef_construction = 200)
+            """)
+            db.commit()
+            logger.info("HNSW index created")
             db.close()
     except Exception as e:
         logger.warning(f"Patent vector init failed (non-fatal): {e}")

@@ -72,10 +72,18 @@ class RedisRateLimiter:
             self._client = redis.from_url(self._redis_url, decode_responses=True)
             logger.info("已连接 Redis: %s", self._redis_url[:30])
         else:
-            import fakeredis
+            try:
+                import fakeredis
 
-            self._client = fakeredis.FakeStrictRedis()
-            logger.warning("未配置 REDIS_URL，使用 fakeredis 内存模拟（仅开发/测试用）")
+                self._client = fakeredis.FakeStrictRedis()
+                logger.warning("未配置 REDIS_URL，使用 fakeredis 内存模拟（仅开发/测试用）")
+            except ImportError:
+                from unittest.mock import MagicMock
+
+                self._client = MagicMock()
+                logger.warning("未配置 REDIS_URL 且 fakeredis 未安装，限流功能降级为放行")
+                self._script = lambda **kw: [1, 0, 1]  # degraded: pass-through
+                return
 
         # 注册 Lua 脚本
         self._script = self._client.register_script(_REDIS_SCRIPT)

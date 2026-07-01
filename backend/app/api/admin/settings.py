@@ -34,7 +34,7 @@ class RagConfigInput(BaseModel):
     hybrid_alpha: float | None = None
     threshold: float | None = None
     document_count: int | None = None
-    file_processor: str | None = None
+    dimensions: int | None = None
     rerank_model: str | None = None
 
 
@@ -45,7 +45,7 @@ RAG_KEYS = [
     "hybrid_alpha",
     "threshold",
     "document_count",
-    "file_processor",
+    "dimensions",
     "rag_rerank_model",
 ]
 
@@ -125,7 +125,7 @@ def set_rag_config(body: RagConfigInput, user: dict = Depends(require_admin)) ->
         "hybrid_alpha": body.hybrid_alpha,
         "threshold": body.threshold,
         "document_count": body.document_count,
-        "file_processor": body.file_processor,
+        "dimensions": body.dimensions,
         "rag_rerank_model": body.rerank_model,
     }
     for key, val in mapping.items():

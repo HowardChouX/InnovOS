@@ -2,7 +2,6 @@
 
 import logging
 import os
-import tempfile
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +40,15 @@ def _parse_text(file_path: str) -> dict:
 
 
 def _parse_pdf(file_path: str, mode: str = "pdfminer") -> dict:
-    if mode == "deepseek":
-        logger.info(f"DeepSeek-OCR 模式: {file_path}")
-        content = _ocr_deepseek(file_path)
-        if not content:
-            raise RuntimeError("DeepSeek-OCR 失败：请检查全局设置中 OCR 模型的 API Key 是否正确")
-        return {"title": os.path.basename(file_path), "content": content, "type": "pdf_ocr"}
+    # 优先 Docling（更好的布局保留和中文支持），失败自动降级
+    if mode in ("docling", "auto"):
+        logger.info(f"Docling 模式: {file_path}")
+        content = _try_docling(file_path)
+        if content:
+            return {"title": os.path.basename(file_path), "content": content, "type": "pdf_docling"}
+        if mode == "docling":
+            raise RuntimeError("Docling 解析失败，PDF 可能为扫描件或格式不支持")
+        logger.warning(f"Docling 失败，降级到 pdfminer: {file_path}")
 
     # pdfminer 模式
     content = _try_pdfminer(file_path)
@@ -82,104 +84,19 @@ def _try_pdfminer(file_path: str) -> str | None:
         return None
 
 
-def _ocr_pdf(file_path: str) -> str:
-    """OCR 扫描件 PDF — DeepSeek-OCR API"""
-    return _ocr_deepseek(file_path) or "[OCR 失败: DeepSeek-OCR 不可用]"
-
-
-def _ocr_deepseek(file_path: str) -> str | None:
-    """使用 DeepSeek-OCR API（需配置供应商 API Key）
-
-    从 model_providers 表中读取 DeepSeek 或配置了 OCR 能力的供应商配置。
-    未配置时返回 None，自动降级到 Tesseract。
-    """
+def _try_docling(file_path: str) -> str | None:
+    """使用 Docling 提取 PDF 文本（Markdown 输出，保留布局和阅读顺序）"""
     try:
-        from app.database import get_db
+        from docling.document_converter import DocumentConverter
 
-        db = get_db()
-        if not db:
-            return None
-
-        # 从 system_settings 读取配置的 OCR 模型
-        row = db.execute("SELECT value FROM system_settings WHERE key='ocr_model'").fetchone()
-        if not row or not row["value"]:
-            logger.info("未配置 OCR 模型，降级到 Tesseract")
-            db.close()
-            return None
-
-        ocr_model_id = row["value"]  # 格式: "providerId:modelId"
-        provider_id, model_name = ocr_model_id.split(":", 1) if ":" in ocr_model_id else ("deepseek", ocr_model_id)
-
-        # 从环境变量读取 API Key
-        from app.algorithm.model_service import _get_provider_api_key
-
-        api_key = _get_provider_api_key(provider_id)
-        if not api_key:
-            logger.info(f"供应商 {provider_id} 未配置 API Key，降级到 Tesseract")
-            return None
-
-        # 查找对应供应商的 host
-        provider = db.execute(
-            """SELECT api_host FROM model_providers
-               WHERE provider_id = ? AND is_enabled = 1 LIMIT 1""",
-            (provider_id,),
-        ).fetchone()
-        db.close()
-
-        if not provider:
-            logger.info(f"供应商 {provider_id} 未启用，降级到 Tesseract")
-            return None
-
-        api_host = provider["api_host"] or f"https://api.{provider_id}.com"
-        from app.algorithm.model_runtime import ModelRuntime
-
-        base_url = ModelRuntime.ensure_v1_url(api_host)
-
-        # 调用 DeepSeek-OCR
-        import base64
-
-        from openai import OpenAI
-
-        client = OpenAI(api_key=api_key, base_url=base_url)
-        from pdf2image import convert_from_path
-
-        images = convert_from_path(file_path, dpi=200)
-        texts = []
-
-        for i, img in enumerate(images):
-            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-                img.save(tmp.name, format="PNG")
-                with open(tmp.name, "rb") as f:
-                    b64 = base64.b64encode(f.read()).decode("utf-8")
-                os.unlink(tmp.name)
-
-            resp = client.chat.completions.create(
-                model=model_name,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
-                            {"type": "text", "text": "只输出图片中的文字，不要任何解释、不要任何格式说明。"},
-                        ],
-                    },
-                ],
-                max_tokens=4096,
-                temperature=0.0,
-            )
-            page_text = resp.choices[0].message.content or ""
-            # 过滤模型幻觉出的 HTML 标签
-            import re as _re
-
-            page_text = _re.sub(r"<[^>]+>", "", page_text)
-            texts.append(f"--- 第 {i + 1} 页 ---\n{page_text.strip()}")
-
-        result = "\n\n".join(texts)
-        logger.info(f"DeepSeek-OCR 完成: {len(images)} 页, {len(result)} 字")
-        return result
-
+        converter = DocumentConverter()
+        result = converter.convert(file_path)
+        return result.document.export_to_markdown()
+    except ImportError:
+        logger.info("Docling 未安装，使用 pdfminer 降级")
+        return None
     except Exception as e:
-        logger.warning(f"DeepSeek-OCR 调用失败，降级到 Tesseract: {e}")
+        logger.warning(f"Docling 失败: {e}")
         return None
 
 

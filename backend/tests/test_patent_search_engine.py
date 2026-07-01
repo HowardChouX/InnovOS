@@ -100,28 +100,20 @@ class TestSearch:
         assert results == []
         mock_db.execute.assert_not_called()
 
-    async def test_search_pg_calls_operator(self, engine, monkeypatch):
+    async def test_search_pg_calls_operator(self, engine, mock_db):
         """PG 环境下应使用 <=> 算子"""
-        # _vector_search uses psycopg2.connect(DATABASE_URL) directly
-        mock_cursor = MagicMock()
-        mock_cursor.description = [("id",), ("title",), ("abstract",),
-                                   ("description",), ("patent_number",),
-                                   ("applicants",), ("relevance",)]
-        mock_cursor.fetchall.return_value = [
-            (1, "散热结构", "摘要", "", "CN123", '["华为"]', 0.95)
-        ]
+        # _vector_search now uses get_db() → mock_db, not raw psycopg2.connect
+        row = {"id": 1, "title": "散热结构", "abstract": "摘要", "description": "",
+               "patent_number": "CN123", "applicants": '["华为"]', "relevance": 0.95}
+        mock_db.execute.return_value.fetchall.return_value = [row]
 
-        mock_conn = MagicMock()
-        mock_conn.cursor.return_value = mock_cursor
-
-        with patch("psycopg2.connect", return_value=mock_conn):
-            results = await engine.search("散热")
+        results = await engine.search("散热")
 
         assert len(results) == 1
         assert results[0]["relevance"] == 0.95
 
         # 验证使用了 <=> 算子
-        call_sql = mock_cursor.execute.call_args[0][0]
+        call_sql = mock_db.execute.call_args[0][0]
         assert "<->" in call_sql or "<=>" in call_sql
 
 

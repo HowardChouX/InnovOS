@@ -27,6 +27,27 @@ services:
         max-size: '10m'
         max-file: '3'
 
+  # ─── Redis (rate limiting + caching) ─────────────────────────
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
   # ─── MinIO (S3-compatible object storage) ────────────────────
   minio:
     image: minio/minio:latest
@@ -86,12 +107,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       minio-setup:
         condition: service_completed_successfully
+    env_file: ./.env
     volumes:
       - backend_uploads:/app/data/uploads
     environment:
       # Database
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       DATABASE_URL: postgresql://innovos:innovos_secret@postgres:5432/innovos
       # JWT
       INNOVOS_JWT_SECRET: ${INNOVOS_JWT_SECRET}
@@ -106,17 +131,20 @@ services:
       S3_REGION: ${S3_REGION:-us-east-1}
       # Public URL for file access
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost}
+      # Redis
+      REDIS_URL: redis://redis:6379/0
       # AI Provider Keys
       AI_SILICON_API_KEY: ${AI_SILICON_API_KEY}
       AI_SILICON_API_HOST: ${AI_SILICON_API_HOST:-https://api.siliconflow.cn}
       AI_DEEPSEEK_API_KEY: ${AI_DEEPSEEK_API_KEY}
       AI_DEEPSEEK_API_HOST: ${AI_DEEPSEEK_API_HOST:-https://api.deepseek.com}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost}
       ENV: production
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 2G
           cpus: '2.0'
     logging:
       driver: json-file

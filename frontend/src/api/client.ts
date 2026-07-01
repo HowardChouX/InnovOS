@@ -29,7 +29,15 @@ export async function apiRequest<T>(
   });
   // Handle empty responses (204, etc.)
   const text = await res.text();
-  const data = text ? JSON.parse(text) : {};
+
+  let data: T;
+  try {
+    data = text ? JSON.parse(text) : ({} as T);
+  } catch {
+    // Response is not JSON — backend may be down or returned an error page
+    throw new Error(text ? `服务器返回了非 JSON 响应: ${text.slice(0, 80)}` : '服务器无响应');
+  }
+
   if (!res.ok) {
     if (res.status === 401) {
       // Clear auth state first, then redirect with a small delay to let stores reset
@@ -40,7 +48,7 @@ export async function apiRequest<T>(
         window.location.href = '/login';
       }, 100);
     }
-    throw new Error(data.detail || '请求失败');
+    throw new Error((data as { detail?: string }).detail || '请求失败');
   }
   return data;
 }

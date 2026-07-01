@@ -1,4 +1,7 @@
+import { useState } from 'react';
+import { analysisApi } from '../../api/analysis';
 import { useWorkflowStore } from '../../store/useWorkflowStore';
+import { useTaskStore } from '../../store/useTaskStore';
 import { WORKFLOW_STEPS } from '../../types/workflow';
 
 const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
@@ -9,10 +12,25 @@ const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }>
 };
 
 export function WorkflowPanel() {
-  const { currentPhase, phaseStatus, isRunning } = useWorkflowStore();
+  const { currentPhase, phaseStatus, isRunning, fetchWorkflow } = useWorkflowStore();
   const hasActiveTask = useWorkflowStore((s) => s.workflow !== null);
+  const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
+  const [retrying, setRetrying] = useState(false);
 
   if (!isRunning && !hasActiveTask) return null;
+
+  const handleRetry = async () => {
+    if (!selectedTaskId || retrying) return;
+    setRetrying(true);
+    try {
+      await analysisApi.retry(selectedTaskId);
+      await fetchWorkflow(selectedTaskId);
+    } catch {
+      // ignore
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   return (
     <aside
@@ -62,6 +80,7 @@ export function WorkflowPanel() {
           const cfg = STATUS_STYLE[status] || STATUS_STYLE.pending;
           const isCurrent = step.phaseId === currentPhase;
           const isDone = status === 'completed';
+          const isFailed = status === 'failed';
 
           return (
             <div
@@ -140,19 +159,37 @@ export function WorkflowPanel() {
                 </div>
               </div>
 
-              {/* Status badge */}
-              <span
-                style={{
-                  fontSize: 10,
-                  padding: '1px 6px',
-                  borderRadius: 4,
-                  background: cfg.bg,
-                  color: cfg.color,
-                  flexShrink: 0,
-                }}
-              >
-                {cfg.label}
-              </span>
+              {/* Status badge + retry */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                {isFailed && !retrying && (
+                  <button
+                    onClick={handleRetry}
+                    title="重试该步骤"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--accent-red)',
+                      fontSize: 11,
+                      padding: 0,
+                      lineHeight: 1,
+                    }}
+                  >
+                    <i className="fa-solid fa-rotate-right" />
+                  </button>
+                )}
+                <span
+                  style={{
+                    fontSize: 10,
+                    padding: '1px 6px',
+                    borderRadius: 4,
+                    background: cfg.bg,
+                    color: cfg.color,
+                  }}
+                >
+                  {cfg.label}
+                </span>
+              </div>
             </div>
           );
         })}
@@ -180,7 +217,7 @@ export function WorkflowPanel() {
               display: 'inline-block',
             }}
           />
-          分析进行中...
+          {retrying ? '正在重试...' : '分析进行中...'}
         </div>
       )}
     </aside>

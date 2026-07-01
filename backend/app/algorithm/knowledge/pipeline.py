@@ -26,6 +26,62 @@ class KnowledgePipeline:
         self.base_id = base_id
         self._embedder_config: dict | None = None
         self._reranker_config: dict | None = None
+        self._chunk_config: dict | None = None
+
+    def _load_chunk_config(self) -> dict:
+        """加载知识库级 / 全局级分块参数。"""
+        if self._chunk_config is not None:
+            return self._chunk_config
+
+        chunk_size: int | None = None
+        chunk_overlap: int | None = None
+
+        # 1. 知识库级配置
+        if self.base_id and self.base_id != "default":
+            from app.database import get_db
+
+            db = get_db()
+            try:
+                row = db.execute(
+                    "SELECT chunk_size, chunk_overlap FROM knowledge_bases WHERE id=? AND user_id=?",
+                    (self.base_id, self.user_id),
+                ).fetchone()
+            finally:
+                db.close()
+            if row and row["chunk_size"]:
+                try:
+                    chunk_size = int(row["chunk_size"])
+                except (ValueError, TypeError):
+                    pass
+            if row and row["chunk_overlap"]:
+                try:
+                    chunk_overlap = int(row["chunk_overlap"])
+                except (ValueError, TypeError):
+                    pass
+
+        # 2. 全局默认值
+        if chunk_size is None or chunk_overlap is None:
+            try:
+                from app.database import get_db
+
+                db = get_db()
+                rows = db.execute(
+                    "SELECT key, value FROM system_settings WHERE key IN (?, ?)",
+                    ("chunk_size", "chunk_overlap"),
+                ).fetchall()
+                db.close()
+                cfg = {r["key"]: r["value"] for r in rows}
+                if chunk_size is None:
+                    chunk_size = int(cfg.get("chunk_size", 512))
+                if chunk_overlap is None:
+                    chunk_overlap = int(cfg.get("chunk_overlap", 64))
+            except Exception:
+                pass
+
+        chunk_size = chunk_size or 512
+        chunk_overlap = chunk_overlap or 64
+        self._chunk_config = {"chunk_size": chunk_size, "chunk_overlap": chunk_overlap}
+        return self._chunk_config
 
     def _load_model_configs(self):
         """从知识库配置中加载嵌入和重排模型配置。"""
@@ -134,12 +190,34 @@ class KnowledgePipeline:
         from app.algorithm.knowledge.retriever import get_retriever
 
         self._load_model_configs()
+        chunk_cfg = self._load_chunk_config()
         retriever = get_retriever(
             self.user_id,
             embedder_config=self._embedder_config,
             reranker_config=self._reranker_config,
         )
-        return await retriever.index_item(self.base_id, item_id, content)
+        result = await retriever.index_item(
+            self.base_id, item_id, content,
+            chunk_size=chunk_cfg["chunk_size"],
+            chunk_overlap=chunk_cfg["chunk_overlap"],
+        )
+
+        # 后台重建 BM25 索引（异步，不阻塞）
+        import asyncio
+        try:
+            asyncio.create_task(self._rebuild_bm25())
+        except Exception:
+            pass
+
+        return result
+
+    async def _rebuild_bm25(self):
+        """后台重建 BM25 关键词索引。"""
+        try:
+            from app.algorithm.knowledge.bm25_index import bm25_manager
+            bm25_manager.build_base(self.base_id, self.user_id)
+        except Exception as e:
+            logger.warning(f"BM25 重建失败（非致命）: {e}")
 
     async def search(
         self,
@@ -154,6 +232,7 @@ class KnowledgePipeline:
         top_k/search_mode/hybrid_alpha 为 None 时从全局设置读取默认值。
         """
         # 读取全局 RAG 默认值
+        threshold_val: float | None = None
         try:
             from app.database import get_db
 
@@ -180,7 +259,6 @@ class KnowledgePipeline:
                     top_k = 10
             if not use_rerank:
                 use_rerank = bool(cfg.get("rag_rerank_model"))
-            threshold_val: float | None = None
             try:
                 if cfg.get("threshold"):
                     threshold_val = float(cfg["threshold"])
@@ -204,6 +282,8 @@ class KnowledgePipeline:
                 embedder_config=self._embedder_config,
                 reranker_config=self._reranker_config,
             )
+
+            # 1. 语义向量检索
             if use_rerank and self._reranker_config:
                 results = await retriever.search_with_rerank(
                     self.base_id,
@@ -221,6 +301,20 @@ class KnowledgePipeline:
                     search_mode=search_mode,
                     hybrid_alpha=hybrid_alpha,
                 )
+
+            # 2. BM25 关键词检索 + 混合合并
+            try:
+                from app.algorithm.knowledge.bm25_index import bm25_manager, hybrid_merge
+
+                bm25_docs = bm25_manager.search(self.base_id, query, top_k=top_k)
+                if bm25_docs:
+                    results = hybrid_merge(
+                        results, bm25_docs, alpha=hybrid_alpha, top_k=top_k
+                    )
+                    logger.debug(f"BM25 混合完成：{len(results)} 条结果")
+            except Exception:
+                pass  # BM25 不可用时静默降级
+
             # 按阈值过滤
             if threshold_val and threshold_val > 0:
                 results = [r for r in results if r.get("score", 0) >= threshold_val]

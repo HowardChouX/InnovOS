@@ -244,6 +244,8 @@ class ModelService:
         for pid, raw_info in BUILTIN_PROVIDERS.items():
             info = cast(dict[str, Any], raw_info)
             c = configured_all.pop(pid, None)  # pop 掉已处理的
+            # hasApiKey 同时检查 DB 记录和环境变量（兼容首次部署场景）
+            has_key = _has_provider_api_key(pid) or bool(c and c["hasApiKey"])
             result.append(
                 {
                     "providerId": info["id"],
@@ -256,7 +258,7 @@ class ModelService:
                     "category": info.get("category", "other"),
                     "isConfigured": c is not None,
                     "isEnabled": c["isEnabled"] if c else False,
-                    "hasApiKey": c["hasApiKey"] if c else False,
+                    "hasApiKey": has_key,
                     "apiKeyMasked": "",  # 不再暴露密钥
                     "apiModel": c["apiModel"] if c else "",
                     "requestCount": c.get("requestCount", 0) if c else 0,

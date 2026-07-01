@@ -27,9 +27,8 @@ class VectorStore:
     - delete_by_external_id(item_id) — 删除某个 item 的所有向量
     """
 
-    def __init__(self, user_id: int, dimensions: int = 1024):
+    def __init__(self, user_id: int):
         self.user_id = user_id
-        self.dimensions = dimensions
 
     def replace_by_external_id(
         self,

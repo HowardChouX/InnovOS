@@ -16,11 +16,12 @@ logger = logging.getLogger(__name__)
 class Embedder:
     """向量嵌入服务。"""
 
-    def __init__(self, api_key: str = "", api_host: str = "", model: str = ""):
+    def __init__(self, api_key: str = "", api_host: str = "", model: str = "", dimensions: int = 0):
         self.api_key = api_key
         self.api_host = api_host.rstrip("/")
         self.model = model or "BAAI/bge-large-zh-v1.5"
-        self._dim = 1024
+        # dimension auto-detected from first API response; 0 means "not yet known"
+        self._dim = dimensions
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
         if not texts:

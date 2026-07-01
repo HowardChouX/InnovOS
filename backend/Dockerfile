@@ -9,6 +9,7 @@ RUN uv sync --no-dev --frozen
 FROM python:3.13-slim AS runtime
 RUN groupadd -r innovos && useradd -r -g innovos innovos
 COPY --from=builder /build/.venv /app/.venv
+RUN find /app/.venv/bin -type f -exec sed -i '1s|#!/build/.venv/bin/python|#!/usr/bin/env python3|' {} +
 ENV PATH="/app/.venv/bin:$PATH"
 WORKDIR /app
 COPY app/ ./app/
