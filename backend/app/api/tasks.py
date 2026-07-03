@@ -162,8 +162,15 @@ def delete_task(
             raise HTTPException(status_code=404, detail="Task not found")
 
         # Delete related records in dependency order
-        db.execute("DELETE FROM evaluations WHERE task_id = ?", (task_id,))
-        db.execute("DELETE FROM feedbacks WHERE task_id = ?", (task_id,))
+        # Note: evaluations and feedbacks don't have task_id — they link via solution_id
+        db.execute(
+            "DELETE FROM evaluations WHERE solution_id IN (SELECT id FROM solutions WHERE task_id = ?)",
+            (task_id,),
+        )
+        db.execute(
+            "DELETE FROM feedbacks WHERE solution_id IN (SELECT id FROM solutions WHERE task_id = ?)",
+            (task_id,),
+        )
         db.execute("DELETE FROM solutions WHERE task_id = ?", (task_id,))
         db.execute("DELETE FROM analyses WHERE task_id = ?", (task_id,))
         db.execute("DELETE FROM workflows WHERE task_id = ?", (task_id,))

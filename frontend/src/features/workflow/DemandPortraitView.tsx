@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useWorkflowStore } from '../../store/useWorkflowStore';
 import { useTaskStore } from '../../store/useTaskStore';
 import { workflowApi } from '../../api/workflow';
+import { StepRunningIndicator } from '../../components/ui/StepRunningIndicator';
 
 interface Demand {
   id: string;
@@ -106,49 +107,9 @@ function DemandPortraitViewInner({ output }: { output: unknown }) {
   };
 
   // 已确认 → 显示加载状态，直到组件因 phase 切换而卸载
+  // 注意：这里不应该显示，因为 WorkflowStepResults 会自动切换到下一步骤的等待画面
   if (submitted) {
-    return (
-      <div
-        className="card"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flex: 1,
-          minHeight: 0,
-          gap: 16,
-        }}
-      >
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: '50%',
-            background: 'rgba(96,165,250,0.15)',
-            border: '2px solid rgba(96,165,250,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <i
-            className="fa-solid fa-circle-notch fa-spin"
-            style={{ fontSize: 20, color: 'var(--accent-blue)' }}
-          />
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div
-            style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}
-          >
-            正在进行问题建模...
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-            AI 正在根据需求进行问题建模，请稍候
-          </div>
-        </div>
-      </div>
-    );
+    return null;  // 不返回任何内容，让父组件的 WorkflowStepResults 处理
   }
 
   if (!workflow || allDemands.length === 0) {
@@ -193,12 +154,8 @@ function DemandPortraitViewInner({ output }: { output: unknown }) {
   };
 
   return (
-    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%' }}>
       <div className="card-title">
-        <i
-          className="fa-solid fa-magnifying-glass"
-          style={{ marginRight: 8, color: 'var(--accent-blue)' }}
-        />
         需求洞察
       </div>
 
@@ -266,10 +223,6 @@ function DemandPortraitViewInner({ output }: { output: unknown }) {
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-            <i
-              className="fa-solid fa-pen"
-              style={{ marginRight: 6, color: 'var(--accent-purple)' }}
-            />
             补充需求
           </div>
 
@@ -448,7 +401,7 @@ function DemandPortraitViewInner({ output }: { output: unknown }) {
         >
           {submitting ? (
             <>
-              <i className="fa-solid fa-circle-notch fa-spin" /> 提交中...
+              <StepRunningIndicator phaseId="demand_portrait" size={16} color="#fff" /> 提交中...
             </>
           ) : submitted ? (
             <>

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTaskStore } from '../../store/useTaskStore';
-import { useWorkflowStore } from '../../store/useWorkflowStore';
 import { InlineConfirmModal } from '../../components/ui/InlineConfirmModal';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -34,7 +33,6 @@ export function TaskList() {
   const deleteTask = useTaskStore((s) => s.deleteTask);
   const loading = useTaskStore((s) => s.loading);
   const fetchTasks = useTaskStore((s) => s.fetchTasks);
-  const workflow = useWorkflowStore((s) => s.workflow);
   const initialized = useRef(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -47,20 +45,13 @@ export function TaskList() {
     onConfirm: () => void;
   }>({ open: false, title: '', message: '', onConfirm: () => {} });
 
+  // 首次挂载拉取任务列表（workflow 完成时的刷新由 store 统一处理）
   useEffect(() => {
     if (!initialized.current) {
       initialized.current = true;
       fetchTasks();
     }
   }, [fetchTasks]);
-
-  // 关键：当workflow完成或失败时，自动刷新task列表以同步状态
-  useEffect(() => {
-    if (workflow && (workflow.status === 'completed' || workflow.status === 'failed')) {
-      console.log('Workflow finished, refreshing task list...');
-      fetchTasks();
-    }
-  }, [workflow, fetchTasks]);
 
   useEffect(() => {
     if (!toast) return;

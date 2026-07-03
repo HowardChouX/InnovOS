@@ -1,33 +1,39 @@
 import { create } from 'zustand';
 import type { WorkflowState } from '../types/workflow';
 import { workflowApi } from '../api/workflow';
+import { analysisApi } from '../api/analysis';
+import { useTaskStore } from './useTaskStore';
 
-export interface WorkflowStatus {
-  currentPhase: string;
-  currentLabel: string;
-  progress: number;
-  phaseStatus: Record<string, 'pending' | 'running' | 'completed' | 'failed'>;
-  history: Array<{ from: string; event: string; to: string }>;
-}
+type PhaseStatus = 'pending' | 'running' | 'completed' | 'failed';
 
 interface WorkflowStore {
   workflow: WorkflowState | null;
   loading: boolean;
   polling: boolean;
+  phaseStatus: Record<string, PhaseStatus>;
   currentPhase: string;
-  phaseStatus: Record<string, 'pending' | 'running' | 'completed' | 'failed'>;
   isRunning: boolean;
+  error: string | null;
+
   fetchWorkflow: (taskId: string) => Promise<void>;
   startPolling: (taskId: string) => void;
   stopPolling: () => void;
-  reset: () => void;
   clearWorkflow: () => void;
+  cancelAnalysis: () => Promise<void>;
 }
 
-let pollTimer: ReturnType<typeof setTimeout> | null = null;
-let pollingFlag = false;
+// ══════════════════════════════════════════════════════════
+//  内部状态（非响应式）
+// ══════════════════════════════════════════════════════════
 
-// 后端 agent_id 到前端 phaseId 的映射
+let pollTimer: ReturnType<typeof setTimeout> | null = null;
+let pollingTaskId: string | null = null;
+let pollingFlag = false;
+let pollStartTime = 0;
+
+// 10 分钟最大轮询时长，避免无限轮询
+const MAX_POLL_MS = 10 * 60 * 1000;
+
 const AGENT_TO_PHASE: Record<string, string> = {
   agent1: 'demand_portrait',
   agent2: 'problem_modeling',
@@ -37,8 +43,16 @@ const AGENT_TO_PHASE: Record<string, string> = {
   agent6: 'conversion',
 };
 
-// 默认 phaseStatus
-const DEFAULT_PHASE_STATUS: Record<string, 'pending' | 'running' | 'completed' | 'failed'> = {
+const PHASE_ORDER = [
+  'demand_portrait',
+  'problem_modeling',
+  'patent_search',
+  'solution_gen',
+  'evaluation',
+  'conversion',
+] as const;
+
+const DEFAULT_PHASE_STATUS: Record<string, PhaseStatus> = {
   demand_portrait: 'pending',
   problem_modeling: 'pending',
   patent_search: 'pending',
@@ -47,49 +61,70 @@ const DEFAULT_PHASE_STATUS: Record<string, 'pending' | 'running' | 'completed' |
   conversion: 'pending',
 };
 
-/** 从 workflow.steps 同步 phaseStatus */
-function syncPhaseStatus(
-  steps: { agentId?: string; agent_id?: string; status: string }[],
-): Record<string, 'pending' | 'running' | 'completed' | 'failed'> {
+// ══════════════════════════════════════════════════════════
+//  纯函数：从 workflow.steps 派生 phaseStatus / currentPhase
+// ══════════════════════════════════════════════════════════
+
+function syncPhaseStatus(steps: { agentId?: string; agent_id?: string; status: string }[]) {
   const status = { ...DEFAULT_PHASE_STATUS };
   for (const step of steps) {
     const agentId = step.agentId || step.agent_id;
     const phase = AGENT_TO_PHASE[agentId || ''];
     if (phase) {
-      (status as Record<string, 'pending' | 'running' | 'completed' | 'failed'>)[phase] =
-        step.status as 'pending' | 'running' | 'completed' | 'failed';
+      status[phase] = step.status as PhaseStatus;
     }
   }
   return status;
 }
 
-/** 确定当前阶段：找到第一个 running 或 pending 的阶段 */
-function determineCurrentPhase(phaseStatus: Record<string, string>): string {
-  const order = [
-    'demand_portrait',
-    'problem_modeling',
-    'patent_search',
-    'solution_gen',
-    'evaluation',
-    'conversion',
-  ];
-  for (const phase of order) {
-    if (phaseStatus[phase] === 'running' || phaseStatus[phase] === 'pending') {
-      return phase;
-    }
+function determineCurrentPhase(phaseStatus: Record<string, PhaseStatus>): string {
+  // 1. 有 running → 显示它
+  for (const phase of PHASE_ORDER) {
+    if (phaseStatus[phase] === 'running') return phase;
   }
-  return 'completed';
+  // 2. 有 failed → 显示它
+  for (const phase of PHASE_ORDER) {
+    if (phaseStatus[phase] === 'failed') return phase;
+  }
+  // 3. 有 pending → 显示它（等待后端启动）
+  for (const phase of PHASE_ORDER) {
+    if (phaseStatus[phase] === 'pending') return phase;
+  }
+  // 4. 全部 completed → 显示最后一个
+  for (let i = PHASE_ORDER.length - 1; i >= 0; i--) {
+    if (phaseStatus[PHASE_ORDER[i]] === 'completed') return PHASE_ORDER[i];
+  }
+  return 'demand_portrait';
 }
+
+// ══════════════════════════════════════════════════════════
+//  Store
+// ══════════════════════════════════════════════════════════
 
 export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   workflow: null,
   loading: false,
   polling: false,
-  currentPhase: 'demand_portrait',
   phaseStatus: { ...DEFAULT_PHASE_STATUS },
+  currentPhase: 'demand_portrait',
   isRunning: false,
+  error: null,
+
+  cancelAnalysis: async () => {
+    const taskId = useTaskStore.getState().selectedTaskId;
+    if (!taskId) return;
+    try {
+      await analysisApi.cancel(taskId);
+    } catch (e) {
+      console.error('[useWorkflowStore] cancelAnalysis failed:', e);
+    }
+    get().stopPolling();
+    get().clearWorkflow();
+    useTaskStore.getState().fetchTasks();
+  },
+
   fetchWorkflow: async (taskId) => {
-    set({ loading: true });
+    set({ loading: true, error: null });
     try {
       const workflow = await workflowApi.getByTaskId(taskId);
       const phaseStatus = syncPhaseStatus(workflow.steps);
@@ -101,46 +136,82 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         loading: false,
         isRunning: workflow.status === 'running',
       });
+      // 如果 workflow 正在运行，自动启动轮询（proceed 后重新追踪）
+      if (workflow.status === 'running') {
+        get().startPolling(taskId);
+      }
     } catch (e) {
       console.error('[useWorkflowStore] fetchWorkflow failed:', e);
-      set({ workflow: null, loading: false });
+      set({ workflow: null, loading: false, error: '加载工作流失败' });
     }
   },
+
   startPolling: (taskId) => {
-    get().stopPolling();
-    set({ polling: true, isRunning: true });
+    // 同一任务已在轮询 → 跳过
+    if (pollingTaskId === taskId && pollingFlag) return;
+
+    // 切换任务 → 先停掉旧的
+    if (pollingTaskId !== taskId) {
+      get().stopPolling();
+    }
+
+    pollingTaskId = taskId;
+    pollStartTime = Date.now();
+    set({ isRunning: true, polling: true });
 
     const poll = async () => {
+      if (pollingTaskId !== taskId) return; // 任务已切换，退出
       if (pollingFlag) return;
       pollingFlag = true;
+
+      // 超时保护
+      if (Date.now() - pollStartTime > MAX_POLL_MS) {
+        console.warn('[useWorkflowStore] 轮询超时，自动停止');
+        set({ error: '分析超时，请检查后端服务或稍后重试' });
+        get().stopPolling();
+        return;
+      }
+
       try {
         const workflow = await workflowApi.getByTaskId(taskId);
+        if (pollingTaskId !== taskId) return; // 期间任务切换了
+
         const phaseStatus = syncPhaseStatus(workflow.steps);
         const currentPhase = determineCurrentPhase(phaseStatus);
         const isRunning = workflow.status === 'running';
-        set({ workflow, phaseStatus, currentPhase, isRunning });
-        if (workflow.status === 'completed' || workflow.status === 'failed') {
+        set({ workflow, phaseStatus, currentPhase, isRunning, error: null });
+
+        // 非运行状态（awaiting_rating / completed / failed）→ 停止轮询，结果已就绪
+        if (workflow.status !== 'running') {
           get().stopPolling();
+          // 刷新任务列表状态
+          useTaskStore.getState().fetchTasks();
           return;
         }
       } catch (err) {
-        console.warn('Workflow poll warning (will retry):', err);
+        console.warn('[useWorkflowStore] poll warning:', err);
+        // 不设置 error，让下一轮重试
       } finally {
         pollingFlag = false;
-        pollTimer = setTimeout(poll, 3000);
+        if (pollingTaskId === taskId) {
+          pollTimer = setTimeout(poll, 2000);
+        }
       }
     };
 
     poll();
   },
+
   stopPolling: () => {
     if (pollTimer !== null) {
       clearTimeout(pollTimer);
       pollTimer = null;
     }
+    pollingTaskId = null;
     pollingFlag = false;
-    set({ polling: false, isRunning: false });
+    set({ isRunning: false, polling: false });
   },
+
   clearWorkflow: () => {
     get().stopPolling();
     set({
@@ -148,15 +219,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
       isRunning: false,
       phaseStatus: { ...DEFAULT_PHASE_STATUS },
       currentPhase: 'demand_portrait',
-    });
-  },
-  reset: () => {
-    get().stopPolling();
-    set({
-      workflow: null,
-      isRunning: false,
-      phaseStatus: { ...DEFAULT_PHASE_STATUS },
-      currentPhase: 'demand_portrait',
+      error: null,
     });
   },
 }));

@@ -1,7 +1,47 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useWorkflowStore } from '../../store/useWorkflowStore';
 import { useTaskStore } from '../../store/useTaskStore';
 import { workflowApi } from '../../api/workflow';
+import { StepRunningIndicator } from '../../components/ui/StepRunningIndicator';
+
+interface PatentData {
+  id?: string;
+  title?: string;
+  summary?: string;
+  abstract?: string;
+  applicant?: string;
+  inventor?: string;
+  mainIpc?: string;
+  documentNumber?: string;
+  patent_number?: string;
+  relevance_score?: number;
+  source?: string;
+}
+
+function RelevanceBadge({ score }: { score?: number }) {
+  if (!score && score !== 0) return null;
+  const pct = Math.round(score * 100);
+  const color =
+    pct >= 70
+      ? 'var(--accent-green)'
+      : pct >= 40
+        ? 'var(--accent-yellow)'
+        : 'var(--text-tertiary)';
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        padding: '1px 6px',
+        borderRadius: 3,
+        background: `color-mix(in srgb, ${color} 12%, transparent)`,
+        color,
+        fontWeight: 500,
+      }}
+    >
+      相关度 {pct}%
+    </span>
+  );
+}
 
 export function PatentSearchView({ output }: { output: unknown }) {
   const workflow = useWorkflowStore((s) => s.workflow);
@@ -12,17 +52,9 @@ export function PatentSearchView({ output }: { output: unknown }) {
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const patents = Array.isArray(output)
-    ? output
-    : ((output as Record<string, unknown>)?.patents as unknown[]) || [];
-
-  // 监听 workflow 状态变化，确认后进入 running 时重置 submitted 以显示加载状态
-  useEffect(() => {
-    // 已确认 → 显示加载状态，直到组件因 phase 切换而卸载
-    if (submitted) {
-      // workflow 已经在运行下一步了，保持 submitted 状态让父组件切换视图
-    }
-  }, [submitted, workflow?.status]);
+  const patents: PatentData[] = Array.isArray(output)
+    ? (output as PatentData[])
+    : ((output as Record<string, unknown>)?.patents as PatentData[]) || [];
 
   if (!workflow || patents.length === 0) {
     return (
@@ -41,59 +73,17 @@ export function PatentSearchView({ output }: { output: unknown }) {
     );
   }
 
-  // 已确认 → 显示加载状态，直到组件因 phase 切换而卸载
   if (submitted) {
-    return (
-      <div
-        className="card"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flex: 1,
-          minHeight: 0,
-          gap: 16,
-        }}
-      >
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: '50%',
-            background: 'rgba(59,130,246,0.15)',
-            border: '2px solid rgba(59,130,246,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <i
-            className="fa-solid fa-circle-notch fa-spin"
-            style={{ fontSize: 20, color: 'var(--accent-blue)' }}
-          />
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div
-            style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}
-          >
-            正在生成创新方案...
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-            AI 正在基于您的专利评分生成解决方案，请稍候
-          </div>
-        </div>
-      </div>
-    );
+    return null;
   }
 
-  const allRated = patents.every((_: unknown, i: number) => (ratings[String(i)] ?? 0) > 0);
+  const allRated = patents.every((_, i: number) => (ratings[String(i)] ?? 0) > 0);
 
   const handleSubmit = async () => {
     if (!selectedTaskId || !allRated || submitting) return;
     setSubmitting(true);
     try {
-      const ratingsPayload = patents.map((patent: Record<string, unknown>, i: number) => ({
+      const ratingsPayload = patents.map((patent, i: number) => ({
         demandId: (patent.id as string) || String(i),
         score: ratings[String(i)] || 0,
       }));
@@ -109,12 +99,18 @@ export function PatentSearchView({ output }: { output: unknown }) {
   };
 
   return (
-    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div
+      className="card"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        width: '100%',
+        flex: 1,
+        minHeight: 0,
+      }}
+    >
       <div className="card-title">
-        <i
-          className="fa-solid fa-file-lines"
-          style={{ marginRight: 8, color: 'var(--accent-cyan)' }}
-        />
         专利检索
         <span
           style={{
@@ -134,8 +130,8 @@ export function PatentSearchView({ output }: { output: unknown }) {
         请对以下专利的相关度进行评分，评分后确认进入下一步
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {patents.map((patent: Record<string, unknown>, i: number) => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minHeight: 0 }}>
+        {patents.map((patent, i: number) => (
           <div
             key={i}
             style={{
@@ -146,9 +142,12 @@ export function PatentSearchView({ output }: { output: unknown }) {
               borderRadius: 8,
               background: 'rgba(0,0,0,0.2)',
               border: '1px solid var(--border)',
+              flex: '1 1 auto',
+              minHeight: 120,
             }}
           >
             <div style={{ flex: 1, minWidth: 0 }}>
+              {/* 专利标题 */}
               <div
                 style={{
                   fontSize: 13,
@@ -157,21 +156,53 @@ export function PatentSearchView({ output }: { output: unknown }) {
                   marginBottom: 4,
                 }}
               >
-                {String(patent._title || patent.title || '').replace(
-                  /^CN\d+_FullTextImage\.pdf/i,
-                  '',
-                ) || '未命名专利'}
+                {patent.title || '未命名专利'}
               </div>
-              {(patent.patent_number as string) && (
-                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                  {patent.patent_number as string}
-                </div>
-              )}
+
+              {/* 元数据标签行 */}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
+                {(patent.documentNumber || patent.patent_number) && (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      padding: '1px 6px',
+                      borderRadius: 3,
+                      background: 'rgba(59,130,246,0.1)',
+                      color: 'var(--accent-blue)',
+                    }}
+                  >
+                    {patent.documentNumber || patent.patent_number}
+                  </span>
+                )}
+                {patent.applicant && (
+                  <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                    {patent.applicant}
+                  </span>
+                )}
+                {patent.mainIpc && (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      padding: '1px 6px',
+                      borderRadius: 3,
+                      background: 'rgba(167,139,250,0.1)',
+                      color: 'var(--accent-purple)',
+                    }}
+                  >
+                    IPC: {patent.mainIpc}
+                  </span>
+                )}
+                <RelevanceBadge score={patent.relevance_score} />
+              </div>
+
+              {/* 摘要 */}
               <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                {(patent.abstract as string | undefined) ||
-                  ((patent.description as string | undefined) || '').slice(0, 300)}
+                {(patent.summary || patent.abstract || '').slice(0, 250)}
+                {(patent.summary || patent.abstract || '').length > 250 ? '...' : ''}
               </div>
             </div>
+
+            {/* 星级评分 */}
             <div style={{ display: 'flex', gap: 2, cursor: 'pointer', flexShrink: 0 }}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <span
@@ -182,7 +213,8 @@ export function PatentSearchView({ output }: { output: unknown }) {
                   }}
                   style={{
                     fontSize: 18,
-                    color: star <= (ratings[String(i)] || 0) ? '#fbbf24' : 'rgba(255,255,255,0.15)',
+                    color:
+                      star <= (ratings[String(i)] || 0) ? '#fbbf24' : 'rgba(255,255,255,0.15)',
                   }}
                 >
                   <i className="fa-solid fa-star" />
@@ -232,7 +264,7 @@ export function PatentSearchView({ output }: { output: unknown }) {
         >
           {submitting ? (
             <>
-              <i className="fa-solid fa-circle-notch fa-spin" /> 提交中...
+              <StepRunningIndicator phaseId="patent_search" size={16} color="#fff" /> 提交中...
             </>
           ) : submitted ? (
             <>

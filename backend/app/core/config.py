@@ -75,11 +75,14 @@ class Settings(BaseSettings):
     S3_REGION: str = "us-east-1"
     PUBLIC_URL: str = "http://localhost"
 
-    # ── CNIPR 专利API ──
+    # ── CNIPR 专利API（备用）──
     CNIPR_CLIENT_ID: str = ""
     CNIPR_CLIENT_SECRET: str = ""
     CNIPR_USERNAME: str = ""
     CNIPR_PASSWORD: str = ""
+
+    # ── PatentHub 专利API（主数据源）──
+    PATENT_HUB_TOKEN: str = ""
 
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value and value == "changethis":

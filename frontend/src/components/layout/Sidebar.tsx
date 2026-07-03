@@ -84,10 +84,12 @@ export function Sidebar() {
           <div style={{ marginTop: 8, borderTop: '1px solid var(--border-light)', paddingTop: 8 }}>
             <div
               style={{
-                fontSize: 10,
+                fontSize: 11,
                 color: 'var(--text-tertiary)',
-                marginBottom: 6,
-                fontWeight: 600,
+                marginBottom: 4,
+                paddingLeft: 12,
+                fontWeight: 500,
+                letterSpacing: '0.04em',
               }}
             >
               管理员
@@ -106,17 +108,30 @@ export function Sidebar() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
-                    padding: '7px 12px',
+                    padding: '9px 12px',
                     borderRadius: 8,
                     textDecoration: 'none',
-                    fontSize: 12,
+                    fontSize: 13,
                     color: active ? '#fff' : 'var(--text-secondary)',
                     background: active ? 'var(--accent)' : 'transparent',
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseOver={(e) => {
+                    if (!active) {
+                      e.currentTarget.style.background = 'var(--bg-card)';
+                      e.currentTarget.style.color = 'var(--text-primary)';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (!active) {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = 'var(--text-secondary)';
+                    }
                   }}
                 >
                   <i
                     className={`fa-solid ${item.icon}`}
-                    style={{ width: 14, textAlign: 'center', fontSize: 11 }}
+                    style={{ width: 16, textAlign: 'center', fontSize: 12 }}
                   />
                   <span>{item.label}</span>
                 </Link>

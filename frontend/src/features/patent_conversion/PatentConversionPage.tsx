@@ -1,49 +1,85 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { tasksApi } from '../../api/tasks';
-import { InlineConfirmModal } from '../../components/ui/InlineConfirmModal';
 import { WorkflowArchiveDetail } from '../history_solutions/WorkflowArchiveDetail';
-import type { Task } from '../../types/task';
-import { Archive, Search, Trash2, ChevronRight, X, LoaderCircle, AlertCircle } from 'lucide-react';
+import type { Task, UpdateTaskInput } from '../../types/task';
+import {
+  Archive,
+  Search,
+  Trash2,
+  ChevronRight,
+  X,
+  LoaderCircle,
+  AlertCircle,
+  Pencil,
+  Play,
+  Link as LinkIcon,
+  Check,
+} from 'lucide-react';
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  pending: { label: '待处理', color: 'var(--accent-yellow)', bg: 'rgba(251,191,36,0.12)' },
-  analyzing: { label: '分析中', color: 'var(--accent-blue)', bg: 'rgba(59,130,246,0.12)' },
-  completed: { label: '已完成', color: 'var(--accent-green)', bg: 'rgba(74,222,128,0.12)' },
-  failed: { label: '失败', color: 'var(--accent-red)', bg: 'rgba(248,113,113,0.12)' },
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; color: string; bg: string; dotColor: string }
+> = {
+  pending: {
+    label: '待处理',
+    color: 'var(--accent-yellow)',
+    bg: 'rgba(251,191,36,0.12)',
+    dotColor: '#f59e0b',
+  },
+  analyzing: {
+    label: '分析中',
+    color: 'var(--accent-blue)',
+    bg: 'rgba(59,130,246,0.12)',
+    dotColor: '#3b82f6',
+  },
+  completed: {
+    label: '已完成',
+    color: 'var(--accent-green)',
+    bg: 'rgba(74,222,128,0.12)',
+    dotColor: '#10b981',
+  },
+  failed: {
+    label: '失败',
+    color: 'var(--accent-red)',
+    bg: 'rgba(248,113,113,0.12)',
+    dotColor: '#ef4444',
+  },
 };
 
 function formatDate(dateStr: string | null | undefined) {
   if (!dateStr) return '';
-  const d = new Date(dateStr.replace(' ', 'T') + 'Z');
-  if (isNaN(d.getTime())) return '';
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHour = Math.floor(diffMs / 3600000);
-  const diffDay = Math.floor(diffMs / 86400000);
-  if (diffMin < 1) return '刚刚';
-  if (diffMin < 60) return `${diffMin}分钟前`;
-  if (diffHour < 24) return `${diffHour}小时前`;
-  if (diffDay < 7) return `${diffDay}天前`;
-  return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
-}
-
-function getDescriptionPreview(task: Task): string {
-  if (!task.description) return '';
-  return task.description.split('\n')[0].slice(0, 80);
+  try {
+    const d = dateStr.includes('T') ? new Date(dateStr) : new Date(dateStr.replace(' ', 'T') + 'Z');
+    if (isNaN(d.getTime())) return '';
+    const now = Date.now();
+    const diffMs = now - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffHour = Math.floor(diffMs / 3600000);
+    const diffDay = Math.floor(diffMs / 86400000);
+    if (diffMin < 1) return '刚刚';
+    if (diffMin < 60) return `${diffMin} 分钟前`;
+    if (diffHour < 24) return `${diffHour} 小时前`;
+    if (diffDay < 7) return `${diffDay} 天前`;
+    if (diffDay < 30) return `${Math.floor(diffDay / 7)} 周前`;
+    return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+  } catch {
+    return '';
+  }
 }
 
 export function PatentConversionPage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [tasksLoading, setTasksLoading] = useState(true); // start as loading
+  const [tasksLoading, setTasksLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
   const [confirmModal, setConfirmModal] = useState<{
     open: boolean;
     title: string;
@@ -51,7 +87,6 @@ export function PatentConversionPage() {
     onConfirm: () => void;
   }>({ open: false, title: '', message: '', onConfirm: () => {} });
 
-  // 加载任务列表
   useEffect(() => {
     tasksApi
       .list({ pageSize: 50 })
@@ -84,6 +119,7 @@ export function PatentConversionPage() {
   };
 
   const handleSelectTask = (taskId: string) => {
+    if (editingId) return; // 编辑中不跳转
     setSelectedTaskId(taskId);
   };
 
@@ -108,10 +144,39 @@ export function PatentConversionPage() {
     });
   };
 
+  const handleStartEdit = useCallback((task: Task) => {
+    setEditingId(task.id);
+    setEditingTitle(task.title);
+  }, []);
+
+  const handleSaveEdit = useCallback(
+    async (taskId: string) => {
+      if (!editingTitle.trim()) {
+        setEditingId(null);
+        return;
+      }
+      try {
+        const task = await tasksApi.update(taskId, { title: editingTitle.trim() } as UpdateTaskInput);
+        setTasks((prev) => prev.map((t) => (t.id === taskId ? task : t)));
+      } catch {
+        setError('编辑标题失败');
+      }
+      setEditingId(null);
+      setEditingTitle('');
+    },
+    [editingTitle],
+  );
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingId(null);
+    setEditingTitle('');
+  }, []);
+
   // ====== 任务列表视图 ======
   if (!selectedTaskId) {
     const filtered = tasks.filter((t) => {
-      const matchSearch = !search || t.title.toLowerCase().includes(search.toLowerCase());
+      const matchSearch =
+        !search || t.title.toLowerCase().includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase());
       const matchFilter = filter === 'all' || t.status === filter;
       return matchSearch && matchFilter;
     });
@@ -137,13 +202,35 @@ export function PatentConversionPage() {
         style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minHeight: 0 }}
       >
         {/* Header */}
-        <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Archive size={16} style={{ color: 'var(--accent-red)' }} />
-          历史方案库
-          <span
-            style={{ marginLeft: 4, fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 400 }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: 'rgba(248,113,113,0.12)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            ({tasks.length})
+            <Archive size={16} style={{ color: 'var(--accent-red)' }} />
+          </div>
+          <div className="card-title" style={{ fontSize: 15, margin: 0 }}>
+            历史方案库
+          </div>
+          <span
+            style={{
+              marginLeft: 2,
+              fontSize: 11,
+              color: 'var(--text-tertiary)',
+              fontWeight: 400,
+              padding: '1px 8px',
+              borderRadius: 10,
+              background: 'rgba(100,116,139,0.1)',
+            }}
+          >
+            {tasks.length}
           </span>
         </div>
 
@@ -180,59 +267,62 @@ export function PatentConversionPage() {
           </div>
         )}
 
-        {/* Search */}
-        <div style={{ position: 'relative' }}>
-          <Search
-            size={13}
-            style={{
-              position: 'absolute',
-              left: 10,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--text-tertiary)',
-              pointerEvents: 'none',
-            }}
-          />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索任务..."
-            style={{
-              width: '100%',
-              padding: '7px 28px 7px 32px',
-              borderRadius: 8,
-              background: 'rgba(0,0,0,0.2)',
-              border: '1px solid var(--border-light)',
-              color: 'var(--text-primary)',
-              fontSize: 12,
-              outline: 'none',
-              fontFamily: 'inherit',
-            }}
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
+        {/* Search row */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <Search
+              size={13}
               style={{
                 position: 'absolute',
-                right: 8,
+                left: 10,
                 top: '50%',
                 transform: 'translateY(-50%)',
-                background: 'rgba(100,116,139,0.2)',
-                border: 'none',
-                borderRadius: '50%',
-                width: 18,
-                height: 18,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
                 color: 'var(--text-tertiary)',
-                padding: 0,
+                pointerEvents: 'none',
               }}
-            >
-              <X size={11} />
-            </button>
-          )}
+            />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜索任务..."
+              style={{
+                width: '100%',
+                padding: '7px 28px 7px 32px',
+                borderRadius: 8,
+                background: 'rgba(0,0,0,0.2)',
+                border: '1px solid var(--border-light)',
+                color: 'var(--text-primary)',
+                fontSize: 12,
+                outline: 'none',
+                fontFamily: 'inherit',
+                boxSizing: 'border-box',
+              }}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                style={{
+                  position: 'absolute',
+                  right: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'rgba(100,116,139,0.2)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: 18,
+                  height: 18,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: 'var(--text-tertiary)',
+                  padding: 0,
+                }}
+              >
+                <X size={11} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Status filter pills */}
@@ -248,9 +338,12 @@ export function PatentConversionPage() {
                 cursor: 'pointer',
                 fontFamily: 'inherit',
                 fontWeight: filter === item.key ? 600 : 400,
-                background: filter === item.key ? 'rgba(59,130,246,0.2)' : 'rgba(100,116,139,0.1)',
+                background:
+                  filter === item.key ? 'rgba(59,130,246,0.2)' : 'rgba(100,116,139,0.1)',
                 border:
-                  filter === item.key ? '1px solid rgba(59,130,246,0.35)' : '1px solid transparent',
+                  filter === item.key
+                    ? '1px solid rgba(59,130,246,0.35)'
+                    : '1px solid transparent',
                 color: filter === item.key ? 'var(--accent-blue)' : 'var(--text-tertiary)',
                 transition: 'all 0.15s',
               }}
@@ -266,7 +359,13 @@ export function PatentConversionPage() {
         {/* Task list */}
         {tasksLoading ? (
           <div
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 48 }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 48,
+              flex: 1,
+            }}
           >
             <LoaderCircle
               size={24}
@@ -314,9 +413,12 @@ export function PatentConversionPage() {
               style={{
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 6,
-                maxHeight: 400,
-                overflow: 'auto',
+                gap: 4,
+                flex: 1,
+                overflowY: 'auto',
+                minHeight: 0,
+                margin: '0 -2px',
+                padding: '0 2px',
               }}
             >
               {filtered.length === 0 ? (
@@ -326,77 +428,102 @@ export function PatentConversionPage() {
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: 32,
+                    padding: 40,
                     gap: 8,
+                    flex: 1,
                   }}
                 >
-                  <Search size={18} style={{ color: 'var(--text-tertiary)', opacity: 0.3 }} />
-                  <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>无匹配任务</span>
+                  <Search size={20} style={{ color: 'var(--text-tertiary)', opacity: 0.3 }} />
+                  <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>无匹配任务</span>
                 </div>
               ) : (
                 filtered.map((task) => {
                   const cfg = STATUS_CONFIG[task.status] || STATUS_CONFIG.pending;
-                  const descPreview = getDescriptionPreview(task);
+                  const isEditing = editingId === task.id;
+
                   return (
                     <div
                       key={task.id}
                       onClick={() => handleSelectTask(task.id)}
-                      onMouseEnter={() => setHoveredId(task.id)}
-                      onMouseLeave={() => setHoveredId(null)}
                       style={{
                         display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: 10,
-                        padding: '10px 12px',
-                        borderRadius: 8,
-                        cursor: 'pointer',
-                        fontSize: 12,
-                        background: hoveredId === task.id ? 'rgba(59,130,246,0.04)' : 'transparent',
-                        border: `1px solid ${hoveredId === task.id ? 'rgba(59,130,246,0.12)' : 'transparent'}`,
+                        alignItems: 'center',
+                        gap: 12,
+                        padding: '12px 14px',
+                        borderRadius: 10,
+                        cursor: editingId ? 'default' : 'pointer',
+                        border: '1px solid var(--border-light)',
+                        background: 'rgba(255,255,255,0.02)',
                         transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!editingId) {
+                          e.currentTarget.style.borderColor = 'var(--border)';
+                          e.currentTarget.style.background = 'rgba(59,130,246,0.04)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!editingId) {
+                          e.currentTarget.style.borderColor = 'var(--border-light)';
+                          e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
+                        }
                       }}
                     >
                       {/* Status dot */}
                       <div
                         style={{
-                          width: 8,
-                          height: 8,
+                          width: 10,
+                          height: 10,
                           borderRadius: '50%',
                           flexShrink: 0,
-                          marginTop: 5,
-                          background: cfg.color,
-                          boxShadow: `0 0 6px ${cfg.color}40`,
+                          background: cfg.dotColor,
+                          boxShadow: `0 0 8px ${cfg.dotColor}50`,
                         }}
                       />
+
                       {/* Content */}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            color: 'var(--text-primary)',
-                            fontWeight: 500,
-                            marginBottom: 3,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {task.title}
-                        </div>
-                        {descPreview && (
+                        {isEditing ? (
+                          <input
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveEdit(task.id);
+                              if (e.key === 'Escape') handleCancelEdit();
+                            }}
+                            onBlur={() => handleSaveEdit(task.id)}
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              width: '100%',
+                              padding: '4px 8px',
+                              borderRadius: 4,
+                              background: 'rgba(0,0,0,0.3)',
+                              border: '1px solid var(--accent)',
+                              color: 'var(--text-primary)',
+                              fontSize: 13,
+                              fontWeight: 500,
+                              outline: 'none',
+                              fontFamily: 'inherit',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                        ) : (
                           <div
                             style={{
-                              fontSize: 11,
-                              color: 'var(--text-tertiary)',
-                              marginBottom: 4,
+                              fontSize: 13,
+                              fontWeight: 500,
+                              color: 'var(--text-primary)',
+                              marginBottom: 3,
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
-                              opacity: 0.7,
                             }}
                           >
-                            {descPreview}
+                            {task.title}
                           </div>
                         )}
+
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span
                             style={{
@@ -411,46 +538,170 @@ export function PatentConversionPage() {
                             {cfg.label}
                           </span>
                           <span
-                            style={{ fontSize: 10, color: 'var(--text-tertiary)', opacity: 0.6 }}
+                            style={{
+                              fontSize: 10,
+                              color: 'var(--text-tertiary)',
+                              opacity: 0.6,
+                            }}
                           >
-                            {formatDate(task.createdAt)}
+                            {formatDate(task.updatedAt || task.createdAt)}
                           </span>
                         </div>
                       </div>
-                      {/* Actions */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                        {hoveredId === task.id && (
+
+                      {/* Action buttons */}
+                      {!isEditing && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 2,
+                            flexShrink: 0,
+                            opacity: 0,
+                            transition: 'opacity 0.15s',
+                          }}
+                          className="history-actions"
+                          onMouseEnter={(e) => e.stopPropagation()}
+                        >
+                          {/* Edit */}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteTask(task.id, task.title);
+                              handleStartEdit(task);
                             }}
-                            title="删除任务"
+                            title="编辑标题"
                             style={{
-                              background: 'rgba(248,113,113,0.1)',
-                              border: '1px solid rgba(248,113,113,0.2)',
-                              color: 'var(--accent-red)',
-                              cursor: 'pointer',
-                              padding: '4px 5px',
+                              width: 28,
+                              height: 28,
                               borderRadius: 6,
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-tertiary)',
+                              cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               transition: 'all 0.15s',
                             }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                              e.currentTarget.style.color = 'var(--text-primary)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                              e.currentTarget.style.color = 'var(--text-tertiary)';
+                            }}
+                          >
+                            <Pencil size={12} />
+                          </button>
+
+                          {/* Continue */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectTask(task.id);
+                            }}
+                            title="继续"
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 6,
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-tertiary)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.15s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(59,130,246,0.15)';
+                              e.currentTarget.style.color = '#3b82f6';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                              e.currentTarget.style.color = 'var(--text-tertiary)';
+                            }}
+                          >
+                            <Play size={12} />
+                          </button>
+
+                          {/* Share */}
+                          <button
+                            onClick={(e) => e.stopPropagation()}
+                            title="分享"
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 6,
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-tertiary)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.15s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(16,185,129,0.15)';
+                              e.currentTarget.style.color = '#10b981';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                              e.currentTarget.style.color = 'var(--text-tertiary)';
+                            }}
+                          >
+                            <LinkIcon size={12} />
+                          </button>
+
+                          {/* Delete */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTask(task.id, task.title);
+                            }}
+                            title="删除"
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 6,
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-tertiary)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.15s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(239,68,68,0.15)';
+                              e.currentTarget.style.color = '#ef4444';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                              e.currentTarget.style.color = 'var(--text-tertiary)';
+                            }}
                           >
                             <Trash2 size={12} />
                           </button>
-                        )}
+                        </div>
+                      )}
+
+                      {/* Arrow indicator */}
+                      {!isEditing && (
                         <ChevronRight
                           size={14}
                           style={{
                             color: 'var(--text-tertiary)',
-                            opacity: hoveredId === task.id ? 0.6 : 0.2,
+                            opacity: 0.2,
+                            flexShrink: 0,
                             transition: 'opacity 0.15s',
                           }}
                         />
-                      </div>
+                      )}
                     </div>
                   );
                 })
@@ -490,13 +741,108 @@ export function PatentConversionPage() {
           </>
         )}
 
-        <InlineConfirmModal
-          open={confirmModal.open}
-          title={confirmModal.title}
-          message={confirmModal.message}
-          onConfirm={confirmModal.onConfirm}
-          onCancel={() => setConfirmModal((prev) => ({ ...prev, open: false }))}
-        />
+        {/* Delete Confirmation Modal */}
+        {confirmModal.open &&
+          createPortal(
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100vw',
+                height: '100vh',
+                background: 'rgba(0,0,0,0.6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 99999,
+              }}
+              onClick={() => setConfirmModal((prev) => ({ ...prev, open: false }))}
+            >
+              <div
+                style={{
+                  width: 360,
+                  maxWidth: '90vw',
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 12,
+                  padding: 24,
+                  boxShadow: '0 24px 48px rgba(0,0,0,0.5)',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginBottom: 12,
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: 'var(--accent-red)',
+                  }}
+                >
+                  <AlertCircle size={20} />
+                  {confirmModal.title}
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: 'var(--text-secondary)',
+                    lineHeight: 1.6,
+                    marginBottom: 20,
+                  }}
+                >
+                  {confirmModal.message}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                  <button
+                    onClick={() => setConfirmModal((prev) => ({ ...prev, open: false }))}
+                    style={{
+                      padding: '6px 16px',
+                      borderRadius: 6,
+                      fontSize: 12,
+                      background: 'rgba(100,116,139,0.1)',
+                      border: '1px solid var(--border-light)',
+                      color: 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={confirmModal.onConfirm}
+                    style={{
+                      padding: '6px 16px',
+                      borderRadius: 6,
+                      fontSize: 12,
+                      background: '#ef4444',
+                      border: 'none',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    确认
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
+
+        {/* CSS for hover action visibility */}
+        <style>{`
+          .history-actions {
+            opacity: 0 !important;
+          }
+          div:hover > .history-actions {
+            opacity: 1 !important;
+          }
+        `}</style>
       </div>
     );
   }

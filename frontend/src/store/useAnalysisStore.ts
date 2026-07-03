@@ -8,7 +8,7 @@ interface AnalysisStore {
   analyzing: boolean;
   error: string | null;
   fetchAnalysis: (taskId: string) => Promise<void>;
-  triggerAnalysis: (taskId: string, knowledgeBaseIds?: string[]) => Promise<void>;
+  triggerAnalysis: (taskId: string, knowledgeBaseIds?: string[], startFrom?: string) => Promise<void>;
 }
 
 export const useAnalysisStore = create<AnalysisStore>((set) => ({
@@ -28,10 +28,10 @@ export const useAnalysisStore = create<AnalysisStore>((set) => ({
     }
   },
 
-  triggerAnalysis: async (taskId, knowledgeBaseIds) => {
+  triggerAnalysis: async (taskId, knowledgeBaseIds, startFrom) => {
     set({ analyzing: true, loading: true });
     try {
-      await analysisApi.triggerAnalysis(taskId, knowledgeBaseIds);
+      await analysisApi.triggerAnalysis(taskId, knowledgeBaseIds, startFrom);
       set({ analyzing: false, loading: false });
     } catch (e) {
       set({ analyzing: false, loading: false });

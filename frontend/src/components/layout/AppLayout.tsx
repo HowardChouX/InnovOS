@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { useAuthStore } from '../../store/useAuthStore';
 import { notificationsApi, type Notification } from '../../api/notifications';
-import { User } from 'lucide-react';
+import { User, Sun, Moon } from 'lucide-react';
 
 export function AppLayout() {
   const location = useLocation();
@@ -12,6 +12,22 @@ export function AppLayout() {
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const [showMenu, setShowMenu] = useState(false);
+
+  // Theme toggle
+  const [theme, setTheme] = useState<'dark' | 'light'>(
+    () => (localStorage.getItem('theme') as 'dark' | 'light') || 'dark',
+  );
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('theme', next);
+      document.documentElement.setAttribute('data-theme', next);
+      return next;
+    });
+  }, []);
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, []);
 
   // Notification state
   const [showNotify, setShowNotify] = useState(false);
@@ -186,6 +202,15 @@ export function AppLayout() {
 
         {/* Right section */}
         <div className="flex items-center gap-4 text-[13px] text-[var(--text-secondary)]">
+          {/* Theme Toggle */}
+          <button
+            onClick={toggleTheme}
+            className="w-7 h-7 rounded-full border border-[var(--border)] flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-all duration-200 bg-transparent cursor-pointer"
+            title={theme === 'dark' ? '切换亮色主题' : '切换暗色主题'}
+          >
+            {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
+          </button>
+
           {/* Help Guide */}
           <span
             onClick={() => navigate('/guide')}

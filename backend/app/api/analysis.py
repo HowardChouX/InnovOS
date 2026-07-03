@@ -21,6 +21,38 @@ _background_tasks: set[asyncio.Task] = set()
 # 并发锁：防止同一个 task_id 的多个后台任务同时执行
 _running_workflows: set[int] = set()
 
+# task_id → asyncio.Task 映射，用于取消运行中的任务
+_task_map: dict[int, asyncio.Task] = {}
+
+
+def _cleanup_task(task_id: int, task: asyncio.Task) -> None:
+    """任务完成后的清理——从跟踪集合中移除，失败时更新状态"""
+    _background_tasks.discard(task)
+    _task_map.pop(task_id, None)
+
+    # 如果任务失败（取消或异常），更新状态为 failed
+    if task.cancelled():
+        logger.warning(f"Task {task_id} was cancelled")
+        _update_task_status(task_id, "failed")
+    elif task.exception():
+        logger.error(f"Task {task_id} failed: {task.exception()}")
+        _update_task_status(task_id, "failed")
+
+
+def _update_task_status(task_id: int, status: str) -> None:
+    """更新任务状态（异步安全）"""
+    try:
+        db = get_db()
+        db.execute(
+            "UPDATE tasks SET status=?, updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
+            (status, task_id),
+        )
+        db.commit()
+        db.close()
+        logger.info(f"Updated task {task_id} status to {status}")
+    except Exception as e:
+        logger.error(f"Failed to update task {task_id} status: {e}")
+
 WORKFLOW_AGENTS = [
     {
         "agent_id": "agent1",
@@ -429,6 +461,11 @@ async def run_demand_portrait(
             "UPDATE workflows SET status=? WHERE task_id=?",
             ("awaiting_rating", task_id),
         )
+        # 更新任务状态为 pending（等待用户下一步操作）
+        db.execute(
+            "UPDATE tasks SET status='pending', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
+            (task_id,),
+        )
         db.commit()
 
         logger.debug(f"Demand portrait completed for task_id={task_id}, {len(demands)} demands")
@@ -437,6 +474,12 @@ async def run_demand_portrait(
     except Exception as e:
         logger.error(f"Demand portrait failed: {e}")
         update_workflow_step(db, task_id, "agent1", "failed", description=f"执行失败: {str(e)}")
+        # 显式更新任务状态为 failed
+        db.execute(
+            "UPDATE tasks SET status='failed', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
+            (task_id,),
+        )
+        db.commit()
         return None
     finally:
         db.close()
@@ -452,34 +495,6 @@ def _is_step_pending(db, task_id: int, agent_id: str) -> bool:
     steps = json.loads(row[0])
     step = next((s for s in steps if s["agent_id"] == agent_id), None)
     return step is not None and step["status"] == "pending"
-
-
-def _fallback_patent_search(db, task_description: str, patent_keywords: list) -> list[dict]:
-    """LIKE 回退检索"""
-    keywords = patent_keywords[:3] if patent_keywords else [task_description[:50]]
-    or_conditions = []
-    params = []
-    for kw in keywords:
-        like = f"%{kw}%"
-        or_conditions.append("(title LIKE ? OR abstract LIKE ?)")
-        params.extend([like, like])
-    sql = f"SELECT * FROM patents WHERE {' OR '.join(or_conditions)} ORDER BY relevance_score DESC LIMIT 10"
-    rows = db.execute(sql, params).fetchall()
-    return [
-        {
-            "id": r["id"],
-            "title": r["title"],
-            "abstract": r["abstract"],
-            "relevance": r["relevance_score"],
-            "applicants": json.loads(r["applicants"]),
-            "inventors": json.loads(r["inventors"]),
-            "patent_number": r["patent_number"],
-            "filing_date": r["filing_date"],
-            "publication_date": r["publication_date"],
-            "ipc_codes": json.loads(r["ipc_codes"]),
-        }
-        for r in rows
-    ]
 
 
 async def run_analysis_background(
@@ -604,17 +619,22 @@ async def run_analysis_background(
             # 来自 proceed 流程，暂停等评分
             if start_from != "agent1":
                 db.execute("UPDATE workflows SET status=? WHERE task_id=?", ("awaiting_rating", task_id))
+                db.execute(
+                    "UPDATE tasks SET status='pending', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
+                    (task_id,),
+                )
                 db.commit()
                 return
 
-        # Step 3: 专利分析 - 语义检索（用所有创新方向搜索，Reranker 精排）
+        # Step 3: 专利分析 - 统一检索服务（PatentHub 主数据源 + 本地降级）
         if _is_step_pending(db, task_id, "agent5"):
             update_workflow_step(db, task_id, "agent5", "running")
 
             patent_info: list[dict] = []
             direction_patents: dict[str, list[str]] = {}
             try:
-                all_directions = [task_description[:200]]  # fallback
+                # 从问题建模结果中获取创新方向
+                innovations_with_ratings = []
                 row_steps = db.execute("SELECT steps FROM workflows WHERE task_id=?", (task_id,)).fetchone()
                 if row_steps:
                     all_steps = json.loads(row_steps["steps"])
@@ -622,56 +642,28 @@ async def run_analysis_background(
                     if agent2 and agent2.get("output"):
                         try:
                             agent2_out = json.loads(agent2["output"])
-                            innovations = agent2_out.get("innovations", [])
-                            if innovations:
-                                sorted_inns = sorted(
-                                    innovations,
-                                    key=lambda x: x.get("user_rating") or 0,
-                                    reverse=True,
-                                )
-                                all_directions = [
-                                    inn.get("description", "") for inn in sorted_inns if inn.get("description")
-                                ]
+                            innovations_with_ratings = agent2_out.get("innovations", [])
                         except (json.JSONDecodeError, TypeError):
                             pass
 
-                from app.algorithm.patent_search_engine import get_patent_search_engine
+                # 使用统一专利检索服务
+                from app.algorithm.patent_service import patent_search
 
-                patent_searcher = get_patent_search_engine()
-                seen_ids = set()
-                patent_info = []
+                search_result = await patent_search(
+                    innovations=innovations_with_ratings,
+                    task_description=task_description,
+                    max_results=50,
+                )
+                patent_info = search_result["patents"]
+                direction_patents = search_result["direction_patents"]
 
-                # 尝试向量搜索
-                vec_ok = patent_searcher.embedder is not None
-                if vec_ok:
-                    for q in all_directions:
-                        try:
-                            results = await patent_searcher.search(q, top_k=1)
-                            for r in results:
-                                pid = r.get("id")
-                                if pid and pid not in seen_ids:
-                                    seen_ids.add(pid)
-                                    patent_info.append(r)
-                            direction_patents[q] = [r.get("title") or r.get("_title") or "未命名专利" for r in results]
-                        except Exception as vec_e:
-                            logger.warning(f"向量搜索失败(q={q[:30]}): {vec_e}")
+                logger.info(
+                    f"专利检索完成(source={search_result['source']}): "
+                    f"找到 {search_result['total_found']} 条相关专利"
+                )
 
-                # 关键词回退：向量搜索无结果或未配置嵌入模型时，使用 LIKE 检索
-                if not patent_info:
-                    logger.info("向量搜索无结果，降级到关键词搜索...")
-                    try:
-                        patent_keywords = [q for q in all_directions if q][:3]
-                        kw_results = _fallback_patent_search(db, task_description, patent_keywords)
-                        for r in kw_results:
-                            if r.get("id") and r["id"] not in seen_ids:
-                                seen_ids.add(r["id"])
-                                patent_info.append(r)
-                                direction_patents.setdefault(r.get("title", ""), [r.get("title", "")])
-                        logger.info(f"关键词搜索找到 {len(kw_results)} 条专利")
-                    except Exception as kw_e:
-                        logger.warning(f"关键词搜索也失败: {kw_e}")
             except Exception as e:
-                logger.warning(f"专利检索失败: {e}")
+                logger.error(f"专利检索异常: {e}")
 
             update_workflow_step(
                 db,
@@ -690,6 +682,10 @@ async def run_analysis_background(
 
             # 暂停等待用户评分，不允许直接继续
             db.execute("UPDATE workflows SET status=? WHERE task_id=?", ("awaiting_rating", task_id))
+            db.execute(
+                "UPDATE tasks SET status='pending', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
+                (task_id,),
+            )
             db.commit()
 
             logger.debug(f"Step 3 completed for task_id={task_id}, patent_info={len(patent_info)}")
@@ -788,6 +784,10 @@ async def run_analysis_background(
             # 暂停等待用户确认方案
             if start_from != "agent1":
                 db.execute("UPDATE workflows SET status=? WHERE task_id=?", ("awaiting_rating", task_id))
+                db.execute(
+                    "UPDATE tasks SET status='pending', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
+                    (task_id,),
+                )
                 db.commit()
                 logger.debug(f"Step 4 completed for task_id={task_id}, pausing for user confirmation")
                 return
@@ -869,6 +869,10 @@ async def run_analysis_background(
             # 暂停等待用户确认评估结果
             if start_from != "agent1":
                 db.execute("UPDATE workflows SET status=? WHERE task_id=?", ("awaiting_rating", task_id))
+                db.execute(
+                    "UPDATE tasks SET status='pending', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
+                    (task_id,),
+                )
                 db.commit()
                 logger.debug(f"Step 5 completed for task_id={task_id}, pausing for user confirmation")
                 return
@@ -1022,6 +1026,7 @@ def get_analysis(task_id: int, user: dict = Depends(get_current_user)):
 
 class TriggerAnalysisInput(BaseModel):
     knowledgeBaseIds: list[str] | None = None
+    startFrom: str | None = None  # 从指定步骤开始，用于失败任务继续执行
 
 
 @router.post("/{task_id}/trigger")
@@ -1064,11 +1069,22 @@ async def trigger_analysis(
 
     db.close()
 
-    # 后台启动需求洞察步骤（仅第一步）
+    # 后台启动分析（支持从指定步骤开始）
     kb_ids = body.knowledgeBaseIds if body else None
-    task = asyncio.create_task(run_demand_portrait(task_id, user["id"], task["description"], kb_ids))
-    _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
+    start_from = body.startFrom if body and body.startFrom else "agent1"
+
+    if start_from != "agent1":
+        # 从指定步骤继续，使用 run_analysis_background
+        task_obj = asyncio.create_task(
+            run_analysis_background(task_id, user["id"], task["description"], kb_ids, start_from=start_from)
+        )
+    else:
+        # 从头开始，使用 run_demand_portrait
+        task_obj = asyncio.create_task(run_demand_portrait(task_id, user["id"], task["description"], kb_ids))
+
+    _background_tasks.add(task_obj)
+    _task_map[task_id] = task_obj
+    task_obj.add_done_callback(lambda t: _cleanup_task(task_id, t))
 
     return {
         "data": {
@@ -1079,6 +1095,51 @@ async def trigger_analysis(
         "message": "分析已启动",
         "code": 200,
     }
+
+
+@router.post("/{task_id}/cancel")
+def cancel_analysis(task_id: int, user: dict = Depends(get_current_user)):
+    """取消正在运行的任务分析"""
+    # 验证任务归属
+    db = get_db()
+    task = db.execute("SELECT * FROM tasks WHERE id=? AND user_id=?", (task_id, user["id"])).fetchone()
+    if not task:
+        db.close()
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    if task["status"] not in ("analyzing",):
+        db.close()
+        raise HTTPException(status_code=400, detail="当前任务不在分析中，无法取消")
+
+    # 取消 asyncio Task（如果有）
+    background_task = _task_map.pop(task_id, None)
+    if background_task and not background_task.done():
+        background_task.cancel()
+
+    # 清理运行锁
+    _running_workflows.discard(task_id)
+
+    # 更新 DB：task → failed, workflow 当前步骤 → failed
+    db.execute(
+        "UPDATE tasks SET status='failed', updated_at=to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id=?",
+        (task_id,),
+    )
+
+    wf = db.execute("SELECT steps FROM workflows WHERE task_id=?", (task_id,)).fetchone()
+    if wf:
+        steps = json.loads(wf["steps"])
+        for step in steps:
+            if step["status"] == "running":
+                step["status"] = "failed"
+                step["description"] = "用户手动取消"
+                break
+        db.execute("UPDATE workflows SET status='failed', steps=? WHERE task_id=?", (json.dumps(steps), task_id))
+
+    db.commit()
+    db.close()
+
+    logger.info(f"Task {task_id} cancelled by user {user['id']}")
+    return {"data": {"status": "cancelled"}, "message": "分析已取消", "code": 200}
 
 
 class ProceedInput(BaseModel):
@@ -1157,7 +1218,8 @@ async def proceed_workflow(task_id: int, body: ProceedInput | None = None, user:
     # 启动后台任务执行下一步
     remaining = asyncio.create_task(run_analysis_background(task_id, user_id, task_desc, None, start_from=next_agent))
     _background_tasks.add(remaining)
-    remaining.add_done_callback(_background_tasks.discard)
+    _task_map[task_id] = remaining
+    remaining.add_done_callback(lambda t: _cleanup_task(task_id, t))
 
     return {
         "data": {"status": "proceeding"},
@@ -1217,7 +1279,8 @@ async def retry_workflow(task_id: int, user: dict = Depends(get_current_user)):
         run_analysis_background(task_id, user["id"], task["description"], start_from=failed_step["agent_id"])
     )
     _background_tasks.add(remaining)
-    remaining.add_done_callback(_background_tasks.discard)
+    _task_map[task_id] = remaining
+    remaining.add_done_callback(lambda t: _cleanup_task(task_id, t))
 
     return {
         "data": {"status": "retrying", "retryFrom": failed_step["agent_id"]},

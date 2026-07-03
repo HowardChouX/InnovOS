@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useWorkflowStore } from '../../store/useWorkflowStore';
 import { useTaskStore } from '../../store/useTaskStore';
 import { workflowApi } from '../../api/workflow';
+import { StepRunningIndicator } from '../../components/ui/StepRunningIndicator';
 
 interface SolutionItem {
   title: string;
@@ -56,68 +57,20 @@ export function SolutionGenView({ output }: { output: SolutionItem[] | null }) {
           gap: 12,
         }}
       >
-        <i
-          className="fa-solid fa-wand-magic-sparkles"
-          style={{ fontSize: 32, color: 'var(--text-tertiary)', opacity: 0.3 }}
-        />
         <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>暂无方案数据</span>
       </div>
     );
   }
 
   // 已确认 → 显示加载状态，直到组件因 phase 切换而卸载
+  // 注意：这里不应该显示，因为 WorkflowStepResults 会自动切换到下一步骤的等待画面
   if (submitted) {
-    return (
-      <div
-        className="card"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flex: 1,
-          minHeight: 0,
-          gap: 16,
-        }}
-      >
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: '50%',
-            background: 'rgba(139,92,246,0.15)',
-            border: '2px solid rgba(139,92,246,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <i
-            className="fa-solid fa-circle-notch fa-spin"
-            style={{ fontSize: 20, color: 'var(--accent-purple)' }}
-          />
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div
-            style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}
-          >
-            正在评估方案...
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-            AI 正在对方案进行多维度评估，请稍候
-          </div>
-        </div>
-      </div>
-    );
+    return null;  // 不返回任何内容，让父组件的 WorkflowStepResults 处理
   }
 
   return (
-    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
       <div className="card-title">
-        <i
-          className="fa-solid fa-wand-magic-sparkles"
-          style={{ marginRight: 8, color: 'var(--accent-green)' }}
-        />
         方案生成
         <span
           style={{
@@ -298,7 +251,7 @@ export function SolutionGenView({ output }: { output: SolutionItem[] | null }) {
           >
             {submitting ? (
               <>
-                <i className="fa-solid fa-circle-notch fa-spin" /> 提交中...
+                <StepRunningIndicator phaseId="solution_gen" size={16} color="#fff" /> 提交中...
               </>
             ) : submitted ? (
               <>

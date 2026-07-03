@@ -8,48 +8,27 @@ import { useWorkflowStore } from '../../store/useWorkflowStore';
 
 export function DashboardPage() {
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
-  const tasks = useTaskStore((s) => s.tasks);
   const loading = useTaskStore((s) => s.loading);
-  const fetchTasks = useTaskStore((s) => s.fetchTasks);
   const fetchWorkflow = useWorkflowStore((s) => s.fetchWorkflow);
   const startPolling = useWorkflowStore((s) => s.startPolling);
   const stopPolling = useWorkflowStore((s) => s.stopPolling);
-  const workflow = useWorkflowStore((s) => s.workflow);
+  const clearWorkflow = useWorkflowStore((s) => s.clearWorkflow);
 
-  // Load tasks ONCE on mount (not on every render)
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
-
-  // Load workflow when task is selected
+  // 选中任务 → 加载 workflow + 启动轮询
+  // 任务列表的获取由 TaskList 自己负责（单一职责），这里不再重复 fetchTasks
   useEffect(() => {
     if (!selectedTaskId) {
       stopPolling();
-      useWorkflowStore.getState().clearWorkflow();
+      clearWorkflow();
       return;
     }
-
     fetchWorkflow(selectedTaskId);
     startPolling(selectedTaskId);
 
-    return () => {
-      stopPolling();
-    };
-  }, [selectedTaskId, fetchWorkflow, startPolling, stopPolling]);
+    return () => stopPolling();
+  }, [selectedTaskId, fetchWorkflow, startPolling, stopPolling, clearWorkflow]);
 
-  // Refresh task list only when workflow finishes
-  useEffect(() => {
-    if (!workflow) return;
-    if (workflow.status === 'completed' || workflow.status === 'failed') {
-      fetchTasks();
-      stopPolling(); // 完成时停止轮询
-    }
-  }, [workflow, fetchTasks, stopPolling]);
-
-  // 首次加载时显示全页骨架屏
-  if (loading && tasks.length === 0) {
-    return <PageSkeleton />;
-  }
+  if (loading) return <PageSkeleton />;
 
   return (
     <div style={{ display: 'flex', gap: 14, minWidth: 800, minHeight: 0, height: '100%' }}>

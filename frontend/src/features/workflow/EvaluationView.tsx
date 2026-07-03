@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useWorkflowStore } from '../../store/useWorkflowStore';
 import { useTaskStore } from '../../store/useTaskStore';
 import { workflowApi } from '../../api/workflow';
+import { StepRunningIndicator } from '../../components/ui/StepRunningIndicator';
 
 interface EvaluationScore {
   innovation: number;
@@ -97,51 +98,10 @@ export function EvaluationView({ output }: { output: EvaluationItem[] | null }) 
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // 已确认 → 显示加载状态（无论 workflow.status 是否已更新）
-  // 只要 submit 完成就立刻显示，直到组件因 phase 切换而卸载
+  // 已确认 → 显示加载状态，直到组件因 phase 切换而卸载
+  // 注意：这里不应该显示，因为 WorkflowStepResults 会自动切换到下一步骤的等待画面
   if (submitted) {
-    return (
-      <div
-        className="card"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flex: 1,
-          minHeight: 0,
-          gap: 16,
-        }}
-      >
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: '50%',
-            background: 'rgba(251,191,36,0.15)',
-            border: '2px solid rgba(251,191,36,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <i
-            className="fa-solid fa-circle-notch fa-spin"
-            style={{ fontSize: 20, color: 'var(--accent-yellow)' }}
-          />
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div
-            style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}
-          >
-            正在执行成果转化...
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-            AI 正在进行侵权风险分析与报告生成，请稍候
-          </div>
-        </div>
-      </div>
-    );
+    return null;  // 不返回任何内容，让父组件的 WorkflowStepResults 处理
   }
 
   if (!output || !Array.isArray(output) || output.length === 0) {
@@ -177,12 +137,8 @@ export function EvaluationView({ output }: { output: EvaluationItem[] | null }) 
   };
 
   return (
-    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
       <div className="card-title">
-        <i
-          className="fa-solid fa-chart-line"
-          style={{ marginRight: 8, color: 'var(--accent-yellow)' }}
-        />
         方案评估
       </div>
 
@@ -368,7 +324,7 @@ export function EvaluationView({ output }: { output: EvaluationItem[] | null }) 
           >
             {submitting ? (
               <>
-                <i className="fa-solid fa-circle-notch fa-spin" /> 提交中...
+                <StepRunningIndicator phaseId="evaluation" size={16} color="#fff" /> 提交中...
               </>
             ) : submitted ? (
               <>

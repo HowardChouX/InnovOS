@@ -66,7 +66,6 @@ function TimelineStep({
             color: isCompleted ? '#fff' : cfg.color,
             zIndex: 1,
             boxShadow: isRunning ? `0 0 0 3px ${cfg.color}30` : 'none',
-            animation: isRunning ? 'pulse-ring 1.5s ease-in-out infinite' : 'none',
             transition: 'all 0.3s ease',
           }}
         >

@@ -12,28 +12,73 @@ function SkeletonBlock({ className }: { className?: string }) {
 
 export function PageSkeleton() {
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <SkeletonBlock className="h-6 w-48" />
-          <SkeletonBlock className="h-4 w-72" />
-        </div>
-        <SkeletonBlock className="h-10 w-28 rounded-lg" />
-      </div>
-
-      {/* Content cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-3">
-            <SkeletonBlock className="h-4 w-24" />
-            <SkeletonBlock className="h-8 w-16" />
-            <SkeletonBlock className="h-3 w-full" />
-            <SkeletonBlock className="h-3 w-3/4" />
-          </div>
-        ))}
+    <div className="flex items-center justify-center h-full min-h-[60vh]">
+      <div className="flex flex-col items-center gap-8">
+        {/* Hexagonal loading animation */}
+        <HexLoader size={180} />
+        <span className="text-xs text-[var(--text-tertiary)] animate-pulse font-medium tracking-wider">
+          加载中
+        </span>
       </div>
     </div>
+  );
+}
+
+function HexLoader({ size = 180 }: { size?: number }) {
+  const r = size * 0.32;
+  const cx = size / 2;
+  const cy = size / 2;
+  const n = 6;
+  const nodes = Array.from({ length: n }, (_, i) => {
+    const a = (Math.PI * 2 / n) * i - Math.PI / 2;
+    return { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r };
+  });
+
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} className="w-28 h-28">
+      {/* Connecting lines */}
+      {Array.from({ length: n }, (_, i) => {
+        const j = (i + 1) % n;
+        return (
+          <line
+            key={`ln-${i}`}
+            x1={nodes[i].x}
+            y1={nodes[i].y}
+            x2={nodes[j].x}
+            y2={nodes[j].y}
+            stroke="var(--border)"
+            strokeWidth="1"
+            opacity="0.4"
+          />
+        );
+      })}
+      {/* Animated nodes */}
+      {nodes.map((node, i) => (
+        <circle
+          key={`nd-${i}`}
+          cx={node.x}
+          cy={node.y}
+          r="4"
+          fill="var(--accent)"
+          opacity="0"
+        >
+          <animate
+            attributeName="opacity"
+            values="0;1;0"
+            dur="1.5s"
+            begin={`${i * 0.15}s`}
+            repeatCount="indefinite"
+          />
+          <animate
+            attributeName="r"
+            values="3;5;3"
+            dur="1.5s"
+            begin={`${i * 0.15}s`}
+            repeatCount="indefinite"
+          />
+        </circle>
+      ))}
+    </svg>
   );
 }
 

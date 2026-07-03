@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>弹窗测试</title>
+  <style>
+    body { font-family: sans-serif; padding: 40px; background: #1a1a2e; color: white; }
+    button { padding: 12px 24px; font-size: 16px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 8px; }
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 99999; }
+    .modal-content { background: white; color: black; padding: 30px; border-radius: 12px; min-width: 300px; text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>历史方案测试</h1>
+  <p>点击下面按钮测试弹窗：</p>
+  <button onclick="document.getElementById('testModal').style.display='flex'">打开历史方案</button>
+
+  <div id="testModal" class="modal" style="display:none;" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal-content">
+      <h2>✅ 弹窗成功！</h2>
+      <p>这是测试弹窗</p>
+      <button onclick="document.getElementById('testModal').style.display='none'" style="margin-top:15px;background:#f44336">关闭</button>
+    </div>
+  </div>
+
+  <h2>或测试 React Portal</h2>
+  <div id="react-root"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel">
+    const { useState } = React;
+
+    function App() {
+      const [show, setShow] = useState(false);
+      return (
+        <div>
+          <button onClick={() => setShow(true)} style={{marginTop:10}}>React Portal 弹窗</button>
+          {show && ReactDOM.createPortal(
+            <div className="modal" onClick={() => setShow(false)}>
+              <div className="modal-content" onClick={e => e.stopPropagation()}>
+                <h2>🎉 React Portal 弹窗成功！</h2>
+                <p>这个弹窗是通过 createPortal 渲染到 body 的</p>
+                <button onClick={() => setShow(false)} style={{marginTop:15px}}>关闭</button>
+              </div>
+            </div>,
+            document.body
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('react-root')).render(<App />);
+  </script>
+</body>
+</html>

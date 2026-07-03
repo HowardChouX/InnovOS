@@ -10,6 +10,7 @@ import { CompletedView } from './CompletedView';
 import { ConversionView } from './ConversionView';
 import { EmptyState, getStepOutput } from './workflowStepUtils';
 import { WORKFLOW_STEPS } from '../../types/workflow';
+import { StepRunningIndicator } from '../../components/ui/StepRunningIndicator';
 
 const PHASE_VIEWS: Record<string, React.ComponentType<{ output: unknown }>> = {
   demand_portrait: DemandPortraitView,
@@ -98,29 +99,6 @@ export function WorkflowStepResults() {
           flex: 1,
         }}
       >
-        {/* Icon ring */}
-        <div
-          style={{
-            width: 72,
-            height: 72,
-            borderRadius: '50%',
-            background: `${accentColor}12`,
-            border: `2px solid ${accentColor}28`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 24,
-          }}
-        >
-          <i
-            className={stepInfo?.icon || 'fa-solid fa-circle-notch fa-spin'}
-            style={{
-              fontSize: 30,
-              color: accentColor,
-              opacity: 0.7,
-            }}
-          />
-        </div>
         {/* Step label */}
         <p
           style={{
@@ -145,18 +123,8 @@ export function WorkflowStepResults() {
         >
           {stepInfo?.description || '正在执行分析...'}
         </p>
-        {/* Spinner */}
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: '50%',
-            border: '3px solid transparent',
-            borderTopColor: accentColor,
-            borderRightColor: accentColor,
-            animation: 'spin 0.8s linear infinite',
-          }}
-        />
+        {/* StepRunningIndicator - 使用统一的阶段动画 */}
+        <StepRunningIndicator phaseId={displayPhase} size={100} color={accentColor} />
       </div>
     );
   }

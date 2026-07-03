@@ -3,6 +3,7 @@ import { useWorkflowStore } from '../../store/useWorkflowStore';
 import { useTaskStore } from '../../store/useTaskStore';
 import { workflowApi } from '../../api/workflow';
 import { ConflictGraph } from './ConflictGraph';
+import { StepRunningIndicator } from '../../components/ui/StepRunningIndicator';
 
 interface Innovation {
   id: string;
@@ -138,49 +139,9 @@ function ProblemModelingViewInner({ output }: { output: unknown }) {
   }
 
   // 已确认 → 显示加载状态，直到组件因 phase 切换而卸载
+  // 注意：这里不应该显示，因为 WorkflowStepResults 会自动切换到下一步骤的等待画面
   if (submitted) {
-    return (
-      <div
-        className="card"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flex: 1,
-          minHeight: 0,
-          gap: 16,
-        }}
-      >
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: '50%',
-            background: 'rgba(167,139,250,0.15)',
-            border: '2px solid rgba(167,139,250,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <i
-            className="fa-solid fa-circle-notch fa-spin"
-            style={{ fontSize: 20, color: 'var(--accent-purple)' }}
-          />
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div
-            style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}
-          >
-            正在检索相关专利...
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-            AI 正在基于您的评分检索相关专利，请稍候
-          </div>
-        </div>
-      </div>
-    );
+    return null;  // 不返回任何内容，让父组件的 WorkflowStepResults 处理
   }
 
   const allRated = innovations.length > 0 && innovations.every((d) => (ratings[d.id] ?? 0) > 0);
@@ -228,22 +189,6 @@ function ProblemModelingViewInner({ output }: { output: unknown }) {
           gap: 12,
         }}
       >
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            background: 'rgba(59,130,246,0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <i
-            className="fa-solid fa-diagram-project"
-            style={{ color: 'var(--accent-blue)', fontSize: 14 }}
-          />
-        </div>
         <div>
           <div
             style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}
@@ -269,10 +214,6 @@ function ProblemModelingViewInner({ output }: { output: unknown }) {
           <div
             style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}
           >
-            <i
-              className="fa-solid fa-code-branch"
-              style={{ marginRight: 6, color: 'var(--accent-purple)' }}
-            />
             冲突分析图
           </div>
           <ConflictGraph centerConflict={centerConflict} nodes={conflictNodes} />
@@ -300,10 +241,6 @@ function ProblemModelingViewInner({ output }: { output: unknown }) {
       {/* Section 3: Innovation Points (always visible) */}
       <div className="card" style={{ flexShrink: 0 }}>
         <div className="card-title">
-          <i
-            className="fa-solid fa-lightbulb"
-            style={{ marginRight: 8, color: 'var(--accent-yellow)' }}
-          />
           创新方向（共 {innovations.length} 项）
         </div>
 
@@ -322,10 +259,6 @@ function ProblemModelingViewInner({ output }: { output: unknown }) {
               fontSize: 12,
             }}
           >
-            <i
-              className="fa-solid fa-cube"
-              style={{ fontSize: 20, display: 'block', marginBottom: 8, opacity: 0.3 }}
-            />
             暂无创新方向数据
           </div>
         ) : (
@@ -343,24 +276,6 @@ function ProblemModelingViewInner({ output }: { output: unknown }) {
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                   {/* Icon for the principle */}
-                  <div
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 6,
-                      flexShrink: 0,
-                      background: 'rgba(251,191,36,0.15)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <i
-                      className="fa-solid fa-wand-magic-sparkles"
-                      style={{ fontSize: 11, color: 'var(--accent-yellow)' }}
-                    />
-                  </div>
-
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {/* Description */}
                     <div
@@ -477,7 +392,7 @@ function ProblemModelingViewInner({ output }: { output: unknown }) {
           >
             {submitting ? (
               <>
-                <i className="fa-solid fa-circle-notch fa-spin" /> 提交中...
+                <StepRunningIndicator phaseId="problem_modeling" size={16} color="#fff" /> 提交中...
               </>
             ) : submitted ? (
               <>

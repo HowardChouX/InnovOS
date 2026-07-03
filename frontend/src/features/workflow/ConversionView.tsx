@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTaskStore } from '../../store/useTaskStore';
 import { historySolutionsApi } from '../../api/historySolutions';
+import { StepRunningIndicator } from '../../components/ui/StepRunningIndicator';
 import type {
   HistorySolutionsData,
   SolutionWithEval,
@@ -104,10 +105,6 @@ function InfringementPanel({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <i
-          className="fa-solid fa-shield-halved"
-          style={{ color: 'var(--accent-red)', fontSize: 14 }}
-        />
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
           侵权风险分析
         </span>
@@ -117,16 +114,24 @@ function InfringementPanel({
         <div
           style={{
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 8,
-            padding: 20,
+            gap: 16,
+            padding: 40,
           }}
         >
-          <i className="fa-solid fa-circle-notch fa-spin" style={{ color: 'var(--accent-blue)' }} />
-          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-            AI 正在分析侵权风险...
-          </span>
+          <StepRunningIndicator phaseId="conversion" size={48} color="var(--accent-green)" />
+          <div style={{ textAlign: 'center' }}>
+            <div
+              style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}
+            >
+              正在进行成果转化...
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              AI 正在生成分析报告与转化建议，请稍候
+            </div>
+          </div>
         </div>
       ) : result ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -343,7 +348,7 @@ function SolutionCard({
               color: 'var(--accent-blue)',
             }}
           >
-            <i className="fa-solid fa-circle-notch fa-spin" /> 分析中
+            <StepRunningIndicator phaseId="conversion" size={14} color="var(--accent-blue)" /> 分析中
           </div>
         )}
       </div>
@@ -547,24 +552,21 @@ function ConversionViewInner({ selectedTaskId }: { selectedTaskId: string }) {
         className="card"
         style={{
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
           flex: 1,
           minHeight: 0,
+          padding: 60,
         }}
       >
-        <div style={{ textAlign: 'center' }}>
-          <i
-            className="fa-solid fa-circle-notch fa-spin"
-            style={{
-              fontSize: 24,
-              color: 'var(--accent-blue)',
-              marginBottom: 12,
-              display: 'block',
-            }}
-          />
-          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>加载成果转化数据...</span>
-        </div>
+        <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 10px' }}>
+          成果转化
+        </p>
+        <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: '0 0 28px', textAlign: 'center', lineHeight: 1.5, maxWidth: 400 }}>
+          正在加载成果转化数据...
+        </p>
+        <StepRunningIndicator phaseId="conversion" size={100} color="var(--accent-green)" />
       </div>
     );
   }
@@ -606,22 +608,14 @@ function ConversionViewInner({ selectedTaskId }: { selectedTaskId: string }) {
           gap: 12,
         }}
       >
-        <i
-          className="fa-solid fa-folder-open"
-          style={{ fontSize: 32, color: 'var(--text-tertiary)', opacity: 0.3 }}
-        />
         <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>该任务暂无成果转化数据</span>
       </div>
     );
   }
 
   return (
-    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
       <div className="card-title">
-        <i
-          className="fa-solid fa-file-contract"
-          style={{ marginRight: 8, color: 'var(--accent-red)' }}
-        />
         成果转化 | {data.taskTitle}
       </div>
 

@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { AlertCircle } from 'lucide-react';
 
 interface InlineConfirmModalProps {
@@ -44,30 +45,89 @@ export function InlineConfirmModal({
 
   const c = colorClasses[confirmColor];
 
-  return (
+  const modalContent = (
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60"
+      className="fixed inset-0 z-[300] flex items-center justify-center"
+      style={{
+        background: 'rgba(0,0,0,0.6)',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
       onClick={onCancel}
     >
       <div
-        className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-6 w-[360px] max-w-[90vw] shadow-2xl"
+        style={{
+          width: 360,
+          maxWidth: '90vw',
+          background: 'var(--bg-card, #1a202c)',
+          border: '1px solid var(--border)',
+          borderRadius: 12,
+          padding: 24,
+          boxShadow: '0 24px 48px rgba(0,0,0,0.5)',
+          zIndex: 301,
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className={`flex items-center gap-2 mb-3 text-[15px] font-semibold ${c.title}`}>
-          <AlertCircle className="w-5 h-5" />
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 12,
+            fontSize: 15,
+            fontWeight: 600,
+            color: 'var(--accent-red)',
+          }}
+        >
+          <AlertCircle size={20} />
           {title}
         </div>
-        <div className="text-[13px] text-slate-400 leading-relaxed mb-5">{message}</div>
-        <div className="flex justify-end gap-2.5">
+        <div
+          style={{
+            fontSize: 13,
+            color: 'var(--text-secondary)',
+            lineHeight: 1.6,
+            marginBottom: 20,
+          }}
+        >
+          {message}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
           <button
             onClick={onCancel}
-            className="px-3.5 py-1.5 rounded-md text-xs bg-slate-500/10 border border-[var(--border-light)] text-slate-400 hover:bg-slate-500/15 transition-colors cursor-pointer font-[inherit]"
+            style={{
+              padding: '6px 16px',
+              borderRadius: 6,
+              fontSize: 12,
+              background: 'rgba(100,116,139,0.1)',
+              border: '1px solid var(--border-light)',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              transition: 'all 0.15s',
+            }}
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
-            className={`px-3.5 py-1.5 rounded-md text-xs border-none text-white transition-colors cursor-pointer font-[inherit] ${c.btn}`}
+            style={{
+              padding: '6px 16px',
+              borderRadius: 6,
+              fontSize: 12,
+              background: '#ef4444',
+              border: 'none',
+              color: '#fff',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              transition: 'all 0.15s',
+            }}
           >
             {confirmText}
           </button>
@@ -75,4 +135,6 @@ export function InlineConfirmModal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
