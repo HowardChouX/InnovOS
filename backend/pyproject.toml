@@ -14,7 +14,6 @@ dependencies = [
     "python-jose[cryptography]>=3.3.0",
     "bcrypt>=4.0.0",
     "openai>=2.41.0",
-    "psutil>=5.9.0",
     "numpy>=2.2.6",
     "python-multipart>=0.0.32",
     "psycopg2-binary>=2.9.9",
@@ -25,14 +24,8 @@ dependencies = [
     "readability-lxml>=0.8.0",
     "html2text>=2024.0.0",
     "lxml>=5.0.0",
-    "pdf2image>=1.17.0",
-    "pillow>=12.2.0",
-    "docling>=2.0.0",
-    "rapidocr-onnxruntime>=1.4.0",
     "jieba>=0.42.0",
     "rank-bm25>=0.2.2",
-    "torch>=2.5.0",
-    "torchvision>=0.27.0",
 ]
 
 [project.optional-dependencies]
@@ -90,7 +83,7 @@ dev = [
 # ── Cloud Deployment ──────────────────────────────────────
 # For minimal production image, install only core deps:
 #   pip install innovos-backend
-# For OCR support, add: pip install innovos-backend[ocr]
+# uvicorn is a runtime dependency — used by both dev and production.
 
 # ── Ruff ──────────────────────────────────────────────
 [tool.ruff]

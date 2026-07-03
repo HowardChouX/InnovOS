@@ -150,17 +150,10 @@ export const knowledgeApi = {
     const formData = new FormData();
     formData.append('file', file);
     if (baseId) formData.append('base_id', baseId);
-    const base = import.meta.env.VITE_API_URL ?? '';
-    const res = await fetch(`${base}/api/knowledge/upload`, {
+    return apiRequest('/api/knowledge/upload', {
       method: 'POST',
-      credentials: 'include',
       body: formData,
     });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || `Upload failed (${res.status})`);
-    }
-    return res.json();
   },
 
   // ─── 文件夹导入（生产环境：上传文件列表）─────────────────
@@ -169,17 +162,10 @@ export const knowledgeApi = {
     for (const file of files) {
       formData.append('files', file);
     }
-    const base = import.meta.env.VITE_API_URL ?? '';
-    const res = await fetch(`${base}/api/knowledge-bases/${baseId}/items/import-directory`, {
+    return apiRequest(`/api/knowledge-bases/${baseId}/items/import-directory`, {
       method: 'POST',
-      credentials: 'include',
       body: formData,
     });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || `Import failed (${res.status})`);
-    }
-    return res.json();
   },
 
   // ─── 搜索 ────────────────────────────────────────────

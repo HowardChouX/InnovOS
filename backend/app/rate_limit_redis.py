@@ -45,12 +45,17 @@ logger = logging.getLogger(__name__)
 class RedisRateLimiter:
     """Redis 滑动窗口限流器。
 
+    降级策略（按优先级）：
+    1. Redis 可用 → 分布式限流（多 worker 共享状态）
+    2. Redis 不可用 → 本地内存限流（单进程有效，保底保护）
+    3. 永不退化为"完全放行"——限流是安全底线
+
     Usage:
         limiter = RedisRateLimiter(max_requests=60, window_seconds=60)
         allowed, remaining, reset = limiter.check("192.168.1.1")
     """
 
-    __test__ = False  # Prevent pytest from collecting this as a test
+    __test__ = False
 
     def __init__(
         self,
@@ -63,92 +68,133 @@ class RedisRateLimiter:
         self.window_seconds = window_seconds
         self.name = name
         self._redis_url = os.getenv("REDIS_URL", "")
+        self._use_redis = False
 
         if redis_client is not None:
             self._client = redis_client
+            self._use_redis = True
         elif self._redis_url:
-            import redis
-
-            self._client = redis.from_url(self._redis_url, decode_responses=True)
-            logger.info("已连接 Redis: %s", self._redis_url[:30])
-        else:
             try:
-                import fakeredis
+                import redis
+                self._client = redis.from_url(self._redis_url, decode_responses=True)
+                self._client.ping()
+                self._use_redis = True
+                logger.info("已连接 Redis: %s", self._redis_url[:30])
+            except Exception as e:
+                logger.warning("Redis 连接失败 (%s)，降级为本地内存限流", e)
+                self._init_local()
+        else:
+            logger.info("未配置 REDIS_URL，使用本地内存限流")
+            self._init_local()
 
-                self._client = fakeredis.FakeStrictRedis()
-                logger.warning("未配置 REDIS_URL，使用 fakeredis 内存模拟（仅开发/测试用）")
-            except ImportError:
-                from unittest.mock import MagicMock
+        if self._use_redis:
+            self._script = self._client.register_script(_REDIS_SCRIPT)
 
-                self._client = MagicMock()
-                logger.warning("未配置 REDIS_URL 且 fakeredis 未安装，限流功能降级为放行")
-                self._script = lambda **kw: [1, 0, 1]  # degraded: pass-through
-                return
-
-        # 注册 Lua 脚本
-        self._script = self._client.register_script(_REDIS_SCRIPT)
+    def _init_local(self):
+        """本地内存限流：不依赖任何外部组件。"""
+        self._use_redis = False
+        self._local_requests: dict[str, list[float]] = {}
+        self._script = lambda **kw: [1, 0, 1]  # unused for local mode
 
     def _key(self, client_key: str) -> str:
-        """生成 Redis key。"""
         return f"ratelimit:{self.name}:{client_key}"
 
     def check(self, key: str) -> tuple[bool, int, int]:
-        """检查 key 是否允许请求。
-
-        Returns:
-            (allowed, remaining, reset_seconds)
-        """
+        """检查 key 是否允许请求。"""
         try:
-            now = int(time.time())
-            result = self._script(
-                keys=[self._key(key)],
-                args=[now, self.window_seconds, self.max_requests],
-            )
-            allowed = bool(result[0])
-            remaining = int(result[1])
-            reset_seconds = int(result[2])
-            return allowed, remaining, reset_seconds
+            if self._use_redis:
+                return self._check_redis(key)
+            else:
+                return self._check_local(key)
         except Exception as e:
-            logger.error("Redis 限流检查失败: %s", e)
-            raise ConnectionError(f"Redis 限流检查失败: {e}") from e
+            logger.error("Redis 限流检查失败 (%s)，降级为本地限流", e)
+            self._init_local()
+            return self._check_local(key)
+
+    def _check_redis(self, key: str) -> tuple[bool, int, int]:
+        now = int(time.time())
+        result = self._script(
+            keys=[self._key(key)],
+            args=[now, self.window_seconds, self.max_requests],
+        )
+        return bool(result[0]), int(result[1]), int(result[2])
+
+    def _check_local(self, key: str) -> tuple[bool, int, int]:
+        """本地内存滑动窗口限流（降级方案）。"""
+        now = time.time()
+        full_key = self._key(key)
+        window = self.window_seconds
+
+        # 清理过期记录
+        if full_key not in self._local_requests:
+            self._local_requests[full_key] = []
+        self._local_requests[full_key] = [
+            t for t in self._local_requests[full_key] if now - t < window
+        ]
+
+        count = len(self._local_requests[full_key])
+        remaining = max(0, self.max_requests - count - 1)
+
+        if count < self.max_requests:
+            self._local_requests[full_key].append(now)
+            reset = window
+            return True, remaining, reset
+        else:
+            oldest = self._local_requests[full_key][0]
+            reset_in = int(window - (now - oldest))
+            return False, 0, max(1, reset_in)
 
     def get_remaining(self, key: str) -> int:
-        """获取剩余可用请求数。"""
         try:
-            now = int(time.time())
-            cutoff = now - self.window_seconds
-            client = self._client
-            redis_key = self._key(key)
-            client.zremrangebyscore(redis_key, 0, cutoff)
-            count = client.zcard(redis_key)
-            return max(0, self.max_requests - count)
+            if self._use_redis:
+                now = int(time.time())
+                cutoff = now - self.window_seconds
+                client = self._client
+                redis_key = self._key(key)
+                client.zremrangebyscore(redis_key, 0, cutoff)
+                count = client.zcard(redis_key)
+                return max(0, self.max_requests - count)
+            else:
+                now = time.time()
+                full_key = self._key(key)
+                if full_key not in self._local_requests:
+                    return self.max_requests
+                valid = [t for t in self._local_requests[full_key] if now - t < self.window_seconds]
+                return max(0, self.max_requests - len(valid))
         except Exception as e:
             logger.error("Redis 查询剩余失败: %s", e)
             return 0
 
     def get_reset(self, key: str) -> int:
-        """获取窗口重置剩余秒数。"""
         try:
-            now = int(time.time())
-            client = self._client
-            redis_key = self._key(key)
-            oldest = client.zrange(redis_key, 0, 0, withscores=True)
-            if oldest:
-                reset_in = self.window_seconds - (now - int(oldest[0][1]))
-                return max(1, reset_in)
-            return 0
+            if self._use_redis:
+                now = int(time.time())
+                client = self._client
+                redis_key = self._key(key)
+                oldest = client.zrange(redis_key, 0, 0, withscores=True)
+                if oldest:
+                    reset_in = self.window_seconds - (now - int(oldest[0][1]))
+                    return max(1, reset_in)
+                return 0
+            else:
+                now = time.time()
+                full_key = self._key(key)
+                if full_key not in self._local_requests or not self._local_requests[full_key]:
+                    return 0
+                valid = [t for t in self._local_requests[full_key] if now - t < self.window_seconds]
+                if not valid:
+                    return 0
+                return max(1, int(self.window_seconds - (now - valid[0])))
         except Exception as e:
             logger.error("Redis 查询重置时间失败: %s", e)
             return 0
 
     def cleanup(self):
-        """清理所有过期 key（调用 Redis 端过期机制自动处理）。"""
         pass
 
     @property
     def client(self):
-        """暴露 Redis 客户端（用于测试/调试）。"""
-        return self._client
+        return self._client if self._use_redis else None
 
 
 def get_client_ip(request: Request) -> str:

@@ -1,7 +1,17 @@
+# InnovOS 优化版 Docker Compose
+# 基于最佳实践配置
+
+version: '3.8'
+
+# ═══════════════════════════════════════════════════════════
+#  服务定义
+# ═══════════════════════════════════════════════════════════
+
 services:
   # ─── PostgreSQL + pgvector ───────────────────────────────────
   postgres:
     image: pgvector/pgvector:pg17
+    container_name: innovos-postgres
     env_file: ./.env
     environment:
       POSTGRES_DB: innovos
@@ -11,16 +21,18 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U innovos']
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 30s
     restart: unless-stopped
     deploy:
       resources:
         limits:
           memory: 512M
           cpus: '1.0'
+    networks:
+      - innovos-network
     logging:
       driver: json-file
       options:
@@ -30,18 +42,24 @@ services:
   # ─── Redis (rate limiting + caching) ─────────────────────────
   redis:
     image: redis:7-alpine
+    container_name: innovos-redis
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
-      interval: 5s
+      interval: 10s
       timeout: 3s
       retries: 5
-      start_period: 5s
+      start_period: 10s
     restart: unless-stopped
     deploy:
       resources:
         limits:
           memory: 128M
           cpus: '0.5'
+    networks:
+      - innovos-network
     logging:
       driver: json-file
       options:
@@ -51,6 +69,7 @@ services:
   # ─── MinIO (S3-compatible object storage) ────────────────────
   minio:
     image: minio/minio:latest
+    container_name: innovos-minio
     command: server /data --console-address ":9001"
     env_file: ./.env
     environment:
@@ -58,21 +77,20 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - minio_data:/data
-    # ports:  # Security: MinIO only needs internal Docker network access.
-    #   - "9000:9000"   # S3 API — production: remove for security
-    #   - "9001:9001"   # Console UI — production: remove for security
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 30s
     restart: unless-stopped
     deploy:
       resources:
         limits:
           memory: 256M
           cpus: '0.5'
+    networks:
+      - innovos-network
     logging:
       driver: json-file
       options:
@@ -82,6 +100,7 @@ services:
   # ─── Create MinIO bucket on startup ──────────────────────────
   minio-setup:
     image: minio/mc:latest
+    container_name: innovos-minio-setup
     depends_on:
       minio:
         condition: service_healthy
@@ -98,14 +117,15 @@ services:
       exit 0
       "
     restart: 'no'
+    networks:
+      - innovos-network
 
   # ─── Backend API ─────────────────────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - '8000:8000'
+    container_name: innovos-backend
     depends_on:
       postgres:
         condition: service_healthy
@@ -140,11 +160,6 @@ services:
       AI_SILICON_API_HOST: ${AI_SILICON_API_HOST:-https://api.siliconflow.cn}
       AI_DEEPSEEK_API_KEY: ${AI_DEEPSEEK_API_KEY}
       AI_DEEPSEEK_API_HOST: ${AI_DEEPSEEK_API_HOST:-https://api.deepseek.com}
-      # CNIPR Patent API
-      CNIPR_CLIENT_ID: ${CNIPR_CLIENT_ID}
-      CNIPR_CLIENT_SECRET: ${CNIPR_CLIENT_SECRET}
-      CNIPR_USERNAME: ${CNIPR_USERNAME:-}
-      CNIPR_PASSWORD: ${CNIPR_PASSWORD:-}
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost}
       ENV: production
     restart: unless-stopped
@@ -153,6 +168,8 @@ services:
         limits:
           memory: 2G
           cpus: '2.0'
+    networks:
+      - innovos-network
     logging:
       driver: json-file
       options:
@@ -164,23 +181,46 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: innovos-frontend
     depends_on:
       - backend
     ports:
-      - '80:80'
+      - '${FRONTEND_PORT:-80}:80'
     restart: unless-stopped
     deploy:
       resources:
         limits:
           memory: 128M
           cpus: '0.5'
+    networks:
+      - innovos-network
     logging:
       driver: json-file
       options:
         max-size: '10m'
         max-file: '3'
 
+# ═══════════════════════════════════════════════════════════
+#  网络配置
+# ═══════════════════════════════════════════════════════════
+
+networks:
+  innovos-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# ═══════════════════════════════════════════════════════════
+#  卷配置
+# ═══════════════════════════════════════════════════════════
+
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
+    driver: local
   minio_data:
+    driver: local
   backend_uploads:
+    driver: local

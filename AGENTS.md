@@ -47,6 +47,27 @@ CI 在 GitHub Actions 中自动执行上述全部检查（`.github/workflows/ci.
 
 Backend auto-reloads via `uvicorn --reload`. API docs at `http://localhost:8000/docs`.
 
+## Development Rules
+
+### One-shot Migration Code
+
+Database migrations that do data backfill, FK rewrites, or column type conversions are **one-time code**:
+
+- Write them as idempotent standalone scripts
+- Execute once, verify, then **delete immediately**
+- Never leave migration code in the production startup path
+- If `init_all_tables` runs it on every boot, it must be a pure DDL declaration (`IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`), not a procedural backfill
+
+- **Example of bad**: a function `_migrate_x_to_y()` called inside `init_all_tables()` that scans and transforms data — this runs every startup forever after the migration is complete.
+
+- **Example of good**: `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` — declarative, idempotent, costs nothing to include permanently.
+
+### Database Connection Management
+
+- Always use `with db_session() as db:` for new code
+- The `__del__` safety net on `_PostgresDatabase` catches leaks but is a last resort — explicit `close()` or `db_session()` is mandatory
+- Never do `db.execute()` after `db.commit()` without a good reason — prefer `RETURNING` clauses
+
 ## Database
 
 **PostgreSQL** `postgresql://innovos:innovos_secret@localhost:5432/innovos`. Configured in `backend/.env` via `DATABASE_URL`.

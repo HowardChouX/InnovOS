@@ -3,7 +3,9 @@ FROM python:3.13-slim AS builder
 RUN pip install uv --no-cache-dir --root-user-action=ignore -i https://pypi.tuna.tsinghua.edu.cn/simple
 WORKDIR /build
 COPY pyproject.toml uv.lock ./
-RUN uv sync --no-dev --frozen
+# 增加超时时间，允许大型包下载
+ENV UV_HTTP_TIMEOUT=300
+RUN uv sync --frozen --no-group dev
 
 # Stage 2: Runtime
 FROM python:3.13-slim AS runtime

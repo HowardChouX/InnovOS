@@ -7,18 +7,17 @@ its own connection. The get_db()/db_session() pattern already provides per-call
 connections, which is correct. However, sharing a connection across concurrent
 coroutines within the same call is unsafe.
 
+RECOMMENDED: Use 'with db_session() as db:' for automatic cleanup.
+
 Usage pattern:
-  db = get_db()
-  db.execute("SELECT * FROM users WHERE id=?", (uid,))    # ? auto-converted to %s for PG
-  row = db.execute(...).fetchone() / .fetchall()           # dict-like rows → row["col"]
-  cursor = db.execute("INSERT INTO ... RETURNING id", ...
-  inserted_id = cursor.fetchone()["id"]                    # RETURNING id + fetchone
-  db.commit()
-  db.close()
+  with db_session() as db:
+      db.execute("SELECT * FROM users WHERE id=?", (uid,))
+      row = db.execute(...).fetchone()
 """
 
 import logging
 import re
+import threading
 from contextlib import contextmanager
 from typing import Any
 
@@ -81,13 +80,19 @@ class _Cursor:
 
 
 _pg_pool: Any = None
+_pg_pool_lock = threading.Lock()
 
 
 class _PostgresDatabase:
-    """PostgreSQL database wrapper."""
+    """PostgreSQL database wrapper with automatic connection recovery.
+
+    If close() is not called explicitly, the connection is returned to the pool
+    during garbage collection as a safety net to prevent connection leaks.
+    """
 
     def __init__(self, conn):
         self._conn = conn
+        self._closed = False
 
     def execute(self, sql: str, params=None):
         if params is not None:
@@ -103,31 +108,56 @@ class _PostgresDatabase:
         self._conn.rollback()
 
     def close(self):
+        if self._closed:
+            return
+        self._closed = True
         global _pg_pool
         try:
             _pg_pool.putconn(self._conn)
         except Exception:
             logger.warning("Failed to return connection to pool, closing directly")
-            self._conn.close()
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+
+    def __del__(self):
+        """Safety net: auto-return connection if not explicitly closed."""
+        if not self._closed:
+            logger.warning(
+                "Database connection was not closed explicitly. "
+                "It is being returned to the pool by the garbage collector. "
+                "Please use 'with db_session() as db:' to avoid this warning."
+            )
+            try:
+                self.close()
+            except Exception:
+                pass
 
 
 def _get_pg_db():
     global _pg_pool
     if _pg_pool is None:
-        from psycopg2 import pool as _pool
+        with _pg_pool_lock:
+            if _pg_pool is None:  # double-checked locking
+                from psycopg2 import pool as _pool
 
-        if not DATABASE_URL:
-            raise RuntimeError(
-                "DATABASE_URL environment variable not set. Example: postgresql://user:password@host:5432/innovos"
-            )
-        logger.info(f"Connecting to PostgreSQL: {DATABASE_URL[:30]}...")
-        _pg_pool = _pool.ThreadedConnectionPool(1, 50, DATABASE_URL)
+                if not DATABASE_URL:
+                    raise RuntimeError(
+                        "DATABASE_URL environment variable not set. Example: postgresql://user:password@host:5432/innovos"
+                    )
+                logger.info(f"Connecting to PostgreSQL: {DATABASE_URL[:30]}...")
+                _pg_pool = _pool.ThreadedConnectionPool(1, 50, DATABASE_URL)
     raw_conn = _pg_pool.getconn()
     return _PostgresDatabase(raw_conn)
 
 
 def get_db():
-    """Get a PostgreSQL database connection."""
+    """Get a PostgreSQL database connection.
+
+    DEPRECATED: Prefer 'with db_session() as db:' for automatic cleanup.
+    The __del__ safety net will catch leaks, but explicit cleanup is better.
+    """
     return _get_pg_db()
 
 
@@ -136,6 +166,10 @@ def db_session():
     """Get a DB connection with guaranteed return to pool.
 
     Auto-commits on success, auto-rollbacks on exception, auto-closes on exit.
+
+    Usage:
+        with db_session() as db:
+            rows = db.execute("SELECT * FROM users").fetchall()
     """
     db = get_db()
     try:
@@ -172,14 +206,6 @@ def init_db():
 
     logger.info("Initializing PostgreSQL schema...")
 
-    db = get_db()
-    try:
+    with db_session() as db:
         init_all_tables(db)
-        db.commit()
         logger.info("Database schema initialized")
-    except Exception:
-        db.rollback()
-        logger.exception("Database schema initialization failed")
-        raise
-    finally:
-        db.close()

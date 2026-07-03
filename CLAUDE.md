@@ -180,3 +180,4 @@ INNOVOS_ADMIN_PASSWORD=    # 可选：管理员密码（未设置则自动生成
 - **Security Headers:** CSP, HSTS, XFO, X-XSS-Protection, Referrer-Policy, Permissions-Policy
 - **Build:** Code splitting (vendor/ui/state chunks), esbuild minification
 - **Error Boundary:** Global React error boundary with professional Chinese error UI and reload button
+- **One-shot Migration Code:** Database migration functions (data backfill, FK changes, column type conversions) must be written as idempotent standalone scripts and deleted after execution. Never leave one-time migration code in the production path — every startup should not re-run a migration that already completed. If a migration must be repeatable, make it a pure schema declaration (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE ADD COLUMN IF NOT EXISTS`), not a procedural backfill.

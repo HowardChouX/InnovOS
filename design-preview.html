@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InnovOS</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600;700&family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg0: #0d0d0d; --bg1: #1a1a1a; --bg2: #262626;
+  --bd: #333; --bd2: #2a2a2a;
+  --t1: #ededed; --t2: #a3a3a3; --t3: #737373;
+  --accent: #2dd4bf; --accent-dim: rgba(45,212,191,0.12);
+  --accent-glow: rgba(45,212,191,0.2);
+  --amber: #fbbf24; --green: #34d399; --red: #f87171;
+  --green-dim: rgba(52,211,153,0.12);
+  --amber-dim: rgba(251,191,36,0.12);
+  --red-dim: rgba(248,113,113,0.12);
+  --blue: #60a5fa; --blue-dim: rgba(96,165,250,0.12);
+  --r: 10px; --r-sm: 6px;
+  --f-d: 'DM Sans','Noto Sans SC',sans-serif;
+  --f-b: 'Inter','Noto Sans SC',sans-serif;
+  --f-m: 'JetBrains Mono',monospace;
+}
+
+[data-theme="light"] {
+  --bg0: #fafafa; --bg1: #f3f3f3; --bg2: #ffffff;
+  --bd: #e5e5e5; --bd2: #f0f0f0;
+  --t1: #171717; --t2: #737373; --t3: #a3a3a3;
+  --accent: #0ea5a5; --accent-dim: rgba(14,165,165,0.08);
+  --accent-glow: rgba(14,165,165,0.15);
+  --green: #10b981; --amber: #f59e0b; --red: #ef4444;
+  --green-dim: rgba(16,185,129,0.08);
+  --amber-dim: rgba(245,158,11,0.08);
+  --red-dim: rgba(239,68,68,0.08);
+  --blue: #3b82f6; --blue-dim: rgba(59,130,246,0.08);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--f-b);background:var(--bg0);color:var(--t1);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
+
+/* Loading Screen */
+.load{position:fixed;inset:0;z-index:1000;background:var(--bg0);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:40px;transition:opacity .5s,visibility .5s}
+.load.hide{opacity:0;visibility:hidden;pointer-events:none}
+.ncv{position:relative;width:200px;height:200px}
+.nd{position:absolute;width:12px;height:12px;border-radius:50%;background:var(--t3);transform:translate(-50%,-50%);transition:background .6s,box-shadow .6s}
+.nd.on{background:var(--accent);box-shadow:0 0 16px var(--accent-glow)}
+.ln{position:absolute;height:1px;background:var(--bd);transform-origin:left center;opacity:0;transition:opacity .6s,background .6s}
+.ln.vis{opacity:1}
+.ln.on{background:var(--accent);opacity:.5}
+.ltxt{font-family:var(--f-d);font-size:18px;font-weight:500;color:var(--t2);letter-spacing:.03em}
+
+/* Particles */
+.ptcl{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.pd{position:absolute;width:2px;height:2px;border-radius:50%;background:var(--accent);opacity:0;animation:drift 60s linear infinite}
+@keyframes drift{0%{opacity:0;transform:translate(0,0)}5%{opacity:.2}95%{opacity:.2}100%{opacity:0;transform:translate(var(--dx),var(--dy))}}
+
+/* Layout */
+.app{max-width:1200px;margin:0 auto;padding:0 32px;position:relative;z-index:1}
+
+/* Nav */
+.nav{display:flex;align-items:center;justify-content:space-between;height:56px;border-bottom:1px solid var(--bd)}
+.nav-l{display:flex;align-items:baseline;gap:10px}
+.nav-l h1{font-family:var(--f-d);font-size:18px;font-weight:700;color:var(--t1);letter-spacing:-.01em}
+.nav-l .sub{font-size:12px;color:var(--t3);font-weight:400}
+.nav-r{display:flex;align-items:center;gap:24px}
+.nav-r a{font-size:13px;color:var(--t2);text-decoration:none;font-weight:500;transition:.12s}
+.nav-r a:hover{color:var(--t1)}
+.nav-r a.active{color:var(--accent)}
+.theme{width:32px;height:32px;border-radius:50%;border:1px solid var(--bd);background:var(--bg1);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--t2);transition:.15s}
+.theme:hover{border-color:var(--accent);color:var(--accent)}
+.theme svg{width:14px;height:14px}
+
+/* Hero */
+.hero{padding:80px 0 48px;max-width:640px}
+.hero h2{font-family:var(--f-d);font-size:40px;font-weight:700;letter-spacing:-.025em;line-height:1.15;margin-bottom:12px}
+.hero h2 .a{color:var(--accent)}
+.hero p{font-size:16px;color:var(--t2);line-height:1.7}
+
+/* Input */
+.inp{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);padding:24px;margin-bottom:48px;transition:border-color .2s,box-shadow .2s}
+.inp:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.inp textarea{width:100%;background:transparent;border:none;resize:none;font-family:var(--f-b);font-size:16px;color:var(--t1);line-height:1.7;outline:none;min-height:60px}
+.inp textarea::placeholder{color:var(--t3)}
+.inp .if{display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:16px;border-top:1px solid var(--bd2)}
+.tags{display:flex;gap:8px}
+.tg{font-size:12px;padding:4px 12px;border-radius:100px;border:1px solid var(--bd);color:var(--t2);cursor:pointer;transition:.12s;background:none}
+.tg:hover,.tg.sa{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.bp{padding:10px 24px;border-radius:var(--r-sm);font-size:14px;font-weight:600;border:none;cursor:pointer;background:var(--accent);color:var(--bg0);font-family:var(--f-d);transition:.12s;display:flex;align-items:center;gap:6px}
+.bp:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.bp svg{width:14px;height:14px}
+[data-theme="light"] .bp{color:#fff}
+
+/* Section */
+.sec{margin-bottom:64px}
+.sec-h{display:flex;align-items:baseline;gap:10px;margin-bottom:24px}
+.sec-h h3{font-family:var(--f-d);font-size:18px;font-weight:600;color:var(--t1)}
+.sec-h .cnt{font-size:13px;color:var(--t3);font-family:var(--f-m)}
+
+/* Pipeline */
+.pipe{display:flex;align-items:center;justify-content:center;gap:0;padding:24px 0}
+.pn{display:flex;flex-direction:column;align-items:center;gap:10px;flex-shrink:0}
+.pd{width:44px;height:44px;border-radius:50%;border:2px solid var(--bd);display:flex;align-items:center;justify-content:center;transition:.3s}
+.pd.done{border-color:var(--accent);background:var(--accent-dim)}
+.pd.run{border-color:var(--accent);background:var(--accent-dim);animation:ppulse 2s ease-in-out infinite}
+.pd svg{color:var(--t2)}
+.pd.done svg,.pd.run svg{color:var(--accent)}
+.pl{font-size:11px;color:var(--t3);font-weight:500;text-align:center;max-width:64px}
+.pl.done{color:var(--accent)}
+.pg{width:48px;height:1px;background:var(--bd);flex-shrink:0;margin-top:-22px}
+.pg.done{background:var(--accent)}
+@keyframes ppulse{0%,100%{box-shadow:0 0 0 0 var(--accent-glow)}50%{box-shadow:0 0 20px 5px var(--accent-glow)}}
+
+/* Cards */
+.cg{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px}
+.crd{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);padding:24px;transition:transform .15s,box-shadow .15s,border-color .15s;cursor:pointer}
+.crd:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.25);border-color:var(--accent)}
+.crd h4{font-family:var(--f-d);font-size:15px;font-weight:600;margin-bottom:8px}
+.crd p{font-size:13px;color:var(--t2);line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.crd .cf{display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:12px;border-top:1px solid var(--bd2)}
+.cs{font-size:11px;padding:2px 8px;border-radius:4px;font-weight:500}
+.cs.done{background:var(--accent-dim);color:var(--accent)}
+.cs.run{background:var(--blue-dim);color:var(--blue)}
+.cs.fail{background:var(--red-dim);color:var(--red)}
+.ct{font-size:11px;color:var(--t3);font-family:var(--f-m)}
+
+/* Two Column */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+
+/* Stat Cards */
+.st-r{display:flex;gap:16px;margin-bottom:20px}
+.st{flex:1;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);padding:20px;text-align:center}
+.st .sl{font-size:12px;color:var(--t3);margin-bottom:8px}
+.st .sn{font-size:28px;font-weight:700;font-family:var(--f-d)}
+.st .sc{font-size:12px;margin-top:4px;color:var(--green)}
+
+/* Conflict SVG area */
+.cfd{display:flex;align-items:center;justify-content:center;padding:32px 0}
+.cfd svg{display:block}
+
+/* Direction Cards */
+.di{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--r);border:1px solid var(--bd2);margin-bottom:10px;transition:.12s;cursor:pointer;background:var(--bg2)}
+.di:hover{border-color:var(--accent);background:var(--accent-dim)}
+.di-n{width:24px;height:24px;border-radius:50%;background:var(--accent-dim);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.di-t{flex:1;font-size:13px;font-weight:500;color:var(--t1)}
+.di-s{display:flex;gap:1px;flex-shrink:0}
+.star{width:13px;height:13px;color:var(--amber)}
+.star.e{color:var(--bd);opacity:.4}
+
+/* Agent Timeline */
+.atl{display:flex;flex-direction:column;position:relative;padding-left:20px}
+.atl::before{content:'';position:absolute;left:6px;top:8px;bottom:8px;width:1px;background:var(--bd)}
+.at{position:relative;padding:8px 0 10px 16px}
+.at::before{content:'';position:absolute;left:-14px;top:13px;width:8px;height:8px;border-radius:50%;border:2px solid var(--bd);background:var(--bg2);z-index:1}
+.at.done::before{border-color:var(--accent);background:var(--accent)}
+.at.run::before{border-color:var(--accent);background:var(--accent);box-shadow:0 0 10px var(--accent-glow)}
+.at.wait::before{border-color:var(--amber);background:var(--amber)}
+.at-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+.at-nm{font-size:12px;font-weight:600}
+.at-bg{font-size:10px;padding:1px 8px;border-radius:4px;font-weight:600}
+.at-bg.done{background:var(--accent-dim);color:var(--accent)}
+.at-bg.run{background:var(--blue-dim);color:var(--blue)}
+.at-bg.wait{background:var(--amber-dim);color:var(--amber)}
+.at-desc{font-size:11px;color:var(--t3);line-height:1.4}
+.at-time{font-size:10px;color:var(--t3);font-family:var(--f-m);margin-top:3px}
+.at-pb{height:3px;background:var(--bg1);border-radius:2px;margin-top:5px;overflow:hidden}
+.at-pb div{height:100%;background:var(--accent);border-radius:2px}
+
+/* Messages */
+.msg{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--bd2);font-size:12px}
+.msg:last-child{border-bottom:none}
+.msg .mt{color:var(--t3);font-family:var(--f-m);font-size:10px;flex-shrink:0}
+.msg .mc{color:var(--t2)}
+
+/* Quick Links */
+.ql{display:flex;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid var(--bd2)}
+.qk{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;border-radius:var(--r);border:1px solid var(--bd);font-size:11px;color:var(--t2);cursor:pointer;transition:.12s;font-weight:500;background:none;text-align:center}
+.qk:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.qk svg{width:22px;height:22px;opacity:.5}
+.qk:hover svg{opacity:1}
+
+[data-theme="light"] .crd:hover{box-shadow:0 4px 16px rgba(0,0,0,.06)}
+</style>
+</head>
+<body>
+
+<div class="load" id="load">
+  <div class="ncv" id="nc"></div>
+  <div class="ltxt" id="lt">InnovOS</div>
+</div>
+
+<div class="ptcl" id="ps"></div>
+
+<div class="app" id="app" style="opacity:0;transition:opacity .5s .2s">
+
+  <nav class="nav">
+    <div class="nav-l">
+      <h1>InnovOS</h1>
+      <span class="sub">智融创新操作系统</span>
+    </div>
+    <div class="nav-r">
+      <a href="#" class="active">工作台</a>
+      <a href="#">知识库</a>
+      <a href="#">专利检索</a>
+      <button class="theme" id="th"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h2>让创新<span class="a">可计算</span></h2>
+    <p>输入你的技术问题，AI 驱动六阶段分析引擎自动完成需求洞察、问题建模、专利检索、方案生成、多维评估和成果转化。</p>
+  </section>
+
+  <div class="inp">
+    <textarea placeholder="描述你想要解决的技术问题或创新方向...">如何在保证电池能量密度的同时，提高其安全性并延长循环寿命？</textarea>
+    <div class="if">
+      <div class="tags">
+        <span class="tg">+ 添加关键词</span>
+        <span class="tg sa">电池安全</span>
+        <span class="tg sa">能量密度</span>
+        <span class="tg sa">循环寿命</span>
+        <span class="tg sa">热管理</span>
+      </div>
+      <button class="bp">开始分析<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+    </div>
+  </div>
+
+  <div class="pipe">
+    <div class="pn"><div class="pd done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></div><div class="pl done">需求洞察</div></div>
+    <div class="pg done"></div>
+    <div class="pn"><div class="pd done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/></svg></div><div class="pl done">问题建模</div></div>
+    <div class="pg done"></div>
+    <div class="pn"><div class="pd run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg></div><div class="pl">专利检索</div></div>
+    <div class="pg"></div>
+    <div class="pn"><div class="pd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></div><div class="pl">方案生成</div></div>
+    <div class="pg"></div>
+    <div class="pn"><div class="pd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></div><div class="pl">多维评估</div></div>
+    <div class="pg"></div>
+    <div class="pn"><div class="pd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg></div><div class="pl">成果转化</div></div>
+  </div>
+
+  <section class="sec">
+    <div class="sec-h"><h3>专利检索与分析</h3><span class="cnt">1,248 条结果</span></div>
+    <div class="st-r">
+      <div class="st"><div class="sl">相关专利</div><div class="sn" style="color:var(--accent)">1,248</div><div class="sc">较通用检索 +86%</div></div>
+      <div class="st"><div class="sl">高相关</div><div class="sn" style="color:var(--green)">186</div><div class="sc">较通用检索 +72%</div></div>
+      <div class="st"><div class="sl">核心分析完成</div><div class="sn" style="color:var(--t2)">36</div><div class="sc">较通用分析 +65%</div></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h"><h3>冲突分析</h3></div>
+    <div class="cfd">
+      <svg viewBox="0 0 240 240" width="200" height="200">
+        <circle cx="120" cy="120" r="85" fill="none" stroke="var(--bd)" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <circle cx="120" cy="120" r="40" fill="var(--accent-dim)" stroke="var(--accent)" stroke-width="2"/>
+        <text x="120" y="116" text-anchor="middle" fill="var(--t1)" font-size="13" font-weight="600" font-family="var(--f-b)">核心冲突</text>
+        <line x1="120" y1="80" x2="120" y2="32" stroke="var(--accent)" stroke-width="1.5"/>
+        <circle cx="120" cy="24" r="4" fill="var(--accent)"/>
+        <text x="120" y="16" text-anchor="middle" fill="var(--accent)" font-size="10" font-weight="600" font-family="var(--f-b)">能量密度</text>
+        <text x="120" y="4" text-anchor="middle" fill="var(--t3)" font-size="8" font-family="var(--f-b)">(提升)</text>
+        <line x1="160" y1="120" x2="208" y2="120" stroke="var(--accent)" stroke-width="1.5"/>
+        <circle cx="216" cy="120" r="4" fill="var(--accent)"/>
+        <text x="218" y="113" text-anchor="start" fill="var(--accent)" font-size="10" font-weight="600" font-family="var(--f-b)">安全性</text>
+        <text x="218" y="127" text-anchor="start" fill="var(--t3)" font-size="8" font-family="var(--f-b)">(提升)</text>
+        <line x1="120" y1="160" x2="120" y2="208" stroke="var(--accent)" stroke-width="1.5"/>
+        <circle cx="120" cy="216" r="4" fill="var(--accent)"/>
+        <text x="120" y="232" text-anchor="middle" fill="var(--accent)" font-size="10" font-weight="600" font-family="var(--f-b)">循环寿命</text>
+        <text x="120" y="244" text-anchor="middle" fill="var(--t3)" font-size="8" font-family="var(--f-b)">(延长)</text>
+        <line x1="80" y1="120" x2="32" y2="120" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <circle cx="24" cy="120" r="4" fill="var(--red)"/>
+        <text x="22" y="104" text-anchor="end" fill="var(--red)" font-size="10" font-weight="600" font-family="var(--f-b)">副作用：</text>
+        <text x="22" y="120" text-anchor="end" fill="var(--red)" font-size="10" font-weight="600" font-family="var(--f-b)">发热问题</text>
+        <text x="22" y="134" text-anchor="end" fill="var(--t3)" font-size="8" font-family="var(--f-b)">(增加)</text>
+      </svg>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="g2">
+      <div>
+        <div class="sec-h"><h3>创新方案推荐</h3></div>
+        <div class="di"><span class="di-n">1</span><span class="di-t">固态电池 + 界面改性</span><div class="di-s"><svg class="star" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg><svg class="star" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg><svg class="star" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg><svg class="star" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg><svg class="star" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg></div></div>
+        <div class="di"><span class="di-n">2</span><span class="di-t">结构优化 + 热管理</span><div class="di-s"><svg class="star" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg><svg class="star" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg><svg class="star" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg><svg class="star" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg><svg class="star e" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg></div></div>
+        <div class="di"><span class="di-n">3</span><span class="di-t">新型电解液 + 添加剂</span><div class="di-s"><svg class="star" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg><svg class="star" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg><svg class="star" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg><svg class="star" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg><svg class="star e" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg></div></div>
+      </div>
+      <div>
+        <div class="sec-h"><h3>多 Agent 协同</h3></div>
+        <div class="atl">
+          <div class="at done"><div class="at-top"><span class="at-nm">需求洞察 Agent</span><span class="at-bg done">完成</span></div><div class="at-desc">理解用户需求，提取关键要素</div><div class="at-time">2.1s</div></div>
+          <div class="at done"><div class="at-top"><span class="at-nm">问题建模 Agent</span><span class="at-bg done">完成</span></div><div class="at-desc">构建问题模型，识别核心冲突</div><div class="at-time">3.4s</div></div>
+          <div class="at done"><div class="at-top"><span class="at-nm">专利分析 Agent</span><span class="at-bg done">完成</span></div><div class="at-desc">检索相关专利，分析技术方案</div><div class="at-time">8.7s</div></div>
+          <div class="at run"><div class="at-top"><span class="at-nm">方案生成 Agent</span><span class="at-bg run">运行中</span></div><div class="at-desc">生成创新方案，整合多源知识</div><div class="at-time">剩余 5.2s</div><div class="at-pb"><div style="width:65%"></div></div></div>
+          <div class="at wait"><div class="at-top"><span class="at-nm">方案评估 Agent</span><span class="at-bg wait">等待</span></div><div class="at-desc">评估方案可行性与创新性</div><div class="at-time">排队中</div></div>
+          <div class="at wait"><div class="at-top"><span class="at-nm">成果转化 Agent</span><span class="at-bg wait">等待</span></div><div class="at-desc">输出结构化成果，支持转化</div><div class="at-time">排队中</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h"><h3>最近分析</h3><span class="cnt">12 项</span></div>
+    <div class="cg">
+      <div class="crd"><h4>锂电池低温充放电效率优化</h4><p>针对-20℃环境下锂电池容量衰减问题，通过电解液改性+负极材料优化路径，结合仿生表面微结构设计提升低温性能。</p><div class="cf"><span class="cs done">已完成</span><span class="ct">2h ago</span></div></div>
+      <div class="crd"><h4>风力发电机叶片除冰方案</h4><p>探索超声波除冰与疏水涂层复合方案，结合仿生表面微结构设计，有效解决寒冷地区风机叶片结冰问题。</p><div class="cf"><span class="cs run">分析中</span><span class="ct">5h ago</span></div></div>
+      <div class="crd"><h4>高精度 CNC 加工振动抑制</h4><p>针对五轴数控机床高速切削中的颤振问题，基于主动阻尼控制原理，优化切削路径和刀具参数。</p><div class="cf"><span class="cs fail">需重试</span><span class="ct">1d ago</span></div></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h"><h3>系统消息</h3></div>
+    <div class="cd" style="padding:20px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r)">
+      <div class="msg"><span class="mt">10:24</span><span class="mc">专利数据库更新完成，新增专利 12,457 篇</span></div>
+      <div class="msg"><span class="mt">10:23</span><span class="mc">知识库更新完成，新增案例 235 个</span></div>
+      <div class="msg"><span class="mt">10:18</span><span class="mc">模型服务 DeepSeek-V3 恢复正常</span></div>
+      <div class="msg"><span class="mt">10:15</span><span class="mc">向量索引优化完成，搜索速度提升 40%</span></div>
+      <div class="msg"><span class="mt">10:10</span><span class="mc">今日活跃用户 47，完成分析 124</span></div>
+      <div class="ql">
+        <button class="qk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>知识图谱</button>
+        <button class="qk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/></svg>TRIZ 工具</button>
+        <button class="qk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>专利地图</button>
+        <button class="qk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>案例库</button>
+        <button class="qk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>创新模板</button>
+      </div>
+    </div>
+  </section>
+
+  <footer style="text-align:center;padding:48px 0 32px;color:var(--t3);font-size:12px">InnovOS · 智融创新操作系统</footer>
+
+</div>
+
+<script>
+(function(){
+var r=75,cx=100,cy=100,nn=6;
+var nc=document.getElementById('nc'),ns=[],ls=[],lt=document.getElementById('lt');
+for(var i=0;i<nn;i++){
+var a=Math.PI*2/nn*i-Math.PI/2,x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r;
+var d=document.createElement('div');d.className='nd';d.style.left=x+'px';d.style.top=y+'px';nc.appendChild(d);ns.push(d);
+}
+for(var i=0;i<nn;i++){
+var j=(i+1)%nn;
+var ln=document.createElement('div');ln.className='ln';
+var x1=+ns[i].style.left.replace('px',''),y1=+ns[i].style.top.replace('px','');
+var x2=+ns[j].style.left.replace('px',''),y2=+ns[j].style.top.replace('px','');
+var dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy),ang=Math.atan2(dy,dx)*180/Math.PI;
+ln.style.width=len+'px';ln.style.left=x1+'px';ln.style.top=y1+'px';ln.style.transform='rotate('+ang+'deg)';
+nc.insertBefore(ln,nc.firstChild);ls.push(ln);
+}
+var texts=['InnovOS','初始化引擎','连接知识库','就绪'],step=0;
+function anim(){
+if(step<nn){
+ns[step].classList.add('on');
+if(step>0)ls[step-1].classList.add('vis');
+if(step===nn-1)ls[nn-1].classList.add('vis');
+lt.textContent=texts[Math.min(step,texts.length-1)];
+step++;setTimeout(anim,200);
+}else{
+setTimeout(function(){
+ls.forEach(function(l){l.classList.add('on')});
+ns.forEach(function(n){n.classList.add('on')});
+lt.textContent='';
+setTimeout(function(){
+document.getElementById('load').classList.add('hide');
+document.getElementById('app').style.opacity='1';
+},400);
+},300);
+}
+}
+setTimeout(anim,300);
+
+var ps=document.getElementById('ps');
+for(var i=0;i<30;i++){
+var p=document.createElement('div');p.className='ptcl';
+p.style.left=Math.random()*100+'%';p.style.top=Math.random()*100+'%';
+p.style.setProperty('--dx',(Math.random()-.5)*200+'px');
+p.style.setProperty('--dy',(Math.random()-.5)*200+'px');
+p.style.animationDelay=Math.random()*60+'s';ps.appendChild(p);
+}
+
+document.getElementById('th').onclick=function(){
+var h=document.documentElement,t=h.getAttribute('data-theme')==='dark'?'light':'dark';
+h.setAttribute('data-theme',t);
+this.innerHTML=t==='dark'
+?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
+:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+};
+})();
+</script>
+</body>
+</html>

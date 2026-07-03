@@ -1,0 +1,69 @@
+# 根目录 .dockerignore
+# 排除不需要复制到镜像中的文件
+
+# Git
+.git
+.gitignore
+.github
+
+# 依赖目录
+**/node_modules
+**/.venv
+**/venv
+**/__pycache__
+
+# 构建产物
+**/dist
+**/build
+**/*.pyc
+**/*.pyo
+
+# IDE 配置
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# 日志文件
+**/*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+uv.lock
+
+# 测试和覆盖率
+**/tests
+**/test
+**/.pytest_cache
+**/coverage
+**/.coverage
+**/htmlcov
+**/coverage_html
+
+# 文档
+*.md
+!README.md
+LICENSE
+docs/
+
+# Docker 相关
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# 环境配置
+.env*
+!.env.example
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 开发工具配置
+.eslintrc*
+.prettierrc*
+tsconfig.json
+vite.config.*
+tailwind.config.*
+postcss.config.*

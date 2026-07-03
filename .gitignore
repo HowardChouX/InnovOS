@@ -27,6 +27,7 @@ htmlcov/
 .env.*.local
 .env.production
 *.env
+.secrets
 
 # ── IDE / Editor ──
 .idea/

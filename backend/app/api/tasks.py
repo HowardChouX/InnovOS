@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from app.audit import log_audit
 from app.auth import get_current_user
-from app.database import get_db
+from app.database import db_session
 from app.utils import utc_iso
 
 ALLOWED_TASK_FIELDS = {"title", "description", "tags", "status", "updated_at"}
@@ -56,136 +56,117 @@ def list_tasks(
     search: str = Query("", max_length=200),
     status: str = Query(""),
 ):
-    db = get_db()
-    params: list = [user["id"]]
-    where = "user_id = ?"
+    with db_session() as db:
+        params: list = [user["id"]]
+        where = "user_id = ?"
 
-    if search:
-        where += " AND (title LIKE ? OR description LIKE ?)"
-        params.extend([f"%{search}%", f"%{search}%"])
-    if status and status in STATUSES:
-        where += " AND status = ?"
-        params.append(status)
+        if search:
+            where += " AND (title LIKE ? OR description LIKE ?)"
+            params.extend([f"%{search}%", f"%{search}%"])
+        if status and status in STATUSES:
+            where += " AND status = ?"
+            params.append(status)
 
-    total = db.execute(f"SELECT COUNT(*) FROM tasks WHERE {where}", params).fetchone()[0]
-    offset = (page - 1) * page_size
-    rows = db.execute(
-        f"SELECT * FROM tasks WHERE {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
-        [*params, page_size, offset],
-    ).fetchall()
-    db.close()
-    return {
-        "data": [row_to_dict(r) for r in rows],
-        "total": total,
-        "page": page,
-        "pageSize": page_size,
-        "totalPages": max(1, (total + page_size - 1) // page_size),
-        "message": "success",
-        "code": 200,
-    }
+        total = db.execute(f"SELECT COUNT(*) FROM tasks WHERE {where}", params).fetchone()[0]
+        offset = (page - 1) * page_size
+        rows = db.execute(
+            f"SELECT * FROM tasks WHERE {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            [*params, page_size, offset],
+        ).fetchall()
+
+        return {
+            "data": [row_to_dict(r) for r in rows],
+            "total": total,
+            "page": page,
+            "pageSize": page_size,
+            "totalPages": max(1, (total + page_size - 1) // page_size),
+            "message": "success",
+            "code": 200,
+        }
 
 
 @router.post("")
 def create_task(body: CreateTaskInput, user: dict = Depends(get_current_user)):
-    db = get_db()
-    cursor = db.execute(
-        "INSERT INTO tasks (user_id, title, description, tags) VALUES (?, ?, ?, ?) RETURNING id",
-        (user["id"], body.title, body.description, json.dumps(body.tags)),
-    )
-    db.commit()
-    inserted_id = cursor.fetchone()["id"]
-    row = db.execute("SELECT * FROM tasks WHERE id = ?", (inserted_id,)).fetchone()
-    db.close()
-    return {"data": row_to_dict(row), "message": "success", "code": 200}
+    with db_session() as db:
+        cursor = db.execute(
+            "INSERT INTO tasks (user_id, title, description, tags) VALUES (?, ?, ?, ?) RETURNING id",
+            (user["id"], body.title, body.description, json.dumps(body.tags)),
+        )
+        inserted_id = cursor.fetchone()["id"]
+        row = db.execute("SELECT * FROM tasks WHERE id = ?", (inserted_id,)).fetchone()
 
-
-@router.get("/{task_id}")
-def get_task(task_id: int, user: dict = Depends(get_current_user)):
-    db = get_db()
-    row = db.execute(
-        "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-        (task_id, user["id"]),
-    ).fetchone()
-    db.close()
-    if not row:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return {"data": row_to_dict(row), "message": "success", "code": 200}
+        return {"data": row_to_dict(row), "message": "success", "code": 200}
 
 
 @router.put("/{task_id}")
-def update_task(task_id: int, body: UpdateTaskInput, user: dict = Depends(get_current_user)):
-    db = get_db()
-    row = db.execute(
-        "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-        (task_id, user["id"]),
-    ).fetchone()
-    if not row:
-        db.close()
-        raise HTTPException(status_code=404, detail="Task not found")
+def update_task(
+    task_id: str,
+    body: UpdateTaskInput,
+    user: dict = Depends(get_current_user),
+):
+    with db_session() as db:
+        task = db.execute(
+            "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
+            (task_id, user["id"]),
+        ).fetchone()
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
 
-    updates = []
-    params: list = []
-    if body.title is not None:
-        updates.append("title = ?")
-        params.append(body.title)
-    if body.description is not None:
-        updates.append("description = ?")
-        params.append(body.description)
-    if body.tags is not None:
-        updates.append("tags = ?")
-        params.append(json.dumps(body.tags))
-    if body.status is not None:
-        if body.status not in STATUSES:
-            db.close()
-            raise HTTPException(status_code=400, detail=f"Invalid status: {body.status}")
-        updates.append("status = ?")
-        params.append(body.status)
+        update_fields = []
+        update_vals = []
+        if body.title is not None:
+            update_fields.append("title = ?")
+            update_vals.append(body.title)
+        if body.description is not None:
+            update_fields.append("description = ?")
+            update_vals.append(body.description)
+        if body.tags is not None:
+            update_fields.append("tags = ?")
+            update_vals.append(json.dumps(body.tags))
+        if body.status is not None:
+            if body.status not in STATUSES:
+                raise HTTPException(status_code=400, detail=f"Invalid status: {body.status}")
+            update_fields.append("status = ?")
+            update_vals.append(body.status)
 
-    if updates:
-        updates.append("updated_at = to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')")
-        params.extend([task_id, user["id"]])
-        _validate_columns([u.split("=")[0].strip() for u in updates], ALLOWED_TASK_FIELDS)
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No fields to update")
+
+        update_fields.append("updated_at = NOW()")
+        update_vals.extend([task_id, user["id"]])
+
         db.execute(
-            f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND user_id = ?",
-            params,
+            f"UPDATE tasks SET {', '.join(update_fields)} WHERE id = ? AND user_id = ?",
+            update_vals,
         )
-        db.commit()
 
-    row = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-    db.close()
-    return {"data": row_to_dict(row), "message": "success", "code": 200}
+        updated_task = db.execute(
+            "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
+            (task_id, user["id"]),
+        ).fetchone()
+
+        return {"data": row_to_dict(updated_task), "message": "success", "code": 200}
 
 
 @router.delete("/{task_id}")
-def delete_task(task_id: int, request: Request, user: dict = Depends(get_current_user)):
-    # Audit log before operation
-    log_audit(
-        user["id"],
-        user.get("username", ""),
-        "task.delete",
-        "task",
-        str(task_id),
-        {},
-        request.client.host if request.client else "",
-    )
-    db = get_db()
-    row = db.execute(
-        "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-        (task_id, user["id"]),
-    ).fetchone()
-    if not row:
-        db.close()
-        raise HTTPException(status_code=404, detail="Task not found")
+def delete_task(
+    task_id: str,
+    user: dict = Depends(get_current_user),
+):
+    with db_session() as db:
+        task = db.execute(
+            "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
+            (task_id, user["id"]),
+        ).fetchone()
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
 
-    solution_ids = [r["id"] for r in db.execute("SELECT id FROM solutions WHERE task_id = ?", (task_id,)).fetchall()]
-    if solution_ids:
-        placeholders = ",".join("?" for _ in solution_ids)
-        db.execute(f"DELETE FROM evaluations WHERE solution_id IN ({placeholders})", solution_ids)
-        db.execute(f"DELETE FROM feedbacks WHERE solution_id IN ({placeholders})", solution_ids)
-    db.execute("DELETE FROM solutions WHERE task_id = ?", (task_id,))
-    db.execute("DELETE FROM analyses WHERE task_id = ?", (task_id,))
-    db.execute("DELETE FROM workflows WHERE task_id = ?", (task_id,))
-    db.execute("DELETE FROM tasks WHERE id = ? AND user_id = ?", (task_id, user["id"]))
-    db.commit()
-    db.close()
-    return {"data": None, "message": "deleted", "code": 200}
+        # Delete related records in dependency order
+        db.execute("DELETE FROM evaluations WHERE task_id = ?", (task_id,))
+        db.execute("DELETE FROM feedbacks WHERE task_id = ?", (task_id,))
+        db.execute("DELETE FROM solutions WHERE task_id = ?", (task_id,))
+        db.execute("DELETE FROM analyses WHERE task_id = ?", (task_id,))
+        db.execute("DELETE FROM workflows WHERE task_id = ?", (task_id,))
+        db.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+
+        return {"message": "Task deleted successfully", "code": 200}

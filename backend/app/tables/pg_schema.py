@@ -283,7 +283,7 @@ def init_notifications(db):
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS notifications (
             id {pk},
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
             title TEXT NOT NULL,
             content TEXT NOT NULL,
             type TEXT DEFAULT 'system',
@@ -306,7 +306,7 @@ def init_knowledge_bases(db):
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS knowledge_bases (
             id TEXT PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
             name TEXT NOT NULL,
             group_id TEXT DEFAULT NULL,
             dimensions INTEGER DEFAULT NULL,
@@ -359,7 +359,7 @@ def init_knowledge_items_pgvector(db):
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS knowledge_vectors (
             id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
             base_id TEXT NOT NULL,
             item_id TEXT NOT NULL,
             chunk_index INTEGER NOT NULL DEFAULT 0,
@@ -419,7 +419,7 @@ def init_knowledge_groups(db):
     db.execute(f"""
         CREATE TABLE IF NOT EXISTS knowledge_groups (
             id TEXT PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
             name TEXT NOT NULL,
             created_at TEXT DEFAULT ({now}),
             updated_at TEXT DEFAULT ({now})
@@ -659,6 +659,7 @@ def init_all_tables(db):
     init_system_settings(db)
     init_model_providers(db)
     _ensure_columns(db, "model_providers", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
+
     # ── Drop deprecated columns ───────────────────────────
     try:
         db.execute("ALTER TABLE model_providers DROP COLUMN IF EXISTS api_key_encrypted")

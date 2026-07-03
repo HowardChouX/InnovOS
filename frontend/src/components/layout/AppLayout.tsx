@@ -170,136 +170,58 @@ export function AppLayout() {
   const getNotifyType = (type: string) => notifyTypeConfig[type] || notifyTypeConfig.system;
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'var(--bg-dark)',
-      }}
-    >
-      <header
-        style={{
-          height: 48,
-          background: 'var(--bg-panel)',
-          borderBottom: '1px solid var(--border-light)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 16px',
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
-            InnovOS
-          </span>
-          <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>创新智能操作系统</span>
+    <div className="min-h-screen flex flex-col bg-[var(--bg-dark)]">
+      {/* Header */}
+      <header className="h-12 bg-[var(--bg-panel)] border-b border-[var(--border-light)] flex items-center justify-between px-4 flex-shrink-0">
+        {/* Logo & Brand */}
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-base font-bold text-[var(--text-primary)]">InnovOS</span>
+          <span className="text-[11px] text-[var(--text-tertiary)]">创新智能操作系统</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-            让创新更智能，让想法变方案
-          </span>
+        {/* Slogan */}
+        <div className="flex items-center gap-5">
+          <span className="text-[13px] text-[var(--text-secondary)]">让创新更智能，让想法变方案</span>
         </div>
 
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 16,
-            fontSize: 13,
-            color: 'var(--text-secondary)',
-          }}
-        >
+        {/* Right section */}
+        <div className="flex items-center gap-4 text-[13px] text-[var(--text-secondary)]">
+          {/* Help Guide */}
           <span
             onClick={() => navigate('/guide')}
-            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+            className="cursor-pointer flex items-center gap-1"
           >
-            <i className="fa-regular fa-circle-question" style={{ fontSize: 12 }} />
+            <i className="fa-regular fa-circle-question text-xs" />
             使用指南
           </span>
 
           {/* Notification Bell */}
-          <div ref={notifyRef} style={{ position: 'relative' }}>
+          <div ref={notifyRef} className="relative">
             <div
               onClick={() => setShowNotify((v) => !v)}
-              style={{
-                position: 'relative',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-              }}
+              className="relative cursor-pointer flex items-center"
             >
-              <i className="fa-regular fa-bell" style={{ fontSize: 14 }} />
+              <i className="fa-regular fa-bell text-[14px]" />
               {unreadCount > 0 && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: -6,
-                    right: -8,
-                    minWidth: 14,
-                    height: 14,
-                    borderRadius: '50%',
-                    background: 'var(--accent-red)',
-                    color: '#fff',
-                    fontSize: 9,
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '0 3px',
-                    boxSizing: 'border-box',
-                  }}
-                >
+                <span className="absolute -top-1.5 -right-2 min-w-[14px] h-3.5 rounded-full bg-[var(--accent-red)] text-white text-[9px] font-bold flex items-center justify-center px-[3px] box-border">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
             </div>
 
+            {/* Notification Panel */}
             {showNotify && (
-              <div
-                style={{
-                  position: 'absolute',
-                  right: -12,
-                  top: 34,
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 10,
-                  width: 340,
-                  maxHeight: 420,
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  zIndex: 100,
-                  boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 14px',
-                    borderBottom: '1px solid var(--border-light)',
-                  }}
-                >
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+              <div className="absolute -right-3 top-[34px] bg-[var(--bg-card)] border border-[var(--border)] rounded-[10px] w-[340px] max-h-[420px] overflow-hidden flex flex-col z-[100] shadow-[0_10px_30px_rgba(0,0,0,0.3)]">
+                {/* Panel Header */}
+                <div className="flex items-center justify-between py-2.5 px-3.5 border-b border-[var(--border-light)]">
+                  <span className="text-[13px] font-semibold text-[var(--text-primary)]">
                     通知 {unreadCount > 0 && `(${unreadCount}条未读)`}
                   </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div className="flex items-center gap-2.5">
                     {unreadCount > 0 && (
                       <button
                         onClick={handleMarkAllRead}
-                        style={{
-                          fontSize: 11,
-                          color: 'var(--accent-blue)',
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                          padding: 0,
-                        }}
+                        className="text-[11px] text-[var(--accent-blue)] bg-transparent border-none cursor-pointer p-0 font-inherit"
                       >
                         全部已读
                       </button>
@@ -307,17 +229,11 @@ export function AppLayout() {
                     {notifications.length > 0 && (
                       <button
                         onClick={handleClearAll}
-                        style={{
-                          fontSize: 11,
-                          color: clearConfirm ? '#fff' : 'var(--accent-red)',
-                          background: clearConfirm ? 'var(--accent-red)' : 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                          padding: '2px 8px',
-                          borderRadius: 4,
-                          transition: 'all 0.15s',
-                        }}
+                        className={`text-[11px] bg-transparent border-none cursor-pointer font-inherit py-0.5 px-2 rounded transition-all duration-150 ${
+                          clearConfirm
+                            ? 'text-white bg-[var(--accent-red)]'
+                            : 'text-[var(--accent-red)]'
+                        }`}
                       >
                         {clearConfirm ? '确认清空' : '清空全部'}
                       </button>
@@ -325,31 +241,15 @@ export function AppLayout() {
                   </div>
                 </div>
 
-                <div style={{ overflowY: 'auto', flex: 1 }}>
+                {/* Notification List */}
+                <div className="overflow-y-auto flex-1">
                   {notifyLoading ? (
-                    <div
-                      style={{
-                        textAlign: 'center',
-                        padding: 20,
-                        color: 'var(--text-tertiary)',
-                        fontSize: 12,
-                      }}
-                    >
+                    <div className="text-center py-5 text-[var(--text-tertiary)] text-xs">
                       加载中...
                     </div>
                   ) : notifications.length === 0 ? (
-                    <div
-                      style={{
-                        textAlign: 'center',
-                        padding: 30,
-                        color: 'var(--text-tertiary)',
-                        fontSize: 12,
-                      }}
-                    >
-                      <i
-                        className="fa-regular fa-bell-slash"
-                        style={{ fontSize: 24, marginBottom: 8, display: 'block', opacity: 0.5 }}
-                      />
+                    <div className="text-center py-7 text-[var(--text-tertiary)] text-xs">
+                      <i className="fa-regular fa-bell-slash text-[24px] mb-2 block opacity-50" />
                       暂无通知
                     </div>
                   ) : (
@@ -357,104 +257,40 @@ export function AppLayout() {
                       <div
                         key={n.id}
                         onClick={() => openDetail(n)}
-                        style={{
-                          padding: '10px 14px',
-                          borderBottom: '1px solid var(--border-light)',
-                          cursor: 'pointer',
-                          background: n.isRead ? 'transparent' : 'rgba(59,130,246,0.04)',
-                          opacity: n.isRead ? 0.7 : 1,
-                          position: 'relative',
-                        }}
+                        className={`py-2.5 px-3.5 border-b border-[var(--border-light)] cursor-pointer relative transition-all ${
+                          n.isRead
+                            ? 'bg-transparent opacity-70'
+                            : 'bg-[rgba(59,130,246,0.04)] opacity-100'
+                        }`}
                       >
-                        <div
-                          style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}
-                        >
+                        <div className="flex items-center gap-1.5 mb-1">
                           {!n.isRead && (
-                            <span
-                              style={{
-                                width: 6,
-                                height: 6,
-                                borderRadius: '50%',
-                                background: 'var(--accent-red)',
-                                flexShrink: 0,
-                              }}
-                            />
+                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-red)] flex-shrink-0" />
                           )}
                           <i
-                            className={getNotifyType(n.type).icon}
-                            style={{
-                              fontSize: 10,
-                              color: getNotifyType(n.type).color,
-                              flexShrink: 0,
-                            }}
+                            className={`${getNotifyType(n.type).icon} text-[10px] flex-shrink-0`}
+                            style={{ color: getNotifyType(n.type).color }}
                           />
-                          <span
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: 'var(--text-primary)',
-                              flex: 1,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
+                          <span className="text-xs font-semibold text-[var(--text-primary)] flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                             {n.title}
                           </span>
-                          <span
-                            style={{ fontSize: 10, color: 'var(--text-tertiary)', flexShrink: 0 }}
-                          >
+                          <span className="text-[10px] text-[var(--text-tertiary)] flex-shrink-0">
                             {formatTime(n.createdAt)}
                           </span>
                         </div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: 'var(--text-secondary)',
-                            lineHeight: 1.5,
-                            paddingLeft: n.isRead ? 0 : 12,
-                            paddingRight: 24,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
+                        <div className="text-[11px] text-[var(--text-secondary)] leading-[1.5] overflow-hidden text-ellipsis whitespace-nowrap pr-6"
+                          style={{ paddingLeft: n.isRead ? 0 : 12 }}
                         >
                           {n.content}
                         </div>
                         <button
                           onClick={(e) => handleDeleteNotify(n.id, e)}
                           title={deleteConfirmId === n.id ? '确认删除' : '删除'}
-                          style={{
-                            position: 'absolute',
-                            right: 8,
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            borderRadius: 4,
-                            background:
-                              deleteConfirmId === n.id
-                                ? 'var(--accent-red)'
-                                : 'rgba(248,113,113,0.1)',
-                            border: '1px solid rgba(248,113,113,0.2)',
-                            color: deleteConfirmId === n.id ? '#fff' : 'var(--accent-red)',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 10,
-                            opacity: deleteConfirmId === n.id ? 1 : 0,
-                            transition: 'opacity 0.15s',
-                            padding: deleteConfirmId === n.id ? '2px 6px' : '0',
-                            minWidth: deleteConfirmId === n.id ? 'auto' : 22,
-                            height: 22,
-                          }}
-                          onMouseEnter={(e) => {
-                            if (deleteConfirmId !== n.id)
-                              (e.currentTarget as HTMLButtonElement).style.opacity = '1';
-                          }}
-                          onMouseLeave={(e) => {
-                            if (deleteConfirmId !== n.id)
-                              (e.currentTarget as HTMLButtonElement).style.opacity = '0';
-                          }}
+                          className={`absolute right-2 top-1/2 -translate-y-1/2 rounded text-[10px] border flex items-center justify-center transition-opacity duration-150 ${
+                            deleteConfirmId === n.id
+                              ? 'bg-[var(--accent-red)] border-[var(--accent-red)] text-white opacity-100 px-1.5 min-w-0 h-[22px]'
+                              : 'bg-[rgba(248,113,113,0.1)] border-[rgba(248,113,113,0.2)] text-[var(--accent-red)] opacity-0 hover:opacity-100 min-w-[22px] h-[22px]'
+                          }`}
                         >
                           {deleteConfirmId === n.id ? (
                             '确认?'
@@ -470,113 +306,56 @@ export function AppLayout() {
             )}
           </div>
 
+          {/* User Menu */}
           <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              cursor: 'pointer',
-              position: 'relative',
-            }}
+            className="flex items-center gap-1.5 cursor-pointer relative"
             onClick={() => setShowMenu(!showMenu)}
           >
-            <div
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 11,
-                color: '#fff',
-              }}
-            >
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3b82f6] to-[#6366f1] flex items-center justify-center text-[11px] text-white">
               {user?.username?.[0] || '?'}
             </div>
-            <span style={{ fontSize: 12 }}>{user?.username || '用户'}</span>
-            <i
-              className="fa-solid fa-chevron-down"
-              style={{ fontSize: 8, color: 'var(--text-tertiary)' }}
-            />
+            <span className="text-xs">{user?.username || '用户'}</span>
+            <i className="fa-solid fa-chevron-down text-[8px] text-[var(--text-tertiary)]" />
+
+            {/* User Dropdown Menu */}
             {showMenu && (
-              <div
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: 34,
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                  padding: '4px 0',
-                  minWidth: 110,
-                  zIndex: 50,
-                }}
-              >
+              <div className="absolute right-0 top-[34px] bg-[var(--bg-card)] border border-[var(--border)] rounded-lg py-1 min-w-[110px] z-50">
                 <button
                   onClick={() => {
                     navigate('/profile');
                     setShowMenu(false);
                   }}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '7px 12px',
-                    fontSize: 12,
-                    color: 'var(--text-primary)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                  }}
+                  className="w-full text-left py-[7px] px-3 text-xs text-[var(--text-primary)] bg-transparent border-none cursor-pointer font-inherit flex items-center gap-1.5"
                 >
                   <User size={14} />
                   个人资料
                 </button>
-                <div style={{ height: 1, background: 'var(--border-light)', margin: '2px 0' }} />
+                <div className="h-px bg-[var(--border-light)] my-0.5" />
                 <button
                   onClick={() => {
                     logout();
                     navigate('/login');
                     setShowMenu(false);
                   }}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '7px 12px',
-                    fontSize: 12,
-                    color: 'var(--accent-red)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                  }}
+                  className="w-full text-left py-[7px] px-3 text-xs text-[var(--accent-red)] bg-transparent border-none cursor-pointer font-inherit"
                 >
                   退出登录
                 </button>
-              </div>
-            )}
+                </div>
+              )}
           </div>
         </div>
       </header>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         <main
-          style={{
-            flex: 1,
-            padding: isKnowledgePage ? 0 : 14,
-            overflowY: 'auto',
-            background: 'var(--bg-dark)',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
+          className={`flex-1 overflow-y-auto bg-[var(--bg-dark)] flex flex-col ${
+            isKnowledgePage ? 'p-0' : 'p-3.5'
+          }`}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          <div className="flex flex-col flex-1 min-h-0">
             <Outlet />
           </div>
         </main>
@@ -585,98 +364,46 @@ export function AppLayout() {
       {/* Notification Detail Modal */}
       {detailNotify && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 200,
-          }}
+          className="fixed inset-0 bg-[rgba(0,0,0,0.6)] flex items-center justify-center z-[200]"
           onClick={() => setDetailNotify(null)}
         >
           <div
-            style={{
-              background: 'var(--bg-card)',
-              borderRadius: 12,
-              padding: 24,
-              border: '1px solid var(--border)',
-              width: 460,
-              maxWidth: '90vw',
-            }}
+            className="bg-[var(--bg-card)] rounded-xl p-6 border border-[var(--border)] w-[460px] max-w-[90vw]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div className="flex items-center gap-2 mb-3">
               {!detailNotify.isRead && (
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: 'var(--accent-red)',
-                    flexShrink: 0,
-                  }}
-                />
+                <span className="w-2 h-2 rounded-full bg-[var(--accent-red)] flex-shrink-0" />
               )}
               <i
-                className={getNotifyType(detailNotify.type).icon}
-                style={{ fontSize: 13, color: getNotifyType(detailNotify.type).color }}
+                className={`${getNotifyType(detailNotify.type).icon} text-[13px]`}
+                style={{ color: getNotifyType(detailNotify.type).color }}
               />
-              <span
-                style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}
-              >
+              <span className="text-[15px] font-semibold text-[var(--text-primary)] flex-1">
                 {detailNotify.title}
               </span>
             </div>
-            <div
-              style={{
-                fontSize: 13,
-                color: 'var(--text-secondary)',
-                lineHeight: 1.7,
-                marginBottom: 16,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-              }}
-            >
+            <div className="text-[13px] text-[var(--text-secondary)] leading-[1.7] mb-4 whitespace-pre-wrap break-words">
               {detailNotify.content}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-[var(--text-tertiary)]">
                 {formatTime(detailNotify.createdAt)}
               </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
                     handleDeleteNotify(detailNotify.id, {
                       stopPropagation: () => {},
                     } as React.MouseEvent);
                   }}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 6,
-                    fontSize: 12,
-                    background: 'rgba(248,113,113,0.1)',
-                    border: '1px solid rgba(248,113,113,0.3)',
-                    color: 'var(--accent-red)',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                  }}
+                  className="py-1.5 px-3.5 rounded-md text-xs bg-[rgba(248,113,113,0.1)] border border-[rgba(248,113,113,0.3)] text-[var(--accent-red)] cursor-pointer font-inherit"
                 >
                   删除
                 </button>
                 <button
                   onClick={() => setDetailNotify(null)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 6,
-                    fontSize: 12,
-                    background: 'var(--accent)',
-                    border: 'none',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                  }}
+                  className="py-1.5 px-3.5 rounded-md text-xs bg-[var(--accent)] border-none text-white cursor-pointer font-inherit"
                 >
                   关闭
                 </button>

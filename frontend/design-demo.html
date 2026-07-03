@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InnovOS · 智融创新操作系统</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,500;9..40,600;9..40,700&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&family=Noto+Sans+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════════════
+   TOKEN SYSTEM
+   ══════════════════════════════════════════════════════════ */
+:root {
+  --bg-root:       #080d14;
+  --bg-panel:      #0f1824;
+  --bg-card:       #162236;
+  --bg-glass:      rgba(15, 24, 36, 0.88);
+  --border-outer:   #1c2d42;
+  --border-inner:   #131f30;
+  --text-primary:   #e6edf5;
+  --text-secondary: #889bb3;
+  --text-tertiary:  #556680;
+  --accent:         #14b8a6;
+  --accent-dim:     rgba(20,184,166,0.10);
+  --accent-glow:    rgba(20,184,166,0.18);
+  --accent-dark:    #0d9488;
+  --green:          #22c55e;
+  --green-dim:      rgba(34,197,94,0.10);
+  --amber:          #f59e0b;
+  --amber-dim:      rgba(245,158,11,0.10);
+  --red:            #ef4444;
+  --red-dim:        rgba(239,68,68,0.10);
+  --blue:           #60a5fa;
+  --blue-dim:       rgba(96,165,250,0.10);
+  --purple:         #a78bfa;
+  --purple-dim:     rgba(167,139,250,0.10);
+  --radius:         10px;
+  --radius-sm:      6px;
+  --radius-xs:      4px;
+  --shadow-card:    0 1px 3px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.25);
+  --font-display:   'DM Sans', 'Noto Sans SC', sans-serif;
+  --font-body:      'Inter', 'Noto Sans SC', sans-serif;
+  --font-mono:      'JetBrains Mono', monospace;
+  --transition-theme: background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+[data-theme="light"] {
+  --bg-root:       #f5f6f8;
+  --bg-panel:      #ffffff;
+  --bg-card:       #f0f2f5;
+  --bg-glass:      rgba(255,255,255,0.92);
+  --border-outer:   #dde1e6;
+  --border-inner:   #eaecf0;
+  --text-primary:   #1a1d23;
+  --text-secondary: #5f697a;
+  --text-tertiary:  #9ca3af;
+  --accent:         #0d9488;
+  --accent-dim:     rgba(13,148,136,0.08);
+  --accent-glow:    rgba(13,148,136,0.14);
+  --accent-dark:    #0f766e;
+  --green:          #16a34a;
+  --green-dim:      rgba(22,163,74,0.08);
+  --amber:          #d97706;
+  --amber-dim:      rgba(217,119,6,0.08);
+  --red:            #dc2626;
+  --red-dim:        rgba(220,38,38,0.08);
+  --blue:           #3b82f6;
+  --blue-dim:       rgba(59,130,246,0.08);
+  --purple:         #7c3aed;
+  --purple-dim:     rgba(124,58,237,0.08);
+  --shadow-card:    0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06);
+}
+
+/* ══════════════════════════════════════════════════════════
+   RESET & BASE
+   ══════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg-root);
+  color: var(--text-primary);
+  line-height: 1.6;
+  overflow-x: hidden;
+  transition: var(--transition-theme);
+}
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+img, svg { display: block; }
+
+/* ══════════════════════════════════════════════════════════
+   LOADING SCREEN — hexagonal mesh signature
+   ══════════════════════════════════════════════════════════ */
+.loading-screen {
+  position: fixed; inset: 0; z-index: 1000;
+  background: var(--bg-root);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 48px;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+.loading-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+.hex-container { position: relative; width: 220px; height: 220px; }
+
+.hex-node {
+  position: absolute; width: 11px; height: 11px; border-radius: 50%;
+  background: var(--text-tertiary);
+  transform: translate(-50%, -50%);
+  transition: background 0.5s ease, box-shadow 0.5s ease, transform 0.3s ease;
+}
+.hex-node.lit {
+  background: var(--accent);
+  box-shadow: 0 0 18px var(--accent-glow), 0 0 4px var(--accent);
+  transform: translate(-50%, -50%) scale(1.3);
+}
+
+.hex-line {
+  position: absolute; height: 1px;
+  background: var(--border-outer);
+  transform-origin: left center;
+  opacity: 0;
+  transition: opacity 0.4s ease, background 0.4s ease;
+}
+.hex-line.visible { opacity: 1; }
+.hex-line.lit { background: var(--accent); opacity: 0.45; }
+
+.loading-label {
+  font-family: var(--font-display);
+  font-size: 20px; font-weight: 600; letter-spacing: 0.04em;
+  color: var(--text-secondary); text-align: center;
+  min-height: 28px; transition: color 0.35s ease;
+}
+
+/* ── Ambient particles during load ── */
+.particle-field {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  overflow: hidden;
+}
+.particle {
+  position: absolute; width: 2px; height: 2px; border-radius: 50%;
+  background: var(--accent); opacity: 0;
+  animation: particulate 55s linear infinite;
+}
+@keyframes particulate {
+  0%   { opacity: 0; transform: translate(0, 0); }
+  3%   { opacity: 0.22; }
+  97%  { opacity: 0.22; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)); }
+}
+
+/* ══════════════════════════════════════════════════════════
+   APP SHELL
+   ══════════════════════════════════════════════════════════ */
+.app { max-width: 1080px; margin: 0 auto; padding: 0 32px; position: relative; z-index: 1; }
+
+/* ── Nav ── */
+.nav {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 52px; border-bottom: 1px solid var(--border-inner);
+  transition: var(--transition-theme);
+}
+.nav-brand { display: flex; align-items: baseline; gap: 8px; }
+.nav-brand h1 {
+  font-family: var(--font-display); font-size: 17px; font-weight: 700;
+  color: var(--text-primary); letter-spacing: -0.01em;
+}
+.nav-brand .tag {
+  font-size: 11px; color: var(--text-tertiary); font-weight: 400;
+}
+.nav-links { display: flex; align-items: center; gap: 28px; }
+.nav-links a {
+  font-size: 12.5px; color: var(--text-secondary); font-weight: 500;
+  transition: color 0.13s ease;
+}
+.nav-links a:hover, .nav-links a.active { color: var(--text-primary); }
+.nav-links a.active { color: var(--accent); }
+
+.theme-toggle {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 1px solid var(--border-outer); background: var(--bg-panel);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary); transition: var(--transition-theme), transform 0.13s ease;
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); transform: rotate(15deg); }
+.theme-toggle svg { width: 15px; height: 15px; }
+
+/* ── Hero ── */
+.hero { padding: 64px 0 40px; max-width: 560px; }
+.hero h2 {
+  font-family: var(--font-display); font-size: 38px; font-weight: 700;
+  letter-spacing: -0.025em; line-height: 1.14; margin-bottom: 10px;
+}
+.hero h2 .stroke { color: var(--accent); }
+.hero p { font-size: 15px; color: var(--text-secondary); line-height: 1.7; }
+
+/* ── Input: focus glow micro-interaction ── */
+.input-card {
+  background: var(--bg-card); border: 1px solid var(--border-outer);
+  border-radius: var(--radius); padding: 22px; margin-bottom: 44px;
+  transition: border-color 0.22s ease, box-shadow 0.22s ease;
+}
+.input-card:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.input-card textarea {
+  width: 100%; background: transparent; border: none; resize: none;
+  font-family: var(--font-body); font-size: 15px; color: var(--text-primary);
+  line-height: 1.7; outline: none; min-height: 56px;
+}
+.input-card textarea::placeholder { color: var(--text-tertiary); }
+.input-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-inner);
+}
+
+.tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag {
+  font-size: 11px; padding: 3px 10px; border-radius: 100px;
+  border: 1px solid var(--border-outer); color: var(--text-secondary);
+  background: transparent; cursor: pointer; transition: var(--transition-theme);
+}
+.tag:hover, .tag.selected {
+  border-color: var(--accent); color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.btn-primary {
+  display: flex; align-items: center; gap: 5px;
+  padding: 9px 22px; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 600; font-family: var(--font-display);
+  border: none; color: #fff; background: var(--accent);
+  transition: filter 0.13s ease, transform 0.13s ease, box-shadow 0.13s ease;
+}
+.btn-primary:hover { filter: brightness(1.12); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(20,184,166,0.3); }
+.btn-primary:active { transform: translateY(0); }
+.btn-primary svg { width: 14px; height: 14px; }
+
+/* ══════════════════════════════════════════════════════════
+   PIPELINE — 6-stage visual
+   ══════════════════════════════════════════════════════════ */
+.pipeline {
+  display: flex; align-items: center; justify-content: center; gap: 0;
+  padding: 28px 0 40px;
+}
+.pipe-node {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  flex-shrink: 0;
+}
+.pipe-dot {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 2px solid var(--border-outer); background: var(--bg-card);
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--transition-theme), transform 0.2s ease;
+}
+.pipe-dot:hover { transform: scale(1.1); }
+.pipe-dot.complete { border-color: var(--accent); background: var(--accent-dim); }
+.pipe-dot.active {
+  border-color: var(--accent); background: var(--accent-dim);
+  animation: pipe-glow 2.2s ease-in-out infinite;
+}
+@keyframes pipe-glow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50%      { box-shadow: 0 0 22px 4px var(--accent-glow); }
+}
+.pipe-dot svg { color: var(--text-tertiary); width: 15px; height: 15px; }
+.pipe-dot.complete svg, .pipe-dot.active svg { color: var(--accent); }
+
+.pipe-label { font-size: 10.5px; color: var(--text-tertiary); font-weight: 500; text-align: center; max-width: 56px; }
+.pipe-label.done { color: var(--accent); }
+.pipe-bar {
+  width: 52px; height: 1px; background: var(--border-outer);
+  flex-shrink: 0; margin-top: -18px; transition: var(--transition-theme);
+}
+.pipe-bar.done { background: var(--accent); }
+
+/* ══════════════════════════════════════════════════════════
+   CARDS — hover lift micro-interaction
+   ══════════════════════════════════════════════════════════ */
+.section { margin-bottom: 56px; }
+.section-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 20px; }
+.section-header h3 { font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--text-primary); }
+.section-header .num { font-size: 12px; color: var(--text-tertiary); font-family: var(--font-mono); }
+
+/* Stat row */
+.stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+.stat-card {
+  background: var(--bg-card); border: 1px solid var(--border-outer);
+  border-radius: var(--radius); padding: 18px 20px; text-align: center;
+  transition: var(--transition-theme), transform 0.17s ease, box-shadow 0.17s ease, border-color 0.17s ease;
+  cursor: default;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+  border-color: var(--accent);
+}
+.stat-label { font-size: 11.5px; color: var(--text-tertiary); margin-bottom: 6px; }
+.stat-value { font-size: 26px; font-weight: 700; font-family: var(--font-display); }
+.stat-sub { font-size: 11px; margin-top: 3px; color: var(--green); }
+
+/* Content grid */
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.content-card {
+  background: var(--bg-card); border: 1px solid var(--border-outer);
+  border-radius: var(--radius); padding: 20px;
+  transition: var(--transition-theme), transform 0.17s ease, box-shadow 0.17s ease, border-color 0.17s ease;
+  cursor: pointer;
+}
+.content-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-card);
+  border-color: var(--accent);
+}
+.content-card h4 { font-family: var(--font-display); font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.content-card p {
+  font-size: 12.5px; color: var(--text-secondary); line-height: 1.6;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.card-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border-inner);
+}
+.status-tag {
+  font-size: 10.5px; padding: 1px 7px; border-radius: var(--radius-xs); font-weight: 500;
+}
+.status-tag.done { background: var(--accent-dim); color: var(--accent); }
+.status-tag.active { background: var(--blue-dim); color: var(--blue); }
+.status-tag.needs { background: var(--red-dim); color: var(--red); }
+.time-tag { font-size: 10.5px; color: var(--text-tertiary); font-family: var(--font-mono); }
+
+/* ══════════════════════════════════════════════════════════
+   DIRECTION LIST (solution ranking)
+   ══════════════════════════════════════════════════════════ */
+.direction-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-radius: var(--radius);
+  border: 1px solid var(--border-inner); background: var(--bg-card);
+  margin-bottom: 8px; cursor: pointer;
+  transition: var(--transition-theme), border-color 0.15s ease, background 0.15s ease;
+}
+.direction-item:hover { border-color: var(--accent); background: var(--accent-dim); }
+.dir-rank {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent-dim); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; flex-shrink: 0;
+}
+.dir-name { flex: 1; font-size: 12.5px; font-weight: 500; color: var(--text-primary); }
+.stars { display: flex; gap: 1px; flex-shrink: 0; }
+.stars svg { width: 12px; height: 12px; color: var(--amber); }
+.stars svg.off { color: var(--border-outer); opacity: 0.5; }
+
+/* ══════════════════════════════════════════════════════════
+   TWO COLUMN
+   ══════════════════════════════════════════════════════════ */
+.cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+/* Agent timeline */
+.timeline { display: flex; flex-direction: column; position: relative; padding-left: 18px; }
+.timeline::before {
+  content: ''; position: absolute; left: 5px; top: 6px; bottom: 6px;
+  width: 1px; background: var(--border-outer);
+}
+.tl-step {
+  position: relative; padding: 6px 0 8px 14px;
+  transition: var(--transition-theme);
+}
+.tl-step::before {
+  content: ''; position: absolute; left: -13px; top: 10px;
+  width: 7px; height: 7px; border-radius: 50%;
+  border: 2px solid var(--border-outer); background: var(--bg-card);
+  z-index: 1; transition: var(--transition-theme);
+}
+.tl-step.done::before { border-color: var(--accent); background: var(--accent); }
+.tl-step.running::before { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+.tl-step.waiting::before { border-color: var(--amber); background: var(--amber); }
+.tl-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1px; }
+.tl-name { font-size: 11.5px; font-weight: 600; }
+.tl-badge { font-size: 9.5px; padding: 0px 7px; border-radius: var(--radius-xs); font-weight: 600; }
+.tl-badge.done { background: var(--accent-dim); color: var(--accent); }
+.tl-badge.running { background: var(--blue-dim); color: var(--blue); }
+.tl-badge.waiting { background: var(--amber-dim); color: var(--amber); }
+.tl-desc { font-size: 10.5px; color: var(--text-tertiary); }
+.tl-time { font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono); margin-top: 2px; }
+.tl-bar { height: 3px; background: var(--bg-root); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+.tl-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.4s ease; }
+
+/* Quick links */
+.quick-links {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-inner);
+}
+.quick-link {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 14px 8px; border-radius: var(--radius);
+  border: 1px solid var(--border-outer); background: transparent;
+  font-size: 10.5px; color: var(--text-secondary); font-weight: 500;
+  text-align: center; transition: var(--transition-theme), transform 0.13s ease;
+}
+.quick-link:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); transform: translateY(-1px); }
+.quick-link svg { width: 20px; height: 20px; opacity: 0.45; transition: opacity 0.13s ease; }
+.quick-link:hover svg { opacity: 1; }
+
+/* Messages */
+.msg-row {
+  display: flex; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--border-inner);
+  font-size: 11.5px;
+}
+.msg-row:last-child { border-bottom: none; }
+.msg-time { color: var(--text-tertiary); font-family: var(--font-mono); font-size: 10px; flex-shrink: 0; }
+.msg-text { color: var(--text-secondary); }
+
+/* Footer */
+.app-footer { text-align: center; padding: 40px 0 28px; color: var(--text-tertiary); font-size: 11px; }
+
+/* ══════════════════════════════════════════════════════════
+   RESPONSIVE
+   ══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .app { padding: 0 16px; }
+  .hero h2 { font-size: 28px; }
+  .cols-2 { grid-template-columns: 1fr; }
+  .stat-row { grid-template-columns: 1fr; }
+  .card-grid { grid-template-columns: 1fr; }
+  .pipeline { flex-wrap: wrap; gap: 8px; }
+  .pipe-bar { display: none; }
+  .quick-links { grid-template-columns: repeat(3, 1fr); }
+  .nav-links { display: none; }
+}
+
+/* ══════════════════════════════════════════════════════════
+   REDUCED MOTION
+   ══════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ LOADING SCREEN ═══════════════ -->
+<div class="loading-screen" id="loader">
+  <div class="hex-container" id="hex"></div>
+  <div class="loading-label" id="loader-label">InnovOS</div>
+</div>
+
+<!-- ═══════════════ AMBIENT PARTICLES ═══════════════ -->
+<div class="particle-field" id="particles"></div>
+
+<!-- ═══════════════ APP ═══════════════ -->
+<div class="app" id="app" style="opacity:0;transition:opacity 0.5s 0.2s ease">
+  <nav class="nav">
+    <div class="nav-brand">
+      <h1>InnovOS</h1>
+      <span class="tag">智融创新操作系统</span>
+    </div>
+    <div class="nav-links">
+      <a href="#" class="active">工作台</a>
+      <a href="#">知识库</a>
+      <a href="#">专利检索</a>
+      <a href="#">历史方案</a>
+    </div>
+    <button class="theme-toggle" id="theme-btn" aria-label="切换主题">
+      <svg id="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    </button>
+  </nav>
+
+  <section class="hero">
+    <h2>让创新<span class="stroke">可计算</span></h2>
+    <p>描述你的技术问题，AI 驱动六阶段分析引擎自动完成需求洞察、问题建模、专利检索、方案生成、多维评估和成果转化。</p>
+  </section>
+
+  <!-- ═══════ TASK INPUT ═══════ -->
+  <div class="input-card">
+    <textarea placeholder="描述你想要解决的技术问题或创新方向...">如何在保证电池能量密度的同时，提高其安全性并延长循环寿命？</textarea>
+    <div class="input-row">
+      <div class="tags">
+        <button class="tag">+ 关键词</button>
+        <button class="tag selected">电池安全</button>
+        <button class="tag selected">能量密度</button>
+        <button class="tag selected">循环寿命</button>
+        <button class="tag">热管理</button>
+      </div>
+      <button class="btn-primary">
+        开始分析
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════ 6-STAGE PIPELINE ═══════ -->
+  <div class="pipeline">
+    <div class="pipe-node">
+      <div class="pipe-dot complete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></div>
+      <div class="pipe-label done">需求洞察</div>
+    </div>
+    <div class="pipe-bar done"></div>
+    <div class="pipe-node">
+      <div class="pipe-dot complete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/></svg></div>
+      <div class="pipe-label done">问题建模</div>
+    </div>
+    <div class="pipe-bar done"></div>
+    <div class="pipe-node">
+      <div class="pipe-dot active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg></div>
+      <div class="pipe-label">专利检索</div>
+    </div>
+    <div class="pipe-bar"></div>
+    <div class="pipe-node">
+      <div class="pipe-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></div>
+      <div class="pipe-label">方案生成</div>
+    </div>
+    <div class="pipe-bar"></div>
+    <div class="pipe-node">
+      <div class="pipe-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></div>
+      <div class="pipe-label">多维评估</div>
+    </div>
+    <div class="pipe-bar"></div>
+    <div class="pipe-node">
+      <div class="pipe-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg></div>
+      <div class="pipe-label">成果转化</div>
+    </div>
+  </div>
+
+  <!-- ═══════ PATENT STATS ═══════ -->
+  <section class="section">
+    <div class="section-header"><h3>专利检索结果</h3><span class="num">1,248 条</span></div>
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="stat-label">相关专利</div>
+        <div class="stat-value" style="color:var(--accent)">1,248</div>
+        <div class="stat-sub">较通用检索 +86%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">高相关度</div>
+        <div class="stat-value" style="color:var(--green)">186</div>
+        <div class="stat-sub">较通用检索 +72%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">核心分析完成</div>
+        <div class="stat-value" style="color:var(--text-secondary)">36</div>
+        <div class="stat-sub">较通用分析 +65%</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════ SOLUTIONS + AGENTS ═══════ -->
+  <section class="section">
+    <div class="cols-2">
+      <div>
+        <div class="section-header"><h3>创新方案推荐</h3></div>
+        <div class="direction-item">
+          <span class="dir-rank">1</span>
+          <span class="dir-name">固态电池 + 界面改性技术</span>
+          <span class="stars">
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+          </span>
+        </div>
+        <div class="direction-item">
+          <span class="dir-rank">2</span>
+          <span class="dir-name">结构优化 + 主动热管理系统</span>
+          <span class="stars">
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+            <svg class="off" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+          </span>
+        </div>
+        <div class="direction-item">
+          <span class="dir-rank">3</span>
+          <span class="dir-name">新型电解液 + 功能添加剂</span>
+          <span class="stars">
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+            <svg class="off" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+          </span>
+        </div>
+      </div>
+      <div>
+        <div class="section-header"><h3>多 Agent 协同</h3></div>
+        <div class="timeline">
+          <div class="tl-step done">
+            <div class="tl-row"><span class="tl-name">需求洞察 Agent</span><span class="tl-badge done">完成</span></div>
+            <div class="tl-desc">理解用户意图，提取关键要素</div>
+            <div class="tl-time">2.1s</div>
+          </div>
+          <div class="tl-step done">
+            <div class="tl-row"><span class="tl-name">问题建模 Agent</span><span class="tl-badge done">完成</span></div>
+            <div class="tl-desc">构建 ZR-IPM 模型，识别核心冲突</div>
+            <div class="tl-time">3.4s</div>
+          </div>
+          <div class="tl-step done">
+            <div class="tl-row"><span class="tl-name">专利分析 Agent</span><span class="tl-badge done">完成</span></div>
+            <div class="tl-desc">检索 1,248 篇相关专利，聚类分析</div>
+            <div class="tl-time">8.7s</div>
+          </div>
+          <div class="tl-step running">
+            <div class="tl-row"><span class="tl-name">方案生成 Agent</span><span class="tl-badge running">运行中</span></div>
+            <div class="tl-desc">RAG 增强检索，生成多路径创新方案</div>
+            <div class="tl-time">剩余 5.2s</div>
+            <div class="tl-bar"><div class="tl-bar-fill" style="width:65%"></div></div>
+          </div>
+          <div class="tl-step waiting">
+            <div class="tl-row"><span class="tl-name">方案评估 Agent</span><span class="tl-badge waiting">等待</span></div>
+            <div class="tl-desc">四维评估：创新性、可行性、完整度、转化</div>
+            <div class="tl-time">排队中</div>
+          </div>
+          <div class="tl-step waiting">
+            <div class="tl-row"><span class="tl-name">成果转化 Agent</span><span class="tl-badge waiting">等待</span></div>
+            <div class="tl-desc">结构化输出，专利转化建议</div>
+            <div class="tl-time">排队中</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════ RECENT ANALYSES ═══════ -->
+  <section class="section">
+    <div class="section-header"><h3>最近分析</h3><span class="num">12 项</span></div>
+    <div class="card-grid">
+      <div class="content-card">
+        <h4>锂电池低温充放电效率优化</h4>
+        <p>针对-20℃环境下锂电池容量衰减问题，通过电解液改性+负极材料优化路径提升低温性能。</p>
+        <div class="card-footer">
+          <span class="status-tag done">已完成</span>
+          <span class="time-tag">2h ago</span>
+        </div>
+      </div>
+      <div class="content-card">
+        <h4>风力发电机叶片除冰方案</h4>
+        <p>探索超声波除冰与疏水涂层复合方案，结合仿生表面微结构设计。</p>
+        <div class="card-footer">
+          <span class="status-tag active">分析中</span>
+          <span class="time-tag">5h ago</span>
+        </div>
+      </div>
+      <div class="content-card">
+        <h4>高精度 CNC 加工振动抑制</h4>
+        <p>针对五轴数控机床高速切削中的颤振问题，基于主动阻尼控制优化切削路径。</p>
+        <div class="card-footer">
+          <span class="status-tag needs">需重试</span>
+          <span class="time-tag">1d ago</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════ SYSTEM MESSAGES + QUICK LINKS ═══════ -->
+  <section class="section">
+    <div class="section-header"><h3>系统消息</h3></div>
+    <div style="background:var(--bg-card);border:1px solid var(--border-outer);border-radius:var(--radius);padding:18px 20px 14px">
+      <div class="msg-row"><span class="msg-time">10:24</span><span class="msg-text">专利数据库更新完成，新增 12,457 篇</span></div>
+      <div class="msg-row"><span class="msg-time">10:23</span><span class="msg-text">知识库同步完成，新增案例 235 个</span></div>
+      <div class="msg-row"><span class="msg-time">10:18</span><span class="msg-text">模型服务 DeepSeek-V3 已恢复</span></div>
+      <div class="msg-row"><span class="msg-time">10:15</span><span class="msg-text">向量索引优化完成，检索速度提升 40%</span></div>
+      <div class="msg-row"><span class="msg-time">10:10</span><span class="msg-text">今日活跃用户 47，完成分析 124</span></div>
+      <div class="quick-links">
+        <button class="quick-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+          知识图谱
+        </button>
+        <button class="quick-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/></svg>
+          TRIZ 工具
+        </button>
+        <button class="quick-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+          专利地图
+        </button>
+        <button class="quick-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+          案例库
+        </button>
+        <button class="quick-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+          创新模板
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="app-footer">InnovOS · 智融创新操作系统 — AI 驱动的多 Agent 创新问题求解引擎</footer>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// LOADING ANIMATION — hexagonal mesh
+// ══════════════════════════════════════════════════════════
+(function(){
+  const R = 82, CX = 110, CY = 110, N = 6;
+  const hex = document.getElementById('hex');
+  const label = document.getElementById('loader-label');
+  const nodes = [], lines = [];
+
+  // Place 6 nodes in a hexagon
+  for (let i = 0; i < N; i++) {
+    const angle = (Math.PI * 2 / N) * i - Math.PI / 2;
+    const x = CX + Math.cos(angle) * R;
+    const y = CY + Math.sin(angle) * R;
+    const el = document.createElement('div');
+    el.className = 'hex-node';
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    hex.appendChild(el);
+    nodes.push(el);
+  }
+
+  // Draw lines between adjacent nodes
+  for (let i = 0; i < N; i++) {
+    const j = (i + 1) % N;
+    const x1 = parseFloat(nodes[i].style.left), y1 = parseFloat(nodes[i].style.top);
+    const x2 = parseFloat(nodes[j].style.left), y2 = parseFloat(nodes[j].style.top);
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    const ln = document.createElement('div');
+    ln.className = 'hex-line';
+    ln.style.width = len + 'px';
+    ln.style.left = x1 + 'px';
+    ln.style.top = y1 + 'px';
+    ln.style.transform = 'rotate(' + ang + 'deg)';
+    hex.insertBefore(ln, hex.firstChild);
+    lines.push(ln);
+  }
+
+  const labels = ['InnovOS', '初始化引擎', '连接知识库', '就绪'];
+  let step = 0;
+
+  function animateStep() {
+    if (step < N) {
+      nodes[step].classList.add('lit');
+      if (step > 0) lines[step - 1].classList.add('visible');
+      if (step === N - 1) lines[N - 1].classList.add('visible');
+      label.textContent = labels[Math.min(step, labels.length - 1)];
+      step++;
+      setTimeout(animateStep, 180);
+    } else {
+      setTimeout(() => {
+        // Final glow — all nodes lit, all lines bright
+        lines.forEach(l => { l.classList.add('lit'); });
+        nodes.forEach(n => { n.classList.add('lit'); });
+        label.textContent = '';
+        setTimeout(() => {
+          document.getElementById('loader').classList.add('hidden');
+          document.getElementById('app').style.opacity = '1';
+        }, 350);
+      }, 250);
+    }
+  }
+  setTimeout(animateStep, 400);
+})();
+
+// ══════════════════════════════════════════════════════════
+// AMBIENT PARTICLES
+// ══════════════════════════════════════════════════════════
+(function(){
+  const field = document.getElementById('particles');
+  const count = 32;
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.top = Math.random() * 100 + '%';
+    p.style.setProperty('--dx', (Math.random() - 0.5) * 180 + 'px');
+    p.style.setProperty('--dy', (Math.random() - 0.5) * 180 + 'px');
+    p.style.animationDelay = Math.random() * 50 + 's';
+    p.style.animationDuration = (40 + Math.random() * 30) + 's';
+    field.appendChild(p);
+  }
+})();
+
+// ══════════════════════════════════════════════════════════
+// THEME TOGGLE
+// ══════════════════════════════════════════════════════════
+(function(){
+  const html = document.documentElement;
+  const btn = document.getElementById('theme-btn');
+  const moon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+  const sun  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+  btn.onclick = function() {
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+  };
+})();
+
+// ══════════════════════════════════════════════════════════
+// TAG TOGGLE (micro-interaction)
+// ══════════════════════════════════════════════════════════
+(function(){
+  document.querySelectorAll('.tag').forEach(tag => {
+    tag.addEventListener('click', function() {
+      if (this.textContent.trim() === '+ 关键词') return;
+      this.classList.toggle('selected');
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,193 +1,191 @@
-import json
+"""
+专利检索 API — CNIPR 开放平台对接
+所有检索走实时 API 调用，不存储本地数据。
+"""
+
 import logging
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 
-from app.database import get_db
+from app.algorithm.cnipr_client import search_patents, get_patent_detail, analyze_patents
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/patents", tags=["patents"])
 
-
-def row_to_patent(r, relevance=None):
-    return {
-        "id": str(r["id"]),
-        "title": r["title"],
-        "abstract": r["abstract"],
-        "applicants": json.loads(r["applicants"]),
-        "inventors": json.loads(r["inventors"]),
-        "filingDate": r["filing_date"],
-        "publicationDate": r["publication_date"],
-        "patentNumber": r["patent_number"],
-        "ipcCodes": json.loads(r["ipc_codes"]),
-        "relevanceScore": round(relevance * 100) if relevance is not None else r["relevance_score"],
-    }
-
-
-async def _hybrid_search(query: str, all_rows: list) -> dict:
-    """混合搜索：合并关键词结果和向量结果，去重后用 Reranker 精排，归一化到 0~1"""
-    try:
-        from app.algorithm.knowledge.reranker import Reranker
-        from app.algorithm.model_resolver import model_resolver
-
-        cfg = model_resolver.resolve_rerank()
-        if not cfg:
-            composite = model_resolver.get_assigned_settings().get("rerank_model")
-            if composite:
-                cfg = model_resolver.resolve(composite)
-
-        if not all_rows or not cfg:
-            return {}
-
-        reranker = Reranker(api_key=cfg.api_key, api_host=cfg.api_host, model=cfg.model_id)
-        documents = [f"{r['title']}。{r['abstract'] or ''}" for r in all_rows]
-        results = await reranker.rerank(query, documents, top_n=len(all_rows))
-
-        if not results:
-            return {}
-
-        score_map = {}
-        for item in results:
-            idx = item["index"]
-            patent_id = all_rows[idx]["id"]
-            score_map[patent_id] = item["relevance_score"]
-        return score_map
-    except Exception as e:
-        logger.warning(f"混合搜索失败: {e}")
-        return {}
+# CNIPR 可用数据库
+DB_OPTIONS = "FMZL,FMSQ,SYXX"  # 发明授权, 发明申请, 实用新型
 
 
 @router.get("/search")
-async def search_patents(
+async def search(
     q: str = "",
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=50),
     ipc_code: str = "",
     applicant: str = "",
-    sort_by: str = "relevance",  # relevance | date | score
-    order: str = "desc",  # desc | asc
+    sort_by: str = "date",   # date | relevance
+    order: str = "desc",
 ):
-    """
-    混合专利检索：关键词 LIKE + 向量语义召回 → Reranker 精排 → 归一化
-    """
-    db = get_db()
-
+    """关键词 + 条件检索专利，对接 sf1-v1 实时查询。"""
     if not q.strip():
-        # 无搜索词，直接返回全部
-        conditions = []
-        params = []
-        if ipc_code:
-            conditions.append("ipc_codes LIKE ?")
-            params.append(f"%{ipc_code}%")
-        if applicant:
-            conditions.append("applicants LIKE ?")
-            params.append(f"%{applicant}%")
-        where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
-
-        sort_map = {"relevance": "relevance_score", "date": "filing_date", "score": "relevance_score"}
-        sort_column = sort_map.get(sort_by, "relevance_score")
-        sort_order = "DESC" if order == "desc" else "ASC"
-
-        count_sql = f"SELECT COUNT(*) FROM patents {where_clause}"
-        total = db.execute(count_sql, params).fetchone()[0]
-        offset = (page - 1) * page_size
-        rows = db.execute(
-            f"SELECT * FROM patents {where_clause} ORDER BY {sort_column} {sort_order} LIMIT ? OFFSET ?",
-            [*params, page_size, offset],
-        ).fetchall()
-        db.close()
         return {
-            "data": [row_to_patent(r) for r in rows],
-            "total": total,
+            "data": [],
+            "total": 0,
             "page": page,
             "page_size": page_size,
-            "total_pages": (total + page_size - 1) // page_size,
-            "message": "success",
+            "total_pages": 0,
+            "message": "请输入搜索关键词",
             "code": 200,
         }
 
-    # === 混合搜索 ===
+    # 构建 CNIPR 表达式
+    parts = [f"名称=({q.strip()})"]
 
-    # 1. 关键词召回
-    keyword_rows = db.execute(
-        "SELECT * FROM patents WHERE title LIKE ? OR abstract LIKE ?",
-        [f"%{q}%", f"%{q}%"],
-    ).fetchall()
-    keyword_ids = {r["id"] for r in keyword_rows}
+    if ipc_code.strip():
+        parts.append(f"主分类号=({ipc_code.strip()})")
 
-    # 2. 向量语义召回（top-20，扩展候选集）
-    vector_rows_map = {}
+    if applicant.strip():
+        parts.append(f"申请(专利权)人=({applicant.strip()})")
+
+    exp = " AND ".join(parts)
+
+    # 排序
+    cnipr_order = {
+        "date": "-appDate",
+        "date_asc": "+appDate",
+        "relevance": "+appDate",  # CNIPR 无相关度排序，用日期替代
+    }.get(sort_by + ("_asc" if order == "asc" else ""), "-appDate")
+
     try:
-        from app.algorithm.patent_search_engine import get_patent_search_engine
-
-        engine = get_patent_search_engine()
-        if engine.embedder:
-            vec_results = await engine.search(q, top_k=20)
-            if vec_results:
-                vec_ids = [vr["id"] for vr in vec_results if vr.get("id") and vr["id"] not in keyword_ids]
-                if vec_ids:
-                    placeholders = ",".join("?" for _ in vec_ids)
-                    full_rows = db.execute(
-                        f"SELECT * FROM patents WHERE id IN ({placeholders})",
-                        vec_ids,
-                    ).fetchall()
-                    for r in full_rows:
-                        vector_rows_map[r["id"]] = r
+        result = await search_patents(
+            exp=exp,
+            page=page,
+            page_size=min(page_size, 50),
+            order=cnipr_order,
+            dbs=DB_OPTIONS,
+        )
     except Exception as e:
-        logger.warning(f"向量召回失败: {e}")
+        logger.error(f"CNIPR 检索异常: {e}")
+        raise HTTPException(status_code=502, detail=f"专利检索服务暂时不可用: {e}")
 
-    db.close()
+    # 转换为前端期望格式
+    items = []
+    for r in result.get("results", []):
+        items.append({
+            "id": r.get("pid", ""),
+            "title": r.get("title", ""),
+            "abstract": r.get("abs", ""),
+            "applicants": r.get("applicantName", []) if isinstance(r.get("applicantName"), list)
+                          else [r["applicantName"]] if r.get("applicantName") else [],
+            "inventors": r.get("inventorName", []) if isinstance(r.get("inventorName"), list)
+                          else [r["inventorName"]] if r.get("inventorName") else [],
+            "filingDate": r.get("appDate", ""),
+            "publicationDate": r.get("pubDate", ""),
+            "patentNumber": r.get("pubNumber", []) if isinstance(r.get("pubNumber"), list)
+                             else [r["pubNumber"]] if r.get("pubNumber") else [],
+            "ipcCodes": r.get("ipc", []) if isinstance(r.get("ipc"), list)
+                          else [r["ipc"]] if r.get("ipc") else [],
+            "mainIpc": r.get("mainIpc", ""),
+            "patentType": r.get("patType", ""),
+            "legalStatus": r.get("legalStatus", ""),
+            "statusCode": r.get("statusCode", ""),
+        })
 
-    # 3. 合并 → Reranker 精排 → 归一化
-    all_rows = list(keyword_rows) + list(vector_rows_map.values())
-    relevance_map = await _hybrid_search(q, all_rows)
-
-    # 4. 按相关度排序，取前 5，分页返回
-    scored = [(r, relevance_map.get(r["id"], 0)) for r in all_rows]
-    scored.sort(key=lambda x: x[1], reverse=True)
-    top_results = scored[:5]
-    total = len(scored)
-    start = (page - 1) * page_size
-    page_rows = top_results[start : start + page_size]
+    total = result.get("total", 0)
 
     return {
-        "data": [row_to_patent(r, score) for r, score in page_rows],
-        "total": len(top_results),
+        "data": items,
+        "total": total,
         "page": page,
         "page_size": page_size,
-        "total_pages": 1,
+        "total_pages": (total + page_size - 1) // page_size if total > 0 else 0,
+        "sections": result.get("sections", []),
+        "message": "success",
+        "code": 200,
+    }
+
+
+@router.get("/detail/{pid}")
+async def detail(pid: str):
+    """按专利 ID 获取详情（权利要求书、说明书等），对接 dl3-v1。"""
+    if not pid.strip():
+        raise HTTPException(status_code=400, detail="缺少专利 ID")
+
+    try:
+        results = await get_patent_detail([pid.strip()])
+    except Exception as e:
+        logger.error(f"CNIPR 下载详情异常: {e}")
+        raise HTTPException(status_code=502, detail=f"专利详情服务暂时不可用: {e}")
+
+    if not results:
+        raise HTTPException(status_code=404, detail="未找到该专利详情")
+
+    patent = results[0]
+    return {
+        "data": patent,
         "message": "success",
         "code": 200,
     }
 
 
 @router.get("/stats")
-def get_patent_stats():
-    db = get_db()
-    total = db.execute("SELECT COUNT(*) FROM patents").fetchone()[0]
-    rows = db.execute("SELECT * FROM patents ORDER BY relevance_score DESC LIMIT 3").fetchall()
-    db.close()
+async def stats(q: str = ""):
+    """专利统计概览，对接 as1 单字段分析接口。"""
+    if not q.strip():
+        return {
+            "data": {
+                "totalCount": 0,
+                "relatedCount": 0,
+                "coreCount": 0,
+                "analyzedCount": 0,
+                "topPatents": [],
+            },
+            "message": "请输入搜索关键词",
+            "code": 200,
+        }
+
+    exp = f"名称=({q.strip()})"
+
+    try:
+        # 检索概览
+        sr = await search_patents(exp=exp, page=1, page_size=3, dbs=DB_OPTIONS)
+        total = sr.get("total", 0)
+
+        items = []
+        for r in sr.get("results", []):
+            items.append({
+                "id": r.get("pid", ""),
+                "title": r.get("title", ""),
+                "abstract": r.get("abs", ""),
+                "applicants": r.get("applicantName", []) if isinstance(r.get("applicantName"), list)
+                              else [r["applicantName"]] if r.get("applicantName") else [],
+                "inventors": r.get("inventorName", []) if isinstance(r.get("inventorName"), list)
+                              else [r["inventorName"]] if r.get("inventorName") else [],
+                "filingDate": r.get("appDate", ""),
+                "publicationDate": r.get("pubDate", ""),
+                "patentNumber": r.get("pubNumber", []) if isinstance(r.get("pubNumber"), list)
+                                 else [r["pubNumber"]] if r.get("pubNumber") else [],
+                "ipcCodes": r.get("ipc", []) if isinstance(r.get("ipc"), list)
+                              else [r["ipc"]] if r.get("ipc") else [],
+                "mainIpc": r.get("mainIpc", ""),
+                "patentType": r.get("patType", ""),
+                "legalStatus": r.get("legalStatus", ""),
+                "statusCode": r.get("statusCode", ""),
+            })
+    except Exception as e:
+        logger.error(f"CNIPR stats 异常: {e}")
+        total = 0
+        items = []
+
     return {
         "data": {
             "totalCount": total,
             "relatedCount": total,
             "coreCount": min(36, total),
             "analyzedCount": min(36, total),
-            "topPatents": [row_to_patent(r) for r in rows],
+            "topPatents": items,
         },
         "message": "success",
         "code": 200,
     }
-
-
-@router.get("/{patent_id}")
-def get_patent_detail(patent_id: int):
-    db = get_db()
-    row = db.execute("SELECT * FROM patents WHERE id=?", (patent_id,)).fetchone()
-    db.close()
-    if not row:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="专利不存在")
-    return {"data": row_to_patent(row), "message": "success", "code": 200}

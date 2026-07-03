@@ -18,6 +18,7 @@ const PatentConversionPage = lazyPage(
 );
 const GuidePage = lazyPage(() => import('../features/guide/GuidePage'));
 const ProfilePage = lazyPage(() => import('../features/profile/ProfilePage'));
+const NotFoundPage = lazyPage(() => import('../features/NotFoundPage'));
 
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
@@ -66,4 +67,5 @@ export const routes: RouteObject[] = [
       },
     ],
   },
+  { path: '*', element: <NotFoundPage /> },
 ];

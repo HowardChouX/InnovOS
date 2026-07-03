@@ -127,6 +127,18 @@ docker-clean:
 db-backup:
 	@uv run python -c "import asyncio; from app.services.backup_service import backup_service; asyncio.run(backup_service.run_now())"
 
+keygen:
+	python scripts/keygen.py
+
+keygen-show:
+	python scripts/keygen.py --show
+
+keygen-rotate-jwt:
+	python scripts/keygen.py --rotate jwt
+
+keygen-rotate-admin:
+	python scripts/keygen.py --rotate admin
+
 db-restore:
 	@if [ -z "$(file)" ]; then echo "Usage: make db-restore file=backup.sql.gz"; exit 1; fi
 	@gunzip -c $(file) | psql "$$DATABASE_URL"
