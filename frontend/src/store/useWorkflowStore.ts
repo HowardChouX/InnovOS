@@ -35,30 +35,31 @@ let pollStartTime = 0;
 const MAX_POLL_MS = 10 * 60 * 1000;
 
 const AGENT_TO_PHASE: Record<string, string> = {
-  agent1: 'demand_portrait',
-  agent2: 'problem_modeling',
+  agent1: 'demand_analysis',
+  agent2: 'problem_definition',
   agent5: 'patent_search',
   agent3: 'solution_gen',
   agent4: 'evaluation',
-  agent6: 'conversion',
+  // agent6 (conversion) 后端仍运行，但前端不再显示为独立阶段
+  // 其完成触发 video_display mock 自动完成
 };
 
 const PHASE_ORDER = [
-  'demand_portrait',
-  'problem_modeling',
+  'demand_analysis',
+  'problem_definition',
   'patent_search',
   'solution_gen',
   'evaluation',
-  'conversion',
+  'video_display',
 ] as const;
 
 const DEFAULT_PHASE_STATUS: Record<string, PhaseStatus> = {
-  demand_portrait: 'pending',
-  problem_modeling: 'pending',
+  demand_analysis: 'pending',
+  problem_definition: 'pending',
   patent_search: 'pending',
   solution_gen: 'pending',
   evaluation: 'pending',
-  conversion: 'pending',
+  video_display: 'pending',
 };
 
 // ══════════════════════════════════════════════════════════
@@ -67,12 +68,21 @@ const DEFAULT_PHASE_STATUS: Record<string, PhaseStatus> = {
 
 function syncPhaseStatus(steps: { agentId?: string; agent_id?: string; status: string }[]) {
   const status = { ...DEFAULT_PHASE_STATUS };
+  let conversionDone = false;
   for (const step of steps) {
     const agentId = step.agentId || step.agent_id;
     const phase = AGENT_TO_PHASE[agentId || ''];
     if (phase) {
       status[phase] = step.status as PhaseStatus;
     }
+    // agent6 (conversion) 完成后触发 video_display mock
+    if (agentId === 'agent6' && step.status === 'completed') {
+      conversionDone = true;
+    }
+  }
+  // Mock: video_display 阶段无后端 agent，conversion(agent6) 完成后自动标记完成
+  if (conversionDone) {
+    status.video_display = 'completed';
   }
   return status;
 }
@@ -94,7 +104,7 @@ function determineCurrentPhase(phaseStatus: Record<string, PhaseStatus>): string
   for (let i = PHASE_ORDER.length - 1; i >= 0; i--) {
     if (phaseStatus[PHASE_ORDER[i]] === 'completed') return PHASE_ORDER[i];
   }
-  return 'demand_portrait';
+  return 'demand_analysis';
 }
 
 // ══════════════════════════════════════════════════════════
@@ -106,8 +116,8 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   loading: false,
   polling: false,
   phaseStatus: { ...DEFAULT_PHASE_STATUS },
-  currentPhase: 'demand_portrait',
-  isRunning: false,
+currentPhase: 'demand_analysis',
+    isRunning: false,
   error: null,
 
   cancelAnalysis: async () => {
@@ -218,7 +228,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
       workflow: null,
       isRunning: false,
       phaseStatus: { ...DEFAULT_PHASE_STATUS },
-      currentPhase: 'demand_portrait',
+      currentPhase: 'demand_analysis',
       error: null,
     });
   },

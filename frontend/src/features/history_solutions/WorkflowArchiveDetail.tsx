@@ -28,6 +28,7 @@ import {
   WandSparkles,
   TrendingUp,
   FileSignature,
+  Video,
 } from 'lucide-react';
 
 // ─── Lucide icon map ────────────────────────────────
@@ -36,12 +37,12 @@ const PHASE_ICONS: Record<
   string,
   React.ComponentType<{ size?: number; style?: React.CSSProperties }>
 > = {
-  demand_portrait: Search,
-  problem_modeling: Box,
+  demand_analysis: Search,
+  problem_definition: Box,
   patent_search: FileText,
   solution_gen: WandSparkles,
   evaluation: TrendingUp,
-  conversion: FileSignature,
+  video_display: Video,
 };
 
 // ─── Types ───────────────────────────────────────────
@@ -913,8 +914,10 @@ function StepOutputRenderer({
   infringementLoading?: boolean;
 }) {
   switch (phaseId) {
+    case 'demand_analysis':
     case 'demand_portrait':
       return <DemandOutput output={output} />;
+    case 'problem_definition':
     case 'problem_modeling':
       return <ModelingOutput output={output} />;
     case 'patent_search':
@@ -923,6 +926,7 @@ function StepOutputRenderer({
       return <SolutionOutput output={output} solutionsData={solutions} />;
     case 'evaluation':
       return <EvalOutput output={output} />;
+    case 'video_display':
     case 'conversion':
       return (
         <ConversionOutput
@@ -982,7 +986,9 @@ function StatusBadge({ workflow }: { workflow: WorkflowState }) {
 // ─── Agent to Phase ID mapping ──────────────────────
 
 const PHASE_TO_AGENT: Record<string, string> = {
+  demand_analysis: 'agent1',
   demand_portrait: 'agent1',
+  problem_definition: 'agent2',
   problem_modeling: 'agent2',
   patent_search: 'agent5',
   solution_gen: 'agent3',

@@ -7,18 +7,18 @@ import { PatentSearchView } from './PatentSearchView';
 import { SolutionGenView } from './SolutionGenView';
 import { EvaluationView } from './EvaluationView';
 import { CompletedView } from './CompletedView';
-import { ConversionView } from './ConversionView';
+import { VideoDisplayView } from './VideoDisplayView';
 import { EmptyState, getStepOutput } from './workflowStepUtils';
 import { WORKFLOW_STEPS } from '../../types/workflow';
 import { StepRunningIndicator } from '../../components/ui/StepRunningIndicator';
 
 const PHASE_VIEWS: Record<string, React.ComponentType<{ output: unknown }>> = {
-  demand_portrait: DemandPortraitView,
-  problem_modeling: ProblemModelingView,
+  demand_analysis: DemandPortraitView,
+  problem_definition: ProblemModelingView,
   patent_search: PatentSearchView,
   solution_gen: SolutionGenView as React.ComponentType<{ output: unknown }>,
   evaluation: EvaluationView as React.ComponentType<{ output: unknown }>,
-  conversion: ConversionView,
+  video_display: VideoDisplayView,
   completed: CompletedView,
 };
 
@@ -30,12 +30,12 @@ export function WorkflowStepResults() {
   const displayPhase = useMemo(() => {
     if (!workflow) return currentPhase;
     const order = [
-      'demand_portrait',
-      'problem_modeling',
+      'demand_analysis',
+      'problem_definition',
       'patent_search',
       'solution_gen',
       'evaluation',
-      'conversion',
+      'video_display',
     ];
     if ((workflow.status as string) === 'awaiting_rating' || workflow.status === 'completed') {
       let lastComplete = '';

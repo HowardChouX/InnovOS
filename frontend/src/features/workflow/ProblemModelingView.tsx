@@ -392,7 +392,7 @@ function ProblemModelingViewInner({ output }: { output: unknown }) {
           >
             {submitting ? (
               <>
-                <StepRunningIndicator phaseId="problem_modeling" size={16} color="#fff" /> 提交中...
+                <StepRunningIndicator phaseId="problem_definition" size={16} color="#fff" /> 提交中...
               </>
             ) : submitted ? (
               <>

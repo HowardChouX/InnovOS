@@ -167,6 +167,15 @@ async def startup():
 
     await backup_service.start()
 
+    # 5.1 种子化 Mock 数据（手机发热主题：专利/笔记/历史方案）
+    try:
+        from app.seed_mock_data import seed_all_mock_data
+
+        await asyncio.to_thread(seed_all_mock_data)
+        logger.info("Mock 种子数据已就绪")
+    except Exception as e:
+        logger.warning(f"Mock 种子数据初始化失败（非致命）: {e}")
+
     # 6. 建专利向量表并重建所有向量
     try:
         from app.algorithm.patent_search_engine import get_patent_search_engine, init_patent_vectors_table

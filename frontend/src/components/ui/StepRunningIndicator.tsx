@@ -261,3 +261,8 @@ const ANIMATIONS: Record<string, (s: number, c: string) => React.ReactNode> = {
     );
   },
 };
+
+// ═══ 新阶段 ID 别名（重命名后兼容） ═══
+ANIMATIONS.demand_analysis = ANIMATIONS.demand_portrait;
+ANIMATIONS.problem_definition = ANIMATIONS.problem_modeling;
+ANIMATIONS.video_display = ANIMATIONS.conversion;

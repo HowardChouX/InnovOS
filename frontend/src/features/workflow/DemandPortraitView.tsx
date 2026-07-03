@@ -401,7 +401,7 @@ function DemandPortraitViewInner({ output }: { output: unknown }) {
         >
           {submitting ? (
             <>
-              <StepRunningIndicator phaseId="demand_portrait" size={16} color="#fff" /> 提交中...
+              <StepRunningIndicator phaseId="demand_analysis" size={16} color="#fff" /> 提交中...
             </>
           ) : submitted ? (
             <>

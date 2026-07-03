@@ -2,12 +2,12 @@
 import type { WorkflowState } from '../../types/workflow';
 
 const PHASE_TO_AGENT: Record<string, string> = {
-  demand_portrait: 'agent1',
-  problem_modeling: 'agent2',
+  demand_analysis: 'agent1',
+  problem_definition: 'agent2',
   patent_search: 'agent5',
   solution_gen: 'agent3',
   evaluation: 'agent4',
-  conversion: 'agent6',
+  // video_display: mock 阶段，无后端 agent
 };
 
 export function getStepOutput(workflow: WorkflowState | null, phaseId: string): unknown {
