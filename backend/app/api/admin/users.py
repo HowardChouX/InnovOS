@@ -78,6 +78,9 @@ def update_user(
             sets.append("is_active=?"); params.append(1 if body.is_active else 0)
         if body.role is not None:
             sets.append("role=?"); params.append(body.role)
+            # role 与 is_superuser 必须一致，避免 SuperUserDep（判 is_superuser）锁死管理员
+            sets.append("is_superuser=?")
+            params.append(body.role == "admin")
         if body.email is not None:
             sets.append("email=?"); params.append(body.email)
         if body.phone is not None:
