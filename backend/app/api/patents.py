@@ -6,6 +6,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.database import get_db
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/patents", tags=["patents"])
@@ -30,8 +32,6 @@ async def search(
     """
     if not q.strip():
         # 无关键词时返回全部本地专利（分页）
-        from app.database import get_db
-
         db = get_db()
         try:
             total_row = db.execute("SELECT COUNT(*) AS cnt FROM patents").fetchone()
@@ -126,16 +126,25 @@ def _row_to_patent_dict(r) -> dict:
         "abstract": r["abstract"] or "",
         "applicant": ", ".join(applicants) if isinstance(applicants, list) else str(applicants),
         "inventor": ", ".join(inventors) if isinstance(inventors, list) else str(inventors),
+        "applicants": applicants if isinstance(applicants, list) else [applicants] if applicants else [],
+        "inventors": inventors if isinstance(inventors, list) else [inventors] if inventors else [],
         "mainIpc": ipc_codes[0] if isinstance(ipc_codes, list) and ipc_codes else "",
         "ipc": ", ".join(ipc_codes) if isinstance(ipc_codes, list) else "",
+        "ipcCodes": ipc_codes if isinstance(ipc_codes, list) else [],
         "legalStatus": "",
         "type": "",
         "documentNumber": r["patent_number"] or "",
+        "patentNumber": r["patent_number"] or "",
         "patent_number": r["patent_number"] or "",
         "relevance_score": r["relevance_score"] or 0,
         "relevance": r["relevance_score"] or 0,
+        "relevanceScore": r["relevance_score"] or 0,
+        "filingDate": r["filing_date"] or "",
         "filing_date": r["filing_date"] or "",
+        "publicationDate": r["publication_date"] or "",
         "publication_date": r["publication_date"] or "",
+        "applicationDate": r["filing_date"] or "",
+        "documentDate": r["publication_date"] or "",
         "source": "local",
     }
 

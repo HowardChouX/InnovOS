@@ -17,6 +17,6 @@ from app.database import get_db_dep
 # 业务表仍用 psycopg2
 SessionDep = Annotated[Any, Depends(get_db_dep)]
 
-# 认证依赖（别名）
-CurrentUser = current_active_user
-SuperUserDep = current_superuser
+# 认证依赖（Annotated 包装 — FastAPI 需要 Depends 元数据来识别为依赖而非查询参数）
+CurrentUser = Annotated[Any, Depends(current_active_user)]
+SuperUserDep = Annotated[Any, Depends(current_superuser)]

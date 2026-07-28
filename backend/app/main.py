@@ -17,13 +17,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 # Importing any app submodule triggers app/__init__.py bootstrap (load_dotenv + setup_logging)
-from app.api import analysis, auth, evaluation, feedback, modeling, notifications, patents, solutions, tasks, workflow
+from app.api import analysis, evaluation, feedback, modeling, notifications, patents, solutions, tasks, workflow
 from app.api import conversion as conversion_api
 from app.api import kb_tools as kb_tools_api
 from app.api import knowledge as knowledge_api
 from app.api import knowledge_bases as knowledge_bases_api
 from app.api import models as models_api
-from app.api import users as users_api
+from app.api import profile as profile_api
 from app.api.admin import router as admin_router
 from app.api.sidebar import router as sidebar_router
 from app.api.workflow_steps import router as workflow_steps_router
@@ -282,7 +282,7 @@ app_.include_router(knowledge_bases_api.router)
 app_.include_router(kb_tools_api.router)
 app_.include_router(models_api.router)
 app_.include_router(modeling.router)
-app_.include_router(users_api.router)
+app_.include_router(profile_api.router)
 app_.include_router(conversion_api.router)
 app_.include_router(workflow_steps_router)
 

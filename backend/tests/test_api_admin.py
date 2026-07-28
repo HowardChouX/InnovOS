@@ -23,7 +23,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from tests.test_api_auth import MockRow
+class MockRow(dict):
+    """Mock row supporting both dict and integer indexing."""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -645,22 +646,38 @@ def client(mock_db, monkeypatch):
     monkeypatch.setattr(model_svc_mod, "model_service", mock_svc)
 
     # ── Step 4: Build the FastAPI test app ──
+    import app.api.deps as deps_mod
     from app.api.admin import router as admin_router
-    from app.api.deps import get_current_user, get_current_superuser, get_db_dep
-    from app.auth import get_current_user as auth_get_current_user
     from app.auth import require_admin
-    from app.models.user import User
+    from app.auth.instance import current_active_user, current_superuser
+    from app.db.models import User as OrmUser
+    from app.db.session import get_session
 
     test_app = FastAPI()
     test_app.include_router(admin_router)
 
-    admin_user = User(id=0, username="admin", password_hash="", role="admin", created_at="")
-    admin_dict = {"id": 0, "username": "admin", "role": "admin", "email": "", "created_at": ""}
+    # 真实管理员（FastAPI Users 路径 — 返回 ORM User）
+    orm_admin = OrmUser(
+        id=1, email="admin@example.com",
+        hashed_password="!", is_active=True, is_superuser=True, is_verified=True,
+        username="admin", role="admin", token_version=0,
+    )
+    # 旧 require_admin 垫片路径 — 返回 dict
+    admin_dict = {
+        "id": 1, "username": "admin", "role": "admin",
+        "email": "admin@example.com", "is_active": True, "created_at": "",
+    }
 
-    test_app.dependency_overrides[get_db_dep] = lambda: mock_db
-    test_app.dependency_overrides[get_current_user] = lambda: admin_user
-    test_app.dependency_overrides[get_current_superuser] = lambda: admin_user
-    test_app.dependency_overrides[auth_get_current_user] = lambda: admin_dict
+    # 业务表仍走 mock_db
+    test_app.dependency_overrides[deps_mod.get_db_dep] = lambda: mock_db
+    # admin/users 等 ORM 路由：get_session 直接被 ORM 路由用，必须也覆盖
+    test_app.dependency_overrides[get_session] = lambda: mock_db
+    # FastAPI Users 依赖（auth.instance 里定义的两个）
+    test_app.dependency_overrides[current_active_user] = lambda: orm_admin
+    test_app.dependency_overrides[current_superuser] = lambda: orm_admin
+    # deps.py 里 CurrentUser/SuperUserDep 是 import-time 别名，必须替换符号本身
+    deps_mod.CurrentUser = lambda: orm_admin
+    deps_mod.SuperUserDep = lambda: orm_admin
     test_app.dependency_overrides[require_admin] = lambda: admin_dict
 
     client = TestClient(test_app)
