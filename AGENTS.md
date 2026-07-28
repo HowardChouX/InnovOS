@@ -68,6 +68,15 @@ Database migrations that do data backfill, FK rewrites, or column type conversio
 - The `__del__` safety net on `_PostgresDatabase` catches leaks but is a last resort — explicit `close()` or `db_session()` is mandatory
 - Never do `db.execute()` after `db.commit()` without a good reason — prefer `RETURNING` clauses
 
+### Auth Boundary（FastAPI Users 迁移期）
+
+- **新代码必须用** `app.auth.instance.current_active_user` / `current_superuser`（返回 ORM User 实例）。
+- **旧代码兼容垫片** `app/_legacy_compat.py: get_current_user / require_admin` 仅供过渡期路由暂用，返回 dict。后续新业务路由不要引入。
+- `CurrentUser` / `SuperUserDep` 在 `app/api/deps.py` 是 `Annotated[Any, Depends(...)]` 类型别名，新路由直接 `user: CurrentUser` 即可。
+- **不要** 在路由里 `Depends(get_current_user)`（旧符号）后再访问 `.id` / `.email` 等 ORM 属性——会拿不到。
+- 改密码走 `app/api/profile.py:PUT /api/users/me/password`（基于 UserManager + pwdlib）；前端 `frontend/src/api/auth.ts` 提供 `forgotPassword / resetPassword` 方法。
+- 邮箱验证/重置邮件由 `app/services/email_service.py` 处理。开发环境建议用 Mailpit（`docker-compose.yml` 已有定义；当前不强制启动）。
+
 ## Database
 
 **PostgreSQL** `postgresql://innovos:innovos_secret@localhost:5432/innovos`. Configured in `backend/.env` via `DATABASE_URL`.
@@ -79,6 +88,7 @@ PostgreSQL only (SQLite phased out). `knowledge_vectors.embedding` is `vector(40
 - PG lowercase-izes unquoted SQL aliases: `AS activeCount` → `activecount` in results. Always use lowercase aliases.
 - `models` table uses SERIAL PRIMARY KEY `id`, with UNIQUE INDEX on `(provider_id, model_id)`
 - Timestamps stored as TEXT (`YYYY-MM-DD HH24:MI:SS`) for backward compat; prefer `TIMESTAMPTZ` in new columns.
+- **users 表 DDL 由 Alembic 管理**（`backend/alembic/versions/0001_users_fastapi_users_schema.py`）。`pg_schema.py:init_all_tables()` **不再** 创建 users 表。修改 users 表结构：新建 alembic revision，**不要** 在 `pg_schema.py` 加 DDL。
 
 ## Project Structure
 
@@ -87,26 +97,32 @@ backend/
   app/
     __init__.py
     main.py               # FastAPI entrypoint — logging config, router registration, startup hooks
-    auth.py               # JWT authentication
     database.py           # PostgreSQL connection pool (psycopg2, max 50) + db_session()
     middleware.py          # SecurityHeaders + RequestID + GlobalException
     rate_limit.py          # In-memory sliding window rate limiter
     logging_config.py     # Structured JSON logging
-    seed_data.py          # Idempotent seed_admin_user()
     utils.py              # Utility functions
-    api/                  # FastAPI routes (auth, knowledge, admin, sidebar, workflow, etc.)
-                          # auth.py, analysis.py, conversion.py, evaluation.py, feedback.py,
+    api/                  # FastAPI routes (knowledge, admin, sidebar, workflow, etc.)
+                          # profile.py, analysis.py, conversion.py, evaluation.py, feedback.py,
                           # kb_tools.py, knowledge.py, knowledge_bases.py, modeling.py, models.py,
                           # notifications.py, patents.py, sidebar.py, solutions.py, tasks.py,
-                          # users.py, workflow.py, workflow_steps/, deps.py
+                          # workflow.py, workflow_steps/, deps.py
                           # admin/ — knowledge.py, monitor.py, patent_db.py, providers.py,
                           #          settings.py, users.py
     algorithm/            # AI core: model_runtime, embedder, reranker, retriever, pipeline, key_manager
-    core/                 # Config, security (Pydantic settings, bcrypt)
-    crud/                 # Generic CRUD helpers
-    models/               # Pydantic models (user, feedback)
-    services/             # Business logic: knowledge_base_service, knowledge_item_service, job system, orchestration
-    tables/               # DB schema definitions (pg_schema.py — PostgreSQL only)
+    auth/                 # FastAPI Users 15.x 集成（参考：fastapi-users 库）
+                          # backend.py — CookieTransport + JWT strategy
+                          # schemas.py — Pydantic BaseUser/BaseUserCreate/BaseUserUpdate
+                          # users.py — UserManager + 同步 Session 适配器
+                          # instance.py — FastAPIUsers 实例与依赖工厂
+                          # exceptions.py — 异常→中文消息
+                          # seed.py — ORM 幂等首任超级用户种子
+                          # sync_db.py — 同步 SQLAlchemyUserDatabase 适配
+    core/                 # Config, security (Pydantic settings, pwdlib + pyjwt)
+    crud/                 # 通用 CRUD 辅助（已精简，多数场景走 ORM）
+    db/                   # users 表的 SQLAlchemy 2.0 ORM（仅认证层用）
+    services/             # 业务逻辑：knowledge_base_service, knowledge_item_service, job system, orchestration, email_service
+    tables/               # DB schema 定义（pg_schema.py — PostgreSQL only；users 表 DDL 由 Alembic 管理）
     data/                 # Static data (models.json, provider-models.json)
 frontend/
   src/
@@ -120,14 +136,20 @@ frontend/
 
 ## Key Architecture
 
+- **Auth: FastAPI Users 15.x**。使用 `fastapi-users[sqlalchemy]` + `fastapi-users-db-sqlalchemy`，统一管理注册、登录、邮箱验证、密码重置、JWT 签发与刷新、用户 CRUD。InnovOS 扩展字段（username/phone/role/token_version）通过 `app/db/models.py:User(SQLAlchemyBaseUserTable[int], Base)` 挂载。
+  - **同步 Session**：库默认使用 AsyncSession；InnovOS 全栈同步，在 `app/auth/sync_db.py` 自定义 `SyncSQLAlchemyUserDatabase` 适配器实现 `BaseUserDatabase` 接口。
+  - **JWT 策略**：`app/auth/strategy.py:InnovOSJWTStrategy(JWTStrategy)` 在 payload 中追加 `token_version`，read_token 时与 DB 对比——`token_version` 不一致即视为撤销。
+  - **Cookie 传输**：`__Host-token`（httpOnly + secure + sameSite=lax）；兼容旧端点。
+  - **Alembic 拥有 users 表 DDL**（`alembic/versions/0001_users_fastapi_users_schema.py`）：is_active INTEGER→BOOLEAN、is_superuser/is_verified 字段、email NOT NULL UNIQUE、username 改可空、phone 字段。
+  - **数据回填**：一次性的 `scripts/migrate_users_to_fastapi_users.py`（已执行并删除）。
+  - **兼容垫片**：`app/_legacy_compat.py` 与 `app/auth/__init__.py` 为尚未迁移的 25+ 路由提供旧符号（`get_current_user`/`require_admin`/`create_access_token` 等），用 `pyjwt` 实现。后续逐步替换为 FastAPI Users 的 `current_active_user`/`current_superuser`。
+- **Admin 模型**：真实 DB 用户（`is_superuser=True`），不再使用 id=0 幽灵用户。`.env` 中的 `INNOVOS_ADMIN_USER`（别名 `FIRST_SUPERUSER`）是种子邮箱，启动时由 `app/auth/seed.py:seed_first_superuser_if_configured()` 幂等创建/提升。
 - **Knowledge Base pipeline**: Upload → `KnowledgePipeline` (read + chunk + embed via Embedder) → `VectorStore` write via pgvector. Orchestrated by async job system (`KnowledgeJobManager`). Supports async file processing with retry and exponential backoff.
 - **Job system**: 5 job types in `backend/app/services/knowledge_jobs/` — `prepare-root`, `index-documents`, `check-file-processing-result`, `delete-subtree`, `reindex-subtree`. Enqueued with idempotency keys, retry 3x with exponential backoff. Error callbacks on all async tasks.
 - **Model registry**: `backend/app/algorithm/model_registry.py` loads 2600+ model entries lazily on first access. Capabilities (embedding, rerank, chat) determined by registry lookup → regex inference fallback.
 - **Model config resolution**: 3-tier fallback — knowledge-base-level → global system settings → first available provider.
 - **API Key management**: Provider-based architecture (inspired by CherryStudio). Keys loaded from environment variables (`AI_{PROVIDER_ID}_API_KEY`), pooled with per-provider round-robin + rate limiting. No database encryption.
-- **Auth**: JWT tokens (24h expiry), bcrypt password hashing. Production requires `INNOVOS_JWT_SECRET` env var. Password minimum 8 characters.
-- **JWT Token Version**: `users` table has a `token_version` column (INTEGER DEFAULT 0). Each JWT includes `token_version` in its payload. On each authenticated request, `deps.py:get_current_user()` compares the token's version with the DB value — if they differ, the token is rejected as revoked. Admin revocations call `UPDATE users SET token_version = token_version + 1 WHERE id = ?` to invalidate all existing tokens.
-- **Admin seeding**: Idempotent — `seed_admin_user()` creates admin only if none exists. Credentials from `INNOVOS_ADMIN_USER`/`INNOVOS_ADMIN_PASSWORD` env vars (default: auto-generated random password logged at startup).
+- **JWT Token Version**: `users` 表的 `token_version` 列（INTEGER DEFAULT 0）。每个 JWT payload 含 `token_version`；read_token 时与 DB 对比——不一致即拒绝。管理员撤销：`UPDATE users SET token_version = token_version + 1` 使所有旧 token 失效。
 
 ## Security Features
 
