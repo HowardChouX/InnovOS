@@ -351,7 +351,7 @@ app_.include_router(
 | `POST /api/auth/login` | `POST /api/auth/jwt/login` | FastAPI Users 标准路径，`OAuth2PasswordRequestForm` |
 | `POST /api/auth/logout` | `POST /api/auth/jwt/logout` | |
 | `GET /api/auth/me` | `GET /api/users/me` | 移到 users router |
-| `PUT /api/users/me/password` | `POST /api/auth/reset-password` | 或保留 custom 改密 |
+| `PUT /api/users/me/password` | 保留 custom 改密端点 | 用户自助改密（需当前密码）走 custom 路由；忘记密码走 FastAPI Users 的 `/api/auth/reset-password` |
 | - | `POST /api/auth/forgot-password` | 新增 |
 | - | `POST /api/auth/request-verify-token` | 新增 |
 | - | `POST /api/auth/verify` | 新增 |
@@ -561,9 +561,13 @@ export const authApi = {
   },
 
   login(email: string, password: string) {
+    // FastAPI Users 用 OAuth2PasswordRequestForm，需 form-urlencoded
+    const form = new URLSearchParams();
+    form.append('username', email);  // 字段名是 username，值是邮箱
+    form.append('password', password);
     return apiRequest<AuthResponse>('/api/auth/jwt/login', {
       method: 'POST',
-      body: JSON.stringify({ username: email, password }),
+      body: form,
     });
   },
 
@@ -599,7 +603,7 @@ export const authApi = {
 };
 ```
 
-**注意**：FastAPI Users 的登录端点用 `OAuth2PasswordRequestForm`，字段名是 `username`/`password`（表单字段，非 JSON body）。前端需用 `application/x-www-form-urlencoded` 发送，`username` 字段填邮箱值。这是一处需要特别注意的契约差异。
+**注意**：FastAPI Users 的登录端点用 `OAuth2PasswordRequestForm`，字段名是 `username`/`password`（表单字段，非 JSON body）。前端需用 `URLSearchParams` 生成 `application/x-www-form-urlencoded` body，`username` 字段填邮箱值。现有 `client.ts` 的 `buildHeaders` 只对 string body 设 JSON content-type，对 `URLSearchParams` body 不设 content-type，由浏览器自动设置正确的 form content-type，无需改动 `client.ts`。
 
 ### 9.2 AuthUser 类型改动
 
