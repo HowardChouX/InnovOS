@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
-import { Eye, EyeOff, User, Lock } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 
 export function LoginPage() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
@@ -15,7 +15,7 @@ export function LoginPage() {
     e.preventDefault();
     setError('');
     try {
-      await login(username, password);
+      await login(email, password);
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : '登录失败');
@@ -49,16 +49,19 @@ export function LoginPage() {
             </div>
           )}
 
-          {/* Username */}
+          {/* Email */}
           <div>
-            <label className="text-sm text-slate-400 mb-1 block">用户名</label>
+            <label className="text-sm text-slate-400 mb-1 block">邮箱</label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
-                placeholder="输入用户名"
+                placeholder="you@example.com"
+                autoComplete="email"
               />
             </div>
           </div>
@@ -70,11 +73,13 @@ export function LoginPage() {
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type={showPw ? 'text' : 'password'}
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 minLength={8}
                 className="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-10 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
                 placeholder="输入密码"
+                autoComplete="current-password"
               />
               <button
                 type="button"
@@ -84,6 +89,16 @@ export function LoginPage() {
                 {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+          </div>
+
+          {/* Forgot password */}
+          <div className="text-right -mt-1">
+            <Link
+              to="/forgot-password"
+              className="text-xs text-slate-400 hover:text-cyan-400 transition-colors"
+            >
+              忘记密码？
+            </Link>
           </div>
 
           {/* Submit */}

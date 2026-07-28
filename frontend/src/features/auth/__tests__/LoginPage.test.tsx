@@ -14,11 +14,12 @@ describe('LoginPage', () => {
     expect(screen.getByText('创新智能操作系统')).toBeInTheDocument();
   });
 
-  it('renders login form with username input', () => {
+  it('renders login form with email input', () => {
     renderWithRouter(<LoginPage />);
-    const usernameInput = screen.getByPlaceholderText('输入用户名');
-    expect(usernameInput).toBeInTheDocument();
-    expect(usernameInput).toHaveAttribute('placeholder', '输入用户名');
+    const emailInput = screen.getByPlaceholderText('you@example.com');
+    expect(emailInput).toBeInTheDocument();
+    expect(emailInput).toHaveAttribute('type', 'email');
+    expect(emailInput).toBeRequired();
   });
 
   it('renders login form with password input', () => {
@@ -39,5 +40,12 @@ describe('LoginPage', () => {
     const registerLink = screen.getByText('注册');
     expect(registerLink).toBeInTheDocument();
     expect(registerLink).toHaveAttribute('href', '/register');
+  });
+
+  it('renders forgot password link', () => {
+    renderWithRouter(<LoginPage />);
+    const forgotLink = screen.getByText('忘记密码？');
+    expect(forgotLink).toBeInTheDocument();
+    expect(forgotLink).toHaveAttribute('href', '/forgot-password');
   });
 });

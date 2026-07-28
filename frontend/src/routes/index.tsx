@@ -7,6 +7,8 @@ import { lazyPage } from '../components/common/LazyPage';
 const DashboardPage = lazyPage(() => import('../features/dashboard/DashboardPage'));
 const LoginPage = lazyPage(() => import('../features/auth/LoginPage'));
 const RegisterPage = lazyPage(() => import('../features/auth/RegisterPage'));
+const ForgotPasswordPage = lazyPage(() => import('../features/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazyPage(() => import('../features/auth/ResetPasswordPage'));
 const PlaceholderPage = lazyPage(() => import('../features/PlaceholderPage'));
 const PatentSearchPage = lazyPage(() => import('../features/patents/PatentSearchPage'));
 const KnowledgeBasePage = lazyPage(() => import('../features/knowledge/KnowledgeBasePage'));
@@ -19,10 +21,17 @@ const PatentConversionPage = lazyPage(
 const GuidePage = lazyPage(() => import('../features/guide/GuidePage'));
 const ProfilePage = lazyPage(() => import('../features/profile/ProfilePage'));
 const NotFoundPage = lazyPage(() => import('../features/NotFoundPage'));
+const DemandMockPage = lazyPage(() => import('../features/workflow/DemandMockPage'));
+const ProblemDefinitionMockPage = lazyPage(() => import('../features/workflow/ProblemDefinitionMockPage'));
+const SolutionMockPage = lazyPage(() => import('../features/workflow/SolutionMockPage'));
+const EvaluationMockPage = lazyPage(() => import('../features/workflow/EvaluationMockPage'));
+const VideoDisplayMockPage = lazyPage(() => import('../features/workflow/VideoDisplayMockPage'));
 
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  { path: '/reset-password', element: <ResetPasswordPage /> },
   {
     path: '/',
     element: <ProtectedRoute />,
@@ -35,12 +44,12 @@ export const routes: RouteObject[] = [
           { path: 'knowledge', element: <KnowledgeBasePage /> },
           { path: 'history', element: <PatentConversionPage /> },
           { path: 'history-solutions', element: <PatentConversionPage /> },
-          { path: 'workflow/demand', element: <PlaceholderPage title="需求分析" /> },
-          { path: 'workflow/problem', element: <PlaceholderPage title="问题定义" /> },
-          { path: 'workflow/solution', element: <PlaceholderPage title="方案生成" /> },
-          { path: 'workflow/evaluation', element: <PlaceholderPage title="方案评估" /> },
-          { path: 'workflow/video', element: <PlaceholderPage title="视频展示" /> },
-          { path: 'workflow/modeling', element: <PlaceholderPage title="问题定义" /> },
+          { path: 'workflow/demand', element: <DemandMockPage /> },
+          { path: 'workflow/problem', element: <ProblemDefinitionMockPage /> },
+          { path: 'workflow/modeling', element: <ProblemDefinitionMockPage /> },
+          { path: 'workflow/solution', element: <SolutionMockPage /> },
+          { path: 'workflow/evaluation', element: <EvaluationMockPage /> },
+          { path: 'workflow/video', element: <VideoDisplayMockPage /> },
           { path: 'guide', element: <GuidePage /> },
           { path: 'profile', element: <ProfilePage /> },
           {

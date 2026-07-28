@@ -1,49 +1,51 @@
 import { create } from 'zustand';
-import { authApi } from '../api/auth';
-
-interface User {
-  id: number;
-  username: string;
-  email: string;
-  role: string;
-  created_at: string;
-}
+import { authApi, AuthUser } from '../api/auth';
 
 interface AuthStore {
-  user: User | null;
+  user: AuthUser | null;
   loading: boolean;
   isAdmin: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string) => Promise<void>;
+  /** 邮箱密码登录 */
+  login: (email: string, password: string) => Promise<void>;
+  /** 注册：email + password + 可选 phone/username */
+  register: (
+    email: string,
+    password: string,
+    phone?: string,
+    username?: string,
+  ) => Promise<void>;
   logout: () => Promise<void>;
   init: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthStore>((set) => ({
+export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
   loading: true,
   isAdmin: false,
 
   init: async () => {
     try {
-      // httpOnly cookie is sent automatically by the browser
+      // httpOnly cookie 由浏览器自动发送
       const user = await authApi.me();
-      set({ user, isAdmin: user.role === 'admin', loading: false });
-    } catch (e) {
-      console.error('[useAuthStore] init failed:', e);
+      set({ user, isAdmin: user.isSuperuser, loading: false });
+    } catch {
+      // 401 是预期路径（未登录）
       set({ user: null, isAdmin: false, loading: false });
     }
   },
 
-  login: async (username, password) => {
-    const res = await authApi.login(username, password);
-    // httpOnly cookie is managed by the browser
-    set({ user: res.user, isAdmin: res.user.role === 'admin' });
+  login: async (email, password) => {
+    await authApi.login(email, password);
+    // 登录后拉取最新用户信息
+    const user = await authApi.me();
+    set({ user, isAdmin: user.isSuperuser });
   },
 
-  register: async (username, password) => {
-    const res = await authApi.register(username, password);
-    set({ user: res.user, isAdmin: res.user.role === 'admin' });
+  register: async (email, password, phone, username) => {
+    const user = await authApi.register({ email, password, phone, username });
+    // 注册成功后用户未登录（FastAPI Users 默认行为），需要再登录拿 cookie
+    await get().login(email, password);
+    // 修正：login 内部会重设 user，这里不需要 set
   },
 
   logout: async () => {
