@@ -39,13 +39,15 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         self, user: User, token: str,
         request: Optional[Request] = None,
     ):
-        pass  # Phase 3 接入邮件服务
+        from app.services.email_service import email_service
+        email_service.send_reset_password_email_sync(user, token, request)
 
     async def on_after_request_verify(
         self, user: User, token: str,
         request: Optional[Request] = None,
     ):
-        pass  # Phase 3 接入邮件服务
+        from app.services.email_service import email_service
+        email_service.send_verification_email_sync(user, token, request)
 
     async def on_after_verify(
         self, user: User, request: Optional[Request] = None
