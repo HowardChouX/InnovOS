@@ -224,7 +224,49 @@ async def shutdown():
     logger.info("Shutdown complete")
 
 
-app_.include_router(auth.router)
+# ── FastAPI Users 路由 ──────────────────────────────────
+from app.auth.backend import auth_backend
+from app.auth.exceptions import fastapi_users_exception_handler
+from app.auth.instance import fastapi_users
+from app.auth.schemas import UserCreate, UserRead, UserUpdate
+from fastapi_users.exceptions import (
+    InvalidPasswordException,
+    InvalidResetPasswordToken,
+    InvalidVerifyToken,
+    UserAlreadyExists,
+    UserAlreadyVerified,
+    UserInactive,
+    UserNotExists,
+)
+
+app_.include_router(
+    fastapi_users.get_auth_router(auth_backend),
+    prefix="/api/auth/jwt", tags=["auth"],
+)
+app_.include_router(
+    fastapi_users.get_register_router(UserRead, UserCreate),
+    prefix="/api/auth", tags=["auth"],
+)
+app_.include_router(
+    fastapi_users.get_reset_password_router(),
+    prefix="/api/auth", tags=["auth"],
+)
+app_.include_router(
+    fastapi_users.get_verify_router(UserRead),
+    prefix="/api/auth", tags=["auth"],
+)
+app_.include_router(
+    fastapi_users.get_users_router(UserRead, UserUpdate),
+    prefix="/api/users", tags=["users"],
+)
+# 注册 FastAPI Users 异常 handler
+for exc in (
+    UserAlreadyExists, UserNotExists, UserInactive,
+    UserAlreadyVerified, InvalidVerifyToken,
+    InvalidResetPasswordToken, InvalidPasswordException,
+):
+    app_.add_exception_handler(exc, fastapi_users_exception_handler)
+
 app_.include_router(tasks.router)
 app_.include_router(analysis.router)
 app_.include_router(patents.router)

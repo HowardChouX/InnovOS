@@ -6,6 +6,7 @@
 from app._legacy_auth import (
     ACCESS_TOKEN_EXPIRE_HOURS,
     SECRET_KEY as _SECRET_KEY,
+    _verify_admin_credentials,
     clear_token_cookie,
     create_access_token,
     get_current_user,
@@ -16,10 +17,13 @@ from app._legacy_auth import (
 from app.auth.schemas import UserCreate, UserRead, UserUpdate
 
 __all__ = [
+    "ACCESS_TOKEN_EXPIRE_MINUTES",
     "ACCESS_TOKEN_EXPIRE_HOURS",
+    "SECRET_KEY",
     "UserCreate",
     "UserRead",
     "UserUpdate",
+    "_verify_admin_credentials",
     "clear_token_cookie",
     "create_access_token",
     "get_current_user",
