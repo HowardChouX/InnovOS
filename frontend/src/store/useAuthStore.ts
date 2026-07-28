@@ -27,7 +27,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       // httpOnly cookie 由浏览器自动发送
       const user = await authApi.me();
-      set({ user, isAdmin: user.isSuperuser, loading: false });
+      set({ user, isAdmin: user.is_superuser, loading: false });
     } catch {
       // 401 是预期路径（未登录）
       set({ user: null, isAdmin: false, loading: false });
@@ -38,7 +38,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     await authApi.login(email, password);
     // 登录后拉取最新用户信息
     const user = await authApi.me();
-    set({ user, isAdmin: user.isSuperuser });
+    set({ user, isAdmin: user.is_superuser });
   },
 
   register: async (email, password, phone, username) => {

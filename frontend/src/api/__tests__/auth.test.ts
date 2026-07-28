@@ -5,7 +5,7 @@ describe('authApi', () => {
     vi.restoreAllMocks();
   });
 
-  it('login posts username=email to /api/auth/jwt/login', async () => {
+  it('login posts FormData (OAuth2 form) to /api/auth/jwt/login', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 204,
@@ -18,11 +18,12 @@ describe('authApi', () => {
 
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/auth/jwt/login'),
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ username: 'user@example.com', password: 'pass1234' }),
-      }),
+      expect.objectContaining({ method: 'POST' }),
     );
+    const body = mockFetch.mock.calls[0][1].body as FormData;
+    expect(body).toBeInstanceOf(FormData);
+    expect(body.get('username')).toBe('user@example.com');
+    expect(body.get('password')).toBe('pass1234');
   });
 
   it('register posts email + password + optional fields to /api/auth/register', async () => {

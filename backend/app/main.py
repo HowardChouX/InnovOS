@@ -105,7 +105,23 @@ async def rate_limit_middleware(request: Request, call_next):
 @app_.on_event("startup")
 async def startup():
     """启动时初始化数据库、初始化模型注册表、知识库作业系统 + 专利向量表"""
-    # 1. 初始化数据库表
+    # 1. 应用 Alembic 迁移（DDL 真源；包括 users 表的 FastAPI Users 字段）
+    try:
+        from alembic.config import Config
+        from alembic import command
+
+        alembic_cfg = Config("alembic.ini")
+        # 强制用当前 settings 的 DATABASE_URL 覆盖 alembic.ini 里的空值
+        from app.core.config import settings
+        if settings.DATABASE_URL:
+            alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+        await asyncio.to_thread(command.upgrade, alembic_cfg, "head")
+        logger.info("Alembic 迁移已应用至 head")
+    except Exception as e:
+        logger.error(f"Alembic 迁移失败: {e}")
+        raise
+
+    # 2. 初始化数据库表（非 users 表的 DDL 兜底；向后兼容老部署）
     try:
         from app.database import init_db
 

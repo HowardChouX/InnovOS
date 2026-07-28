@@ -20,9 +20,10 @@ export interface AuthUser {
   username?: string | null;
   phone?: string | null;
   role: string;
-  isActive: boolean;
-  isSuperuser: boolean;
-  isVerified: boolean;
+  // FastAPI Users 默认 Pydantic 是 snake_case 而非驼峰
+  is_active: boolean;
+  is_superuser: boolean;
+  is_verified: boolean;
 }
 
 export const authApi = {
@@ -39,11 +40,14 @@ export const authApi = {
     });
   },
 
-  /** 登录：FastAPI Users 把登录字段统一命名为 "username"（我们传 email） */
+  /** 登录：FastAPI Users 端点用 OAuth2PasswordRequestForm（form-urlencoded，不是 JSON） */
   login(email: string, password: string): Promise<void> {
+    const form = new FormData();
+    form.append('username', email);
+    form.append('password', password);
     return apiRequest<void>('/api/auth/jwt/login', {
       method: 'POST',
-      body: JSON.stringify({ username: email, password }),
+      body: form,
     });
   },
 
