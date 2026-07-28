@@ -48,6 +48,28 @@ services:
         max-size: '10m'
         max-file: '3'
 
+  # ─── Mailpit (dev email capture, optional) ──────────────────
+  # 默认不强制启动；如需使用：
+  #   docker compose --profile mail up mailpit
+  #   然后把 .env 中 SMTP_HOST=mailpit SMTP_PORT=1025
+  mailpit:
+    image: axllent/mailpit:latest
+    profiles: ['mail']
+    ports:
+      - '8025:8025'   # Web UI
+      - '1025:1025'   # SMTP
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.2'
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
   # ─── MinIO (S3-compatible object storage) ────────────────────
   minio:
     image: minio/minio:latest
