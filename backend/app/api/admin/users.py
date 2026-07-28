@@ -91,7 +91,7 @@ def update_user(
             db.commit()
 
         row = db.execute(
-            "SELECT id, email, username, phone, role, is_active FROM users WHERE id=?",
+            "SELECT id, email, username, phone, role, is_active, is_superuser FROM users WHERE id=?",
             (user_id,),
         ).fetchone()
         return {
@@ -102,6 +102,7 @@ def update_user(
                 "phone": row.get("phone") or "",
                 "role": row.get("role") or "user",
                 "isActive": bool(row.get("is_active", 0)),
+                "isSuperuser": bool(row.get("is_superuser", False)),
             },
             "message": "success",
             "code": 200,

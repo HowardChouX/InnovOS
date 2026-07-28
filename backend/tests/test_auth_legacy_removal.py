@@ -85,3 +85,29 @@ class TestUpdateUserSyncsSuperuser:
         assert row["is_superuser"] is False, (
             "role 改为 user 后 is_superuser 必须同步为 False"
         )
+
+    def test_no_role_leaves_is_superuser_unchanged(self, mock_db, orm_admin):
+        """body 不含 role 时（仅改 is_active），is_superuser 与 role 必须保持不变。"""
+        from app.api.admin.users import UpdateUserInput, update_user
+
+        mock_db.add_row(
+            "users",
+            username="carol",
+            email="carol@x.com",
+            hashed_password="hashed",
+            role="admin",
+            is_active=1,
+            is_superuser=True,
+        )
+
+        with patch("app.database.get_db", return_value=mock_db):
+            result = update_user(
+                user_id=1, body=UpdateUserInput(is_active=False), _admin=orm_admin
+            )
+
+        assert result["code"] == 200
+        row = mock_db._table("users")[1]
+        assert row["role"] == "admin"
+        assert row["is_superuser"] is True, (
+            "未传 role 时 is_superuser 不应被改动"
+        )
