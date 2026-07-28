@@ -1,104 +1,22 @@
 """
-FastAPI dependencies — psycopg2-based auth & DB injection.
+FastAPI dependencies - 兼容垫片。
 
-  SessionDep    = Annotated[Any, Depends(get_db_dep)]
-  CurrentUser   = Annotated[User, Depends(get_current_user)]
-  SuperUserDep  = Annotated[User, Depends(get_current_superuser)]
+- SessionDep: 业务表用 psycopg2（保持不变）
+- CurrentUser/SuperUserDep: 指向 FastAPI Users 依赖（认证用）
+
+注意：deps.py 中旧的 get_current_user/get_current_superuser 函数（基于 psycopg2 + JWT）
+已被 FastAPI Users 替代，保留为仅做向后兼容垫片，业务路由将逐步迁移。
 """
-
 from typing import Annotated, Any
 
-from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
-from pydantic import ValidationError
+from fastapi import Depends
 
-from app.core.config import settings
-from app.core.security import ALGORITHM
+from app.auth.instance import current_active_user, current_superuser
 from app.database import get_db_dep
-from app.models.user import TokenPayload, User
 
+# 业务表仍用 psycopg2
 SessionDep = Annotated[Any, Depends(get_db_dep)]
 
-reusable_oauth2 = HTTPBearer(auto_error=False)
-
-
-def _extract_token(
-    credentials: HTTPAuthorizationCredentials | None,
-    request: Request,
-) -> str | None:
-    """Extract JWT from Bearer header first, fallback to httpOnly cookie."""
-    if credentials:
-        return credentials.credentials
-    # Cookie fallback — httpOnly 'token' cookie set by login/register
-    return request.cookies.get("__Host-token")
-
-
-def get_current_user(
-    db: SessionDep,
-    request: Request,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(reusable_oauth2)],
-) -> User:
-    """Decode JWT → resolve User from DB.
-
-    Supports both `Authorization: Bearer <token>` header and the httpOnly `token` cookie.
-    Admin users (user_id=0, env-based) are returned as a light User object.
-    Regular users are fetched from the `users` table via raw SQL.
-    """
-    token = _extract_token(credentials, request)
-    if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="未登录")
-
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-        token_data = TokenPayload(**payload)
-    except (JWTError, ValidationError):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="无效的登录凭证",
-        ) from None
-
-    # Admin user (user_id=0 or sub="0", validated against .env)
-    role = token_data.role or payload.get("role", "user")
-    uid_str = token_data.sub or str(payload.get("user_id", ""))
-    token_version = payload.get("token_version", 0)
-    if role == "admin" and uid_str == "0":
-        if token_version != 0:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="令牌已被撤销")
-        return User(
-            id=0,
-            username=payload.get("username", "admin"),
-            password_hash="",
-            role="admin",
-            created_at="",
-        )
-
-    # Regular user — support both `sub` (template) and `user_id` (legacy) claims
-    user_id_str: str | None = token_data.sub or payload.get("user_id")
-    if user_id_str is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的令牌")
-    row = db.execute("SELECT * FROM users WHERE id=?", (int(user_id_str),)).fetchone()
-    if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
-    user = User(**row)
-    if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="用户已被禁用")
-    if user.token_version != token_version:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="令牌已被撤销")
-    return user
-
-
-CurrentUser = Annotated[User, Depends(get_current_user)]
-
-
-def get_current_superuser(current_user: CurrentUser) -> User:
-    """Require admin role (env-based admin or DB superuser)."""
-    if current_user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="需要管理员权限",
-        )
-    return current_user
-
-
-SuperUserDep = Annotated[User, Depends(get_current_superuser)]
+# 认证依赖（别名）
+CurrentUser = current_active_user
+SuperUserDep = current_superuser
