@@ -121,16 +121,13 @@ async def startup():
     await asyncio.to_thread(model_registry.load)
     logger.info("模型注册表已加载")
 
-    # 3. 注入 admin 用户记录（id=0），确保 FK 约束对 env 管理员可用
+    # 3. 注入首任超级用户（仅当 .env 提供 FIRST_SUPERUSER 时执行；幂等）
     try:
-        from app.tables.pg_schema import seed_admin_user
+        from app.auth.seed import seed_first_superuser_if_configured
 
-        db = get_db()
-        seed_admin_user(db)
-        db.close()
-        logger.info("管理员用户记录已确保存在")
+        await asyncio.to_thread(seed_first_superuser_if_configured)
     except Exception as e:
-        logger.warning(f"注入管理员用户失败（非致命）: {e}")
+        logger.warning(f"首任超级用户种子失败（非致命）: {e}")
 
     # 4. 自动种子化有环境变量 API Key 的内置供应商
     try:

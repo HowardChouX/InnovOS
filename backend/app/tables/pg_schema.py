@@ -48,55 +48,6 @@ def _ensure_columns(db, table: str, columns: list[tuple[str, str]]):
 # ═══════════════════════════════════════════════════════════════
 
 
-def init_users(db):
-    pk = _ddl_int_pk()
-    now = _ddl_now()
-    db.execute(f"""
-        CREATE TABLE IF NOT EXISTS users (
-            id {pk},
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            role TEXT DEFAULT 'user',
-            email TEXT DEFAULT '',
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT DEFAULT ({now})
-        );
-    """)
-    _ensure_columns(
-        db,
-        "users",
-        [
-            ("role", "TEXT DEFAULT 'user'"),
-            ("email", "TEXT DEFAULT ''"),
-            ("is_active", "INTEGER DEFAULT 1"),
-        ],
-    )
-    _ensure_columns(
-        db,
-        "users",
-        [
-            ("token_version", "INTEGER DEFAULT 0"),
-        ],
-    )
-
-
-def seed_admin_user(db):
-    """注入一条 id=0 的管理员记录，确保 FK 约束（tasks.user_id→users.id）对 env 管理员可用。
-
-    仅在首次启动时执行一次，后续 on conflict 跳过。
-    """
-    from app.core.config import settings
-
-    username = settings.FIRST_SUPERUSER or "admin"
-    db.execute(
-        """INSERT INTO users (id, username, password_hash, role, email, is_active, created_at)
-           VALUES (0, ?, '', 'admin', '', 1, to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))
-           ON CONFLICT (id) DO NOTHING""",
-        (username,),
-    )
-    db.commit()
-
-
 def init_tasks(db):
     pk = _ddl_int_pk()
     now = _ddl_now()
@@ -586,13 +537,15 @@ def init_model_providers(db):
 
 
 def init_all_tables(db):
-    """按依赖顺序初始化所有表。"""
+    """按依赖顺序初始化所有表。
+
+    注意：users 表的 DDL 改由 Alembic 迁移管理（见 alembic/versions/0001_users_fastapi_users_schema.py），
+    此处不再创建。admin 用户的种子数据由 seed_first_superuser_if_configured() 单独处理。
+    """
     logger.info("Initializing PostgreSQL schema...")
     # pgvector 扩展必须最先创建
     db.execute("CREATE EXTENSION IF NOT EXISTS vector;")
     logger.info("pgvector extension ready")
-    init_users(db)
-    _ensure_columns(db, "users", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
     init_tasks(db)
     init_analyses(db)
     _ensure_columns(db, "analyses", [("created_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
