@@ -84,6 +84,15 @@ class Settings(BaseSettings):
     # ── PatentHub 专利API（主数据源）──
     PATENT_HUB_TOKEN: str = ""
 
+    # ── 邮件（SMTP）──
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = "noreply@innovos.local"
+    SMTP_TLS: bool = True
+    SMTP_SSL: bool = False
+
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value and value == "changethis":
             msg = f'The value of {var_name} is "changethis", for security, please change it.'
