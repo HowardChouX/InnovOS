@@ -4,9 +4,9 @@ from typing import Optional
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, IntegerIDMixin
 from fastapi_users.exceptions import InvalidPasswordException
-from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 
 from app.audit import log_audit
+from app.auth.sync_db import SyncSQLAlchemyUserDatabase
 from app.core.config import settings
 from app.db.models import User
 from app.db.session import get_session
@@ -61,7 +61,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
 
 
 async def get_user_db(session=Depends(get_session)):
-    yield SQLAlchemyUserDatabase(session, User)
+    yield SyncSQLAlchemyUserDatabase(session, User)
 
 
 async def get_user_manager(user_db=Depends(get_user_db)):
