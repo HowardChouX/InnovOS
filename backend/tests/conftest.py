@@ -158,3 +158,12 @@ def mock_db_all_providers(monkeypatch, sample_provider_rows):
     # models.py 使用 from app.database import get_db（本地引用），需要单独 patch
     monkeypatch.setattr("app.api.models.get_db", lambda: mock_conn)
     return mock_conn
+
+
+# ── OTP 测试基础设施 ──
+@pytest.fixture(autouse=True)
+def _otp_pepper(monkeypatch):
+    """在 production 测试中要求 OTP_PEPPER；统一注入测试值以避免 4 处重复。"""
+    monkeypatch.setenv("INNOVOS_OTP_PEPPER", "test-pepper")
+    # 兼容 Pydantic Settings 已缓存的 settings 单例：同时清环境使下一次 Settings() 重读
+    os.environ["INNOVOS_OTP_PEPPER"] = "test-pepper"

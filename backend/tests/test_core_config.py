@@ -92,6 +92,13 @@ class TestSettingsDefaults:
         assert s.S3_BUCKET == "innovos-files"
         assert s.S3_REGION == "us-east-1"
 
+    def test_otp_defaults_present(self):
+        s = Settings()
+        assert s.OTP_TTL_SECONDS == 600
+        assert s.OTP_MAX_ATTEMPTS == 5
+        assert s.OTP_RESEND_COOLDOWN == 60
+        assert s.EMAIL_OTP_SOFT_FAIL is False
+
 
 class TestSettingsEnvAliases:
     """Settings should accept values via alternative env variable names."""

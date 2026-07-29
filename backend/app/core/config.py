@@ -93,6 +93,13 @@ class Settings(BaseSettings):
     SMTP_TLS: bool = True
     SMTP_SSL: bool = False
 
+    # ── Email OTP 验证 ──
+    OTP_TTL_SECONDS: int = 600
+    OTP_MAX_ATTEMPTS: int = 5
+    OTP_RESEND_COOLDOWN: int = 60
+    OTP_PEPPER: str = Field(default="", validation_alias=AliasChoices("INNOVOS_OTP_PEPPER", "OTP_PEPPER"))
+    EMAIL_OTP_SOFT_FAIL: bool = False
+
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value and value == "changethis":
             msg = f'The value of {var_name} is "changethis", for security, please change it.'
@@ -127,6 +134,8 @@ class Settings(BaseSettings):
                     "BACKEND_CORS_ORIGINS must be configured in production. "
                     "Set to ['https://yourdomain.com'] or configure nginx to handle CORS."
                 )
+            if not self.OTP_PEPPER:
+                raise ValueError("OTP_PEPPER must be set in production")
         return self
 
 
