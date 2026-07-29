@@ -3,10 +3,6 @@
 Uses a lightweight SQLite-backed fake DB (psycopg2-compatible cursor API)
 so the service's raw SQL can be exercised without PostgreSQL. Patches
 ``app.database.get_db`` so ``db_session()`` yields the fake.
-
-Per CLAUDE.md, the test helper ``_make_user`` accepts a ``client``
-parameter (kept to avoid linter warnings) and only the canonical
-``None`` value is used.
 """
 from __future__ import annotations
 
