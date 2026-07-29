@@ -8,6 +8,10 @@ Pytest 配置 — 为所有测试自动隔离数据库依赖。
 - 提供 client fixture 用于 API 测试
 """
 import os
+
+# 在 app.core.config.settings 实例化前注入 OTP_PEPPER，确保单例创建时即拿到测试值
+os.environ.setdefault("INNOVOS_OTP_PEPPER", "test-pepper")
+
 import sys
 import json
 import pytest
@@ -162,8 +166,9 @@ def mock_db_all_providers(monkeypatch, sample_provider_rows):
 
 # ── OTP 测试基础设施 ──
 @pytest.fixture(autouse=True)
-def _otp_pepper(monkeypatch):
-    """在 production 测试中要求 OTP_PEPPER；统一注入测试值以避免 4 处重复。"""
-    monkeypatch.setenv("INNOVOS_OTP_PEPPER", "test-pepper")
-    # 兼容 Pydantic Settings 已缓存的 settings 单例：同时清环境使下一次 Settings() 重读
-    os.environ["INNOVOS_OTP_PEPPER"] = "test-pepper"
+def _otp_pepper():
+    """INNOVOS_OTP_PEPPER 已在 conftest 模块顶部注入（os.environ.setdefault），
+
+    此 fixture 仅作为文档标记存在：所有测试自动获得 'test-pepper' 值，
+    无需各测试文件单独设置。"""
+    yield
