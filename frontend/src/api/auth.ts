@@ -92,4 +92,28 @@ export const authApi = {
       body: JSON.stringify({ token }),
     });
   },
+
+  /** 请求邮箱验证码（6 位 OTP） */
+  requestEmailOtp(email: string): Promise<{ expires_in: number; next_resend_in: number }> {
+    return apiRequest('/api/auth/email-verifications/request', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  /** 重发邮箱验证码 */
+  resendEmailOtp(email: string): Promise<{ expires_in: number; next_resend_in: number }> {
+    return apiRequest('/api/auth/email-verifications/resend', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  /** 验证邮箱验证码 */
+  verifyEmailOtp(email: string, code: string): Promise<{ verified: boolean; already?: boolean }> {
+    return apiRequest('/api/auth/email-verifications/verify', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    });
+  },
 };
