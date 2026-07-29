@@ -282,8 +282,8 @@ class TestInitDB:
         monkeypatch.setattr("app.tables.pg_schema.init_all_tables", mock_init_all)
         init_db()
         mock_init_all.assert_called_once_with(mock_db)
-        mock_db.commit.assert_called_once()
-        mock_db.close.assert_called_once()
+        assert mock_db.commit.call_count == 2  # init_all_tables 提交 + purge_expired 提交
+        assert mock_db.close.call_count == 2  # 对应的两次 close
 
     def test_init_db_rollback_on_failure(self, monkeypatch):
         mock_db = MagicMock(spec=_PostgresDatabase)
