@@ -436,6 +436,44 @@ def test_verify_wrong_code_increments_attempts_persisted(fake_db: _FakeDB, monke
     # 如需完全验证回滚语义，需真实 PG 覆盖。
 
 
+def test_5_wrong_attempts_exhaust(fake_db: _FakeDB, monkeypatch: pytest.MonkeyPatch) -> None:
+    """5 次错误码后 CodeExhausted，第 6 次直接 CodeExpired（已作废）。"""
+    import pytest as _pytest
+
+    from app.exceptions.email_verification import CodeExhausted, CodeExpired, CodeInvalid
+    from app.services.email_verification_service import email_verification_service as ev
+    from app.services.email_service import email_service
+
+    class _Stub:
+        def __init__(self) -> None:
+            self.code: str = ""
+
+        def send_verification_otp_sync(self, user, code, request=None) -> None:
+            self.code = code
+
+    stub = _Stub()
+    monkeypatch.setattr(
+        email_service, "send_verification_otp_sync", stub.send_verification_otp_sync, raising=False
+    )
+
+    user_id = _make_user(None, fake_db, email="e5@x.com")
+    user_obj = MagicMock()
+    user_obj.id = user_id
+    user_obj.email = "e5@x.com"
+    ev.issue_for_user(user_obj)
+
+    # 前 4 次错误码 -> CodeInvalid（attempts 1->4）
+    for i in range(4):
+        with _pytest.raises(CodeInvalid):
+            ev.verify("e5@x.com", "000000")
+    # 第 5 次错误码 -> CodeExhausted（attempts=5=max，作废）
+    with _pytest.raises(CodeExhausted):
+        ev.verify("e5@x.com", "000000")
+    # 第 6 次 -> CodeExpired（已作废，无活跃 row）
+    with _pytest.raises(CodeExpired):
+        ev.verify("e5@x.com", "111111")
+
+
 # ── Route-level tests (HTTP contract via mocked service) ──────────────────
 
 from fastapi.testclient import TestClient
@@ -460,7 +498,7 @@ def test_request_endpoint_returns_202(monkeypatch):
         "/api/auth/email-verifications/request",
         json={"email": "noone@x.com"},
     )
-    # 邮箱不存在应 404（按 spec §4.1/§6 仅 resend/verify 区分；request 同样 404 防探测）
+    # 邮箱不存在返回 202（防探测）
     assert r.status_code == 202
 
 
@@ -524,3 +562,79 @@ def test_verify_endpoint_expired_code_returns_410(monkeypatch):
     )
     assert r.status_code == 410
     assert r.json()["code"] == "CODE_EXPIRED"
+
+
+def test_login_requires_verification():
+    """未验证用户登录被拒（requires_verification=True on auth router）。"""
+    import os
+    os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+    os.environ.setdefault("SECRET_KEY", "test-secret-key-for-auth-tests")
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from sqlalchemy import create_engine, event
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    from app.auth.backend import auth_backend
+    from app.auth.exceptions import fastapi_users_exception_handler
+    from app.auth.instance import fastapi_users
+    from app.auth.schemas import UserCreate, UserRead, UserUpdate
+    from app.db.base import Base
+    import app.db.models  # noqa: F401  (ensure models are loaded)
+    from app.db.session import get_session
+    from fastapi_users.exceptions import (
+        InvalidPasswordException,
+        InvalidResetPasswordToken,
+        InvalidVerifyToken,
+        UserAlreadyExists,
+        UserAlreadyVerified,
+        UserInactive,
+        UserNotExists,
+    )
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragma(dbapi_conn, _conn_record):
+        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    app = FastAPI()
+    app.include_router(
+        fastapi_users.get_auth_router(auth_backend, requires_verification=True),
+        prefix="/api/auth/jwt", tags=["auth"],
+    )
+    app.include_router(
+        fastapi_users.get_register_router(UserRead, UserCreate),
+        prefix="/api/auth", tags=["auth"],
+    )
+    for exc in (UserAlreadyExists, UserNotExists, UserInactive,
+                UserAlreadyVerified, InvalidVerifyToken,
+                InvalidResetPasswordToken, InvalidPasswordException):
+        app.add_exception_handler(exc, fastapi_users_exception_handler)
+
+    app.dependency_overrides[get_session] = lambda: session
+
+    c = TestClient(app)
+
+    # 注册一个未验证用户 -> 注册成功返回 201
+    r = c.post("/api/auth/register", json={"email": "nr@x.com", "password": "password123"})
+    assert r.status_code == 201, f"注册应成功: {r.json()}"
+
+    # 登录未验证用户 -> 400（UserInactive）
+    r = c.post(
+        "/api/auth/jwt/login",
+        data={"username": "nr@x.com", "password": "password123"},
+    )
+    assert r.status_code == 400, f"未验证用户登录应被拒: {r.json()}"
+
+    session.close()
+    Base.metadata.drop_all(engine)
