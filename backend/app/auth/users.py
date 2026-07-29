@@ -25,6 +25,13 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             user.id, user.email, "user.register", "user", str(user.id),
             {}, request.client.host if request else "",
         )
+        # 注册后自动下发 6 位邮件 OTP（失败不阻塞注册响应）
+        try:
+            from app.services.email_verification_service import email_verification_service
+            email_verification_service.issue_for_user(user, request)
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("issue_for_user 失败: %s", e)
 
     async def on_after_login(
         self, user: User, request: Optional[Request] = None,
