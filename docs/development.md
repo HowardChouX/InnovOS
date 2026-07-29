@@ -96,6 +96,14 @@ InnovOS/
 - 时间戳使用 `TEXT` 格式 `YYYY-MM-DD HH24:MI:SS`（向后兼容），新列推荐 `TIMESTAMPTZ`
 - 建表和迁移通过 `init_all_tables()` 幂等执行
 
+### 邮箱验证（OTP）
+
+- **开发环境 SMTP**: `docker compose --profile mail up mailpit` 启动 Mailpit（localhost:1025）
+- **临时关闭 SMTP**: 设 `EMAIL_OTP_SOFT_FAIL=true`，验证码打印到后端日志 `[DEV OTP] code=...`
+- **环境变量**: 见 `.env.example` 中 `# ── Email OTP 验证 ──` 章节
+- **前端**: `/verify-email?email=...` 页面接收 6 位 OTP，满位自动 submit
+- **测试**: `tests/test_email_verification.py` 使用 SQLite 内存替代 PostgreSQL（服务层 + 路由层合同测试）
+
 ### 测试
 
 ```bash

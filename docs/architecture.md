@@ -163,3 +163,15 @@ PostgreSQL 16 + pgvector，约 22 张表：
 - 请求限流（登录 10/min, 注册 3/5min, API 120/min）
 - 安全响应头（CSP, HSTS, XFO）
 - 文件上传大小限制
+
+## 邮箱验证
+
+采用 6 位 OTP（一次性密码）替代 FastAPI Users 的 verify token 链路。
+
+- **用户注册后**: 后端自动调用 `send_verification_otp_sync()` 发送 6 位数字验证码
+- **验证流程**: 前端 `/verify-email` 页面 -> POST `/api/auth/email-verifications/verify`
+- **OTP 存储**: `email_verifications` 表存储 code_hash（SHA-256 + pepper），支持 max_attempts=5 试错耗尽
+- **限流**: 每 IP 30 req/min + 每邮箱 1 req/60s（request）+ 10 req/60s（verify）
+- **防探测**: 未知邮箱调用验证路由返回 fake `verified=False`（不暴露邮箱是否存在）
+- **生产安全**: SMTP 未配置 + ENVIRONMENT=production + EMAIL_OTP_SOFT_FAIL=False 时抛出 `EmailUnavailable`
+- **开发便利**: `ENVIRONMENT=development` 或 `EMAIL_OTP_SOFT_FAIL=true` 时跳过 SMTP，仅打印验证码到日志
