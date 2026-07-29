@@ -54,3 +54,16 @@ def test_send_skipped_when_smtp_not_configured():
     # 不抛异常即通过
     svc.send_verification_email_sync(user, "token123")
     svc.send_reset_password_email_sync(user, "token123")
+
+
+def test_dev_otp_logged_when_smtp_unset(monkeypatch, caplog):
+    from app.services import email_service as es
+
+    class _User:
+        email = "a@b.com"
+
+    monkeypatch.setattr(es.settings, "SMTP_HOST", "")
+    monkeypatch.setattr(es.settings, "ENVIRONMENT", "development")
+    with caplog.at_level("INFO", logger=es.logger.name):
+        es.email_service.send_verification_otp_sync(_User(), "123456")
+    assert any("[DEV OTP]" in rec.message and "code=123456" in rec.message for rec in caplog.records)

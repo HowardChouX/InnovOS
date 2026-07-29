@@ -70,5 +70,20 @@ class EmailService:
         """
         self._send(user.email, "InnovOS 密码重置", body)
 
+    def send_verification_otp_sync(self, user, code: str, request=None) -> None:
+        """发送 6 位邮件 OTP。仅 dev 在未配 SMTP 时记录明文日志。"""
+        body = (
+            f"<h2>您的 InnovOS 邮箱验证码</h2>"
+            f"<p>验证码：<b>{code}</b></p>"
+            f"<p>10 分钟内有效，请勿泄露给他人。</p>"
+        )
+        if not self.host:
+            if settings.ENVIRONMENT == "development":
+                logger.info("[DEV OTP] email=%s code=%s ttl=%ss", user.email, code, settings.OTP_TTL_SECONDS)
+                return
+            logger.warning("SMTP_HOST 未配置，跳过邮件发送 to=%s", user.email)
+            return
+        self._send(user.email, "InnovOS 邮箱验证码", body)
+
 
 email_service = EmailService()
