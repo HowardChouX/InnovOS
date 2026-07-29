@@ -6,25 +6,15 @@
 // - POST /api/auth/jwt/logout            → 204
 // - POST /api/auth/forgot-password       {email} → 202
 // - POST /api/auth/reset-password        {token, password} → 200
-// - POST /api/auth/request-verify-token  {email} → 202
-// - POST /api/auth/verify                {token} → 200
+// - POST /api/auth/email-verifications/request  {email} → 202
+// - POST /api/auth/email-verifications/resend   {email} → 202
+// - POST /api/auth/email-verifications/verify   {email, code} → 200
 //
 // UserRead 形状：{id, email, username?, phone?, role, isActive, isSuperuser, isVerified}
 //
 // 注意：FastAPI Users 的登录字段统一命名为 "username"（任意标识符；InnovOS 用 email）。
 import { apiRequest } from './client';
-
-export interface AuthUser {
-  id: number;
-  email: string;
-  username?: string | null;
-  phone?: string | null;
-  role: string;
-  // FastAPI Users 默认 Pydantic 是 snake_case 而非驼峰
-  is_active: boolean;
-  is_superuser: boolean;
-  is_verified: boolean;
-}
+import type { AuthUser } from '../types/auth';
 
 export const authApi = {
   /** 注册：email + password + 可选 username/phone */
@@ -74,22 +64,6 @@ export const authApi = {
     return apiRequest<void>('/api/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify({ token, password }),
-    });
-  },
-
-  /** 请求邮箱验证邮件 */
-  requestVerifyToken(email: string): Promise<void> {
-    return apiRequest<void>('/api/auth/request-verify-token', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    });
-  },
-
-  /** 用 token 完成邮箱验证 */
-  verify(token: string): Promise<void> {
-    return apiRequest<void>('/api/auth/verify', {
-      method: 'POST',
-      body: JSON.stringify({ token }),
     });
   },
 
