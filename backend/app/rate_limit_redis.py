@@ -214,3 +214,11 @@ def get_client_ip(request: Request) -> str:
 auth_limiter = RedisRateLimiter(max_requests=10, window_seconds=60, name="auth")
 register_limiter = RedisRateLimiter(max_requests=3, window_seconds=300, name="register")
 api_limiter = RedisRateLimiter(max_requests=120, window_seconds=60, name="api")
+
+# ── 邮件 OTP 限流器 ────────────────────────────────────
+# 每个邮箱地址每 60s 最多请求 1 次 OTP（resend）
+email_otp_request_limiter = RedisRateLimiter(max_requests=1, window_seconds=60, name="email_otp_req")
+# 每个邮箱地址每 60s 最多验证 10 次
+email_otp_verify_limiter = RedisRateLimiter(max_requests=10, window_seconds=60, name="email_otp_verify")
+# 每个 IP 每 60s 最多 30 次 OTP 相关操作（兜底防滥用）
+email_otp_ip_limiter = RedisRateLimiter(max_requests=30, window_seconds=60, name="email_otp_ip")

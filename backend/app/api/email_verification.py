@@ -1,8 +1,9 @@
 # app/api/email_verification.py
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from app.core.config import settings
-from app.exceptions.email_verification import EmailVerificationError
+from app.exceptions.email_verification import EmailVerificationError, OtpRateLimited
+from app.rate_limit_redis import email_otp_ip_limiter
 from app.schemas.email_verification import (
     OtpIssuedOut,
     OtpRequestIn,
@@ -29,12 +30,20 @@ def request_otp(payload: OtpRequestIn) -> OtpIssuedOut:
 
 
 @router.post("/resend", response_model=OtpIssuedOut, status_code=202)
-def resend_otp(payload: OtpResendIn) -> OtpIssuedOut:
+def resend_otp(payload: OtpResendIn, request: Request) -> OtpIssuedOut:
+    ip = request.client.host if request.client else "unknown"
+    allowed, _, _ = email_otp_ip_limiter.check(ip)
+    if not allowed:
+        raise OtpRateLimited(60)
     rec = email_verification_service.resend(payload.email)
     return OtpIssuedOut(**rec)
 
 
 @router.post("/verify", response_model=OtpVerifiedOut)
-def verify_otp(payload: OtpVerifyIn) -> OtpVerifiedOut:
+def verify_otp(payload: OtpVerifyIn, request: Request) -> OtpVerifiedOut:
+    ip = request.client.host if request.client else "unknown"
+    allowed, _, _ = email_otp_ip_limiter.check(ip)
+    if not allowed:
+        raise OtpRateLimited(60)
     rec = email_verification_service.verify(payload.email, payload.code)
     return OtpVerifiedOut(**rec)
