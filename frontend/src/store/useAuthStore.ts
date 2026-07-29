@@ -7,7 +7,7 @@ interface AuthStore {
   isAdmin: boolean;
   /** 邮箱密码登录 */
   login: (email: string, password: string) => Promise<void>;
-  /** 注册：email + password + 可选 phone/username */
+  /** 注册：email + password + 可选 phone/username（注册后不自动登录，需邮箱验证） */
   register: (
     email: string,
     password: string,
@@ -42,10 +42,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   register: async (email, password, phone, username) => {
-    const user = await authApi.register({ email, password, phone, username });
-    // 注册成功后用户未登录（FastAPI Users 默认行为），需要再登录拿 cookie
-    await get().login(email, password);
-    // 修正：login 内部会重设 user，这里不需要 set
+    // 注册成功后用户未登录：等待邮箱验证完成后手动登录。
+    await authApi.register({ email, password, phone, username });
   },
 
   logout: async () => {
