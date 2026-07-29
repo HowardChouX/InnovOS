@@ -376,3 +376,61 @@ def test_purge_expired(fake_db: _FakeDB, monkeypatch: pytest.MonkeyPatch) -> Non
     remaining_hashes = {r["code_hash"] for r in remaining}
     assert "hash_fresh" in remaining_hashes
     assert "hash_old" not in remaining_hashes
+
+
+def test_verify_wrong_code_increments_attempts_persisted(fake_db: _FakeDB, monkeypatch: pytest.MonkeyPatch) -> None:
+    """错误码后 attempts 必须持久化（验证 db_session 异常回滚不撤销 UPDATE）。"""
+    from app.exceptions.email_verification import CodeInvalid
+    from app.services.email_service import email_service
+    from app.services.email_verification_service import email_verification_service
+
+    class _Stub:
+        def __init__(self) -> None:
+            self.code: str = ""
+
+        def send_verification_otp_sync(self, user, code, request=None) -> None:
+            self.code = code
+
+    stub = _Stub()
+    monkeypatch.setattr(
+        email_service, "send_verification_otp_sync", stub.send_verification_otp_sync, raising=False
+    )
+
+    from app.database import db_session
+    from fastapi_users.password import PasswordHelper
+    pw = PasswordHelper()
+    with db_session() as db:
+        db.execute(
+            "INSERT INTO users (email, username, hashed_password, is_active, is_superuser, is_verified) "
+            "VALUES (%s, %s, %s, TRUE, FALSE, FALSE)",
+            ("att@x.com", "att", pw.hash("password123")),
+        )
+        uid = db.execute("SELECT id FROM users WHERE email=%s", ("att@x.com",)).fetchone()["id"]
+    from app.db.models import User
+    user = User(id=uid, email="att@x.com")  # type: ignore[call-arg]
+    email_verification_service.issue_for_user(user)
+    correct_code = stub.code
+
+    # 提交一次错误码
+    try:
+        email_verification_service.verify("att@x.com", "000000")
+    except CodeInvalid:
+        pass
+
+    # 断言 attempts 持久化为 1（如果 db_session 回滚了 UPDATE，这里会是 0）
+    with db_session() as db:
+        row = db.execute(
+            "SELECT attempts FROM email_verifications WHERE email=%s AND consumed_at IS NULL ORDER BY id DESC LIMIT 1",
+            ("att@x.com",),
+        ).fetchone()
+    assert row is not None, "active OTP row should exist"
+    assert row["attempts"] == 1, f"attempts should be persisted as 1, got {row['attempts']}"
+
+    # 验证正确码仍能成功
+    result = email_verification_service.verify("att@x.com", correct_code)
+    assert result == {"verified": True, "already": False}
+
+    # 注意：此测试依赖 fake session 的行为。如果 fake session 在异常时不 rollback
+    # （与真实 db_session 不同），测试仍可能假绿。已知 _FakeSession 的 rollback()
+    # 调用 sqlite3.Connection.rollback() 可撤销未提交的 UPDATE，语义正确。
+    # 如需完全验证回滚语义，需真实 PG 覆盖。

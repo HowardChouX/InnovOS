@@ -30,7 +30,8 @@ def _gen_code() -> str:
 
 
 class EmailVerificationService:
-    def _now_sql(self, db) -> Any:
+    @staticmethod
+    def _now_sql(db) -> Any:
         return db.execute("SELECT NOW() AS now").fetchone()["now"]
 
     def issue_for_user(self, user, request: Optional[Request] = None) -> dict[str, Any]:
@@ -49,6 +50,7 @@ class EmailVerificationService:
                 (user.id, user.email, _hash_code(code), settings.OTP_MAX_ATTEMPTS, str(ttl)),
             )
         email_service.send_verification_otp_sync(user, code, request)
+        logger.info("OTP issued user=%s expires_in=%s", user.id, ttl)
         return {"expires_in": ttl, "next_resend_in": settings.OTP_RESEND_COOLDOWN}
 
     def resend(self, email: str, request: Optional[Request] = None) -> dict[str, Any]:
@@ -81,6 +83,8 @@ class EmailVerificationService:
         return self.issue_for_user(u, request)
 
     def verify(self, email: str, code: str, request: Optional[Request] = None) -> dict[str, Any]:
+        _action: Optional[Exception] = None
+        _user_id: Optional[int] = None
         with db_session() as db:
             user = db.execute(
                 "SELECT id, email, is_verified FROM users WHERE email=%s", (email,)
@@ -89,6 +93,7 @@ class EmailVerificationService:
                 raise EmailNotFound()
             if user["is_verified"]:
                 return {"verified": True, "already": True}
+            _user_id = user["id"]
             row = db.execute(
                 "SELECT id, code_hash, attempts, max_attempts, expires_at FROM email_verifications "
                 "WHERE email=%s AND consumed_at IS NULL "
@@ -102,26 +107,31 @@ class EmailVerificationService:
                 db.execute(
                     "UPDATE email_verifications SET consumed_at=NOW() WHERE id=%s", (row["id"],)
                 )
-                raise CodeExpired()
-            if _hash_code(code) != row["code_hash"]:
+                _action = CodeExpired()
+            elif _hash_code(code) != row["code_hash"]:
                 new_attempts = row["attempts"] + 1
                 if new_attempts >= row["max_attempts"]:
                     db.execute(
                         "UPDATE email_verifications SET attempts=%s, consumed_at=NOW() WHERE id=%s",
                         (new_attempts, row["id"]),
                     )
-                    raise CodeExhausted()
+                    _action = CodeExhausted()
+                else:
+                    db.execute(
+                        "UPDATE email_verifications SET attempts=%s WHERE id=%s",
+                        (new_attempts, row["id"]),
+                    )
+                    _action = CodeInvalid(row["max_attempts"] - new_attempts)
+            else:
                 db.execute(
-                    "UPDATE email_verifications SET attempts=%s WHERE id=%s",
-                    (new_attempts, row["id"]),
+                    "UPDATE email_verifications SET consumed_at=NOW() WHERE id=%s", (row["id"],)
                 )
-                raise CodeInvalid(row["max_attempts"] - new_attempts)
-            db.execute(
-                "UPDATE email_verifications SET consumed_at=NOW() WHERE id=%s", (row["id"],)
-            )
-            db.execute(
-                "UPDATE users SET is_verified=TRUE, is_active=TRUE WHERE id=%s", (user["id"],)
-            )
+                db.execute(
+                    "UPDATE users SET is_verified=TRUE, is_active=TRUE WHERE id=%s", (user["id"],)
+                )
+        if _action is not None:
+            raise _action
+        logger.info("OTP verified user=%s", _user_id)
         return {"verified": True, "already": False}
 
     def purge_expired(self, retention_days: int = 30) -> int:
@@ -132,7 +142,9 @@ class EmailVerificationService:
                 "   OR (expires_at < NOW() - (%s || ' days')::interval)",
                 (str(retention_days), str(retention_days)),
             )
-            return cur.rowcount
+            deleted = cur.rowcount
+        logger.info("Purged %d expired email_verifications", deleted)
+        return deleted
 
 
 email_verification_service = EmailVerificationService()
