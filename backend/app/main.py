@@ -238,22 +238,24 @@ async def shutdown():
 
 
 # ── FastAPI Users 路由 ──────────────────────────────────
+from app.api.email_verification import router as email_verification_router
 from app.auth.backend import auth_backend
 from app.auth.exceptions import fastapi_users_exception_handler
 from app.auth.instance import fastapi_users
 from app.auth.schemas import UserCreate, UserRead, UserUpdate
+from app.exceptions.email_verification import (
+    EmailVerificationError,
+    email_verification_exception_handler,
+)
 from fastapi_users.exceptions import (
     InvalidPasswordException,
     InvalidResetPasswordToken,
-    InvalidVerifyToken,
     UserAlreadyExists,
-    UserAlreadyVerified,
-    UserInactive,
     UserNotExists,
 )
 
 app_.include_router(
-    fastapi_users.get_auth_router(auth_backend),
+    fastapi_users.get_auth_router(auth_backend, requires_verification=True),
     prefix="/api/auth/jwt", tags=["auth"],
 )
 app_.include_router(
@@ -264,18 +266,15 @@ app_.include_router(
     fastapi_users.get_reset_password_router(),
     prefix="/api/auth", tags=["auth"],
 )
+# 移除 fastapi_users.get_verify_router(UserRead) -- 改用自实现 /email-verifications
 app_.include_router(
-    fastapi_users.get_verify_router(UserRead),
-    prefix="/api/auth", tags=["auth"],
-)
-app_.include_router(
-    fastapi_users.get_users_router(UserRead, UserUpdate),
+    fastapi_users.get_users_router(UserRead, UserUpdate, requires_verification=True),
     prefix="/api/users", tags=["users"],
 )
-# 注册 FastAPI Users 异常 handler
+app_.include_router(email_verification_router)
+app_.add_exception_handler(EmailVerificationError, email_verification_exception_handler)
 for exc in (
-    UserAlreadyExists, UserNotExists, UserInactive,
-    UserAlreadyVerified, InvalidVerifyToken,
+    UserAlreadyExists, UserNotExists,
     InvalidResetPasswordToken, InvalidPasswordException,
 ):
     app_.add_exception_handler(exc, fastapi_users_exception_handler)

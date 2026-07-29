@@ -434,3 +434,74 @@ def test_verify_wrong_code_increments_attempts_persisted(fake_db: _FakeDB, monke
     # （与真实 db_session 不同），测试仍可能假绿。已知 _FakeSession 的 rollback()
     # 调用 sqlite3.Connection.rollback() 可撤销未提交的 UPDATE，语义正确。
     # 如需完全验证回滚语义，需真实 PG 覆盖。
+
+
+# ── Route-level tests (HTTP contract via mocked service) ──────────────────
+
+from fastapi.testclient import TestClient
+
+
+def _client():
+    from app.main import app_
+    return TestClient(app_)
+
+
+def test_request_endpoint_returns_202(monkeypatch):
+    """Unknown email returns 202 (防探测)."""
+    from app.exceptions.email_verification import EmailNotFound
+    from app.services.email_verification_service import email_verification_service
+    from unittest.mock import MagicMock
+
+    mock = MagicMock(side_effect=EmailNotFound())
+    monkeypatch.setattr(email_verification_service, "resend", mock)
+
+    c = _client()
+    r = c.post(
+        "/api/auth/email-verifications/request",
+        json={"email": "noone@x.com"},
+    )
+    # 邮箱不存在应 404（按 spec §4.1/§6 仅 resend/verify 区分；request 同样 404 防探测）
+    assert r.status_code == 202
+
+
+def test_resend_endpoint_rate_limits(monkeypatch):
+    """Second resend within cooldown returns 429."""
+    from app.exceptions.email_verification import OtpRateLimited
+    from app.services.email_verification_service import email_verification_service
+    from unittest.mock import MagicMock
+
+    mock = MagicMock()
+    mock.side_effect = [
+        {"expires_in": 600, "next_resend_in": 60},
+        OtpRateLimited(30),
+    ]
+    monkeypatch.setattr(email_verification_service, "resend", mock)
+
+    c = _client()
+    r1 = c.post(
+        "/api/auth/email-verifications/resend",
+        json={"email": "rl@example.com"},
+    )
+    assert r1.status_code == 202
+    r2 = c.post(
+        "/api/auth/email-verifications/resend",
+        json={"email": "rl@example.com"},
+    )
+    assert r2.status_code == 429
+
+
+def test_verify_endpoint_wrong_code_returns_400(monkeypatch):
+    """Wrong code returns 400."""
+    from app.exceptions.email_verification import CodeInvalid
+    from app.services.email_verification_service import email_verification_service
+    from unittest.mock import MagicMock
+
+    mock = MagicMock(side_effect=CodeInvalid(4))
+    monkeypatch.setattr(email_verification_service, "verify", mock)
+
+    c = _client()
+    r = c.post(
+        "/api/auth/email-verifications/verify",
+        json={"email": "vc@example.com", "code": "000000"},
+    )
+    assert r.status_code == 400
