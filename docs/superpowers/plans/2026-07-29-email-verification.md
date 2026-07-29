@@ -415,7 +415,7 @@ logger = logging.getLogger(__name__)
 
 
 def _hash_code(code: str) -> str:
-    return hashlib.sha256((code + (settings.INNOVOS_OTP_PEPPER or "")).encode("utf-8")).hexdigest()
+    return hashlib.sha256((code + (settings.OTP_PEPPER or "")).encode("utf-8")).hexdigest()
 
 
 def _gen_code() -> str:
