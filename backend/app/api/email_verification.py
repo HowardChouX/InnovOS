@@ -1,6 +1,8 @@
 # app/api/email_verification.py
 from fastapi import APIRouter
 
+from app.core.config import settings
+from app.exceptions.email_verification import EmailVerificationError
 from app.schemas.email_verification import (
     OtpIssuedOut,
     OtpRequestIn,
@@ -17,9 +19,12 @@ router = APIRouter(prefix="/api/auth/email-verifications", tags=["auth"])
 def request_otp(payload: OtpRequestIn) -> OtpIssuedOut:
     try:
         rec = email_verification_service.resend(payload.email)
-    except Exception:
-        # 防探测：未知邮箱静默返回 202
-        return OtpIssuedOut(expires_in=600, next_resend_in=60)
+    except EmailVerificationError:
+        # 防探测：未知邮箱/已验证/冷却中等预期异常静默返回 202
+        return OtpIssuedOut(
+            expires_in=settings.OTP_TTL_SECONDS,
+            next_resend_in=settings.OTP_RESEND_COOLDOWN,
+        )
     return OtpIssuedOut(**rec)
 
 

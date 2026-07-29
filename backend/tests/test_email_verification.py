@@ -505,3 +505,22 @@ def test_verify_endpoint_wrong_code_returns_400(monkeypatch):
         json={"email": "vc@example.com", "code": "000000"},
     )
     assert r.status_code == 400
+
+
+def test_verify_endpoint_expired_code_returns_410(monkeypatch):
+    """CodeExpired -> 410（路由层 mock service，验证 HTTP 契约）。"""
+    from app.exceptions.email_verification import CodeExpired
+    from app.services.email_verification_service import email_verification_service
+
+    def _raise(*args, **kwargs):
+        raise CodeExpired()
+
+    monkeypatch.setattr(email_verification_service, "verify", _raise)
+
+    c = _client()
+    r = c.post(
+        "/api/auth/email-verifications/verify",
+        json={"email": "ex@x.com", "code": "111111"},
+    )
+    assert r.status_code == 410
+    assert r.json()["code"] == "CODE_EXPIRED"
