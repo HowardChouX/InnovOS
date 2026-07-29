@@ -536,6 +536,42 @@ def init_model_providers(db):
 # ═══════════════════════════════════════════════════════════════
 
 
+def init_email_verifications(db):
+    """email_verifications 表 — 6 位邮件 OTP。
+
+    注册时落码（code_hash 存 SHA-256 hex），验证通过后置 consumed_at。
+    FK 到 users(id) ON DELETE CASCADE。
+    """
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS email_verifications (
+            id BIGSERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            email VARCHAR(255) NOT NULL,
+            code_hash CHAR(64) NOT NULL,
+            attempts SMALLINT NOT NULL DEFAULT 0,
+            max_attempts SMALLINT NOT NULL DEFAULT 5,
+            expires_at TIMESTAMPTZ NOT NULL,
+            consumed_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            last_sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS email_verifications_user_id_idx "
+        "ON email_verifications(user_id)"
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS email_verifications_email_idx "
+        "ON email_verifications(email)"
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS email_verifications_active_idx "
+        "ON email_verifications(consumed_at) WHERE consumed_at IS NULL"
+    )
+
+
 def init_all_tables(db):
     """按依赖顺序初始化所有表。
 
@@ -546,6 +582,8 @@ def init_all_tables(db):
     # pgvector 扩展必须最先创建
     db.execute("CREATE EXTENSION IF NOT EXISTS vector;")
     logger.info("pgvector extension ready")
+    # email_verifications 依赖 users(id)，由 Alembic 在 init_all_tables 之前创建。
+    init_email_verifications(db)
     init_tasks(db)
     init_analyses(db)
     _ensure_columns(db, "analyses", [("created_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
