@@ -638,3 +638,138 @@ def test_login_requires_verification():
 
     session.close()
     Base.metadata.drop_all(engine)
+
+
+# ── Error-code matrix (reviewer I4) ─────────────────────────────────────
+
+
+def test_email_not_found_resend_raises(fake_db: _FakeDB) -> None:
+    """未注册邮箱调 resend → EmailNotFound."""
+    from app.exceptions.email_verification import EmailNotFound
+    from app.services.email_verification_service import email_verification_service
+
+    import pytest
+
+    with pytest.raises(EmailNotFound):
+        email_verification_service.resend("noone@x.com")
+
+
+def test_already_verified_resend_raises(fake_db: _FakeDB) -> None:
+    """已验证邮箱调 resend → AlreadyVerified."""
+    from app.database import db_session
+    from app.exceptions.email_verification import AlreadyVerified
+    from app.services.email_verification_service import email_verification_service
+    from fastapi_users.password import PasswordHelper
+
+    import pytest
+
+    pw = PasswordHelper()
+    with db_session() as db:
+        db.execute(
+            "INSERT INTO users (email, username, hashed_password, is_active, is_superuser, is_verified) "
+            "VALUES (%s, %s, %s, TRUE, FALSE, TRUE)",
+            ("av@x.com", "av", pw.hash("password123")),
+        )
+    with pytest.raises(AlreadyVerified):
+        email_verification_service.resend("av@x.com")
+
+
+def test_login_succeeds_when_verified() -> None:
+    """已验证用户登录应成功。"""
+    import os
+
+    os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+    os.environ.setdefault("SECRET_KEY", "test-secret-key-for-auth-tests")
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from sqlalchemy import create_engine, event, text
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    from app.auth.backend import auth_backend
+    from app.auth.exceptions import fastapi_users_exception_handler
+    from app.auth.instance import fastapi_users
+    from app.auth.schemas import UserCreate, UserRead, UserUpdate
+    from app.db.base import Base
+    import app.db.models  # noqa: F401
+    from app.db.session import get_session
+    from fastapi_users.exceptions import (
+        InvalidPasswordException,
+        InvalidResetPasswordToken,
+        InvalidVerifyToken,
+        UserAlreadyExists,
+        UserAlreadyVerified,
+        UserInactive,
+        UserNotExists,
+    )
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragma(dbapi_conn, _conn_record):
+        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    app = FastAPI()
+    app.include_router(
+        fastapi_users.get_auth_router(auth_backend, requires_verification=True),
+        prefix="/api/auth/jwt", tags=["auth"],
+    )
+    app.include_router(
+        fastapi_users.get_register_router(UserRead, UserCreate),
+        prefix="/api/auth", tags=["auth"],
+    )
+    for exc in (
+        UserAlreadyExists, UserNotExists, UserInactive,
+        UserAlreadyVerified, InvalidVerifyToken,
+        InvalidResetPasswordToken, InvalidPasswordException,
+    ):
+        app.add_exception_handler(exc, fastapi_users_exception_handler)
+
+    app.dependency_overrides[get_session] = lambda: session
+
+    c = TestClient(app)
+
+    # 注册未验证用户
+    r = c.post("/api/auth/register", json={"email": "ov@x.com", "password": "password123"})
+    assert r.status_code == 201
+
+    # 直接 DB 标记已验证
+    session.execute(text("UPDATE users SET is_verified=TRUE WHERE email='ov@x.com'"))
+    session.commit()
+
+    # 验证用户登录应成功
+    r = c.post(
+        "/api/auth/jwt/login",
+        data={"username": "ov@x.com", "password": "password123"},
+    )
+    assert r.status_code in (200, 204), f"已验证用户登录应成功: {r.status_code} {r.json() if r.content else ''}"
+
+    session.close()
+    Base.metadata.drop_all(engine)
+
+
+def test_email_unavailable_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """未配 SMTP + ENVIRONMENT=production + EMAIL_OTP_SOFT_FAIL=False → EmailUnavailable."""
+    from app.exceptions.email_verification import EmailUnavailable
+    from app.services import email_service as es
+
+    monkeypatch.setattr(es.settings, "SMTP_HOST", "")
+    monkeypatch.setattr(es.settings, "ENVIRONMENT", "production")
+    monkeypatch.setattr(es.settings, "EMAIL_OTP_SOFT_FAIL", False)
+
+    import pytest
+
+    class _U:
+        email = "x@y.com"
+
+    with pytest.raises(EmailUnavailable):
+        es.email_service.send_verification_otp_sync(_U(), "123456")
