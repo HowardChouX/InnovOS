@@ -8,6 +8,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from app.core.config import settings
+from app.exceptions.email_verification import EmailUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +79,13 @@ class EmailService:
             f"<p>10 分钟内有效，请勿泄露给他人。</p>"
         )
         if not self.host:
+            if settings.ENVIRONMENT == "production" and not settings.EMAIL_OTP_SOFT_FAIL:
+                raise EmailUnavailable()
             if settings.ENVIRONMENT == "development":
-                logger.info("[DEV OTP] email=%s code=%s ttl=%ss", user.email, code, settings.OTP_TTL_SECONDS)
+                logger.info(
+                    "[DEV OTP] email=%s code=%s ttl=%ss",
+                    user.email, code, settings.OTP_TTL_SECONDS,
+                )
                 return
             logger.warning("SMTP_HOST 未配置，跳过邮件发送 to=%s", user.email)
             return
