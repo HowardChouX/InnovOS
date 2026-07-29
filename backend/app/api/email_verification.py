@@ -2,8 +2,16 @@
 from fastapi import APIRouter, Request
 
 from app.core.config import settings
-from app.exceptions.email_verification import EmailVerificationError, OtpRateLimited
-from app.rate_limit_redis import email_otp_ip_limiter
+from app.exceptions.email_verification import (
+    EmailNotFound,
+    EmailVerificationError,
+    OtpRateLimited,
+)
+from app.rate_limit_redis import (
+    email_otp_ip_limiter,
+    email_otp_request_limiter,
+    email_otp_verify_limiter,
+)
 from app.schemas.email_verification import (
     OtpIssuedOut,
     OtpRequestIn,
@@ -17,7 +25,12 @@ router = APIRouter(prefix="/api/auth/email-verifications", tags=["auth"])
 
 
 @router.post("/request", response_model=OtpIssuedOut, status_code=202)
-def request_otp(payload: OtpRequestIn) -> OtpIssuedOut:
+def request_otp(payload: OtpRequestIn, request: Request) -> OtpIssuedOut:
+    ip = request.client.host if request.client else "unknown"
+    if not email_otp_ip_limiter.check(ip)[0]:
+        raise OtpRateLimited(60)
+    if not email_otp_request_limiter.check(payload.email)[0]:
+        raise OtpRateLimited(60)
     try:
         rec = email_verification_service.resend(payload.email)
     except EmailVerificationError:
@@ -42,8 +55,13 @@ def resend_otp(payload: OtpResendIn, request: Request) -> OtpIssuedOut:
 @router.post("/verify", response_model=OtpVerifiedOut)
 def verify_otp(payload: OtpVerifyIn, request: Request) -> OtpVerifiedOut:
     ip = request.client.host if request.client else "unknown"
-    allowed, _, _ = email_otp_ip_limiter.check(ip)
-    if not allowed:
+    if not email_otp_ip_limiter.check(ip)[0]:
         raise OtpRateLimited(60)
-    rec = email_verification_service.verify(payload.email, payload.code)
+    if not email_otp_verify_limiter.check(payload.email)[0]:
+        raise OtpRateLimited(60)
+    try:
+        rec = email_verification_service.verify(payload.email, payload.code)
+    except EmailNotFound:
+        # 防探测：未知邮箱返回假成功（verified=False）
+        return OtpVerifiedOut(verified=False, already=False)
     return OtpVerifiedOut(**rec)
