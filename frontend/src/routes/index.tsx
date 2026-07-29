@@ -7,6 +7,7 @@ import { lazyPage } from '../components/common/LazyPage';
 const DashboardPage = lazyPage(() => import('../features/dashboard/DashboardPage'));
 const LoginPage = lazyPage(() => import('../features/auth/LoginPage'));
 const RegisterPage = lazyPage(() => import('../features/auth/RegisterPage'));
+const VerifyEmailPage = lazyPage(() => import('../features/auth/VerifyEmailPage'));
 const ForgotPasswordPage = lazyPage(() => import('../features/auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazyPage(() => import('../features/auth/ResetPasswordPage'));
 const PlaceholderPage = lazyPage(() => import('../features/PlaceholderPage'));
@@ -30,6 +31,7 @@ const VideoDisplayMockPage = lazyPage(() => import('../features/workflow/VideoDi
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
+  { path: '/verify-email', element: <VerifyEmailPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
   {

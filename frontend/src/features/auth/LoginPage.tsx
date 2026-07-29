@@ -18,7 +18,15 @@ export function LoginPage() {
       await login(email, password);
       navigate('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '登录失败');
+      const e = err as { status?: number; message?: string; detail?: string };
+      // FastAPI Users 在 requires_verification=True 时返回 400 + {detail: "LOGIN_USER_NOT_VERIFIED"}
+      const detail = (e?.detail ?? e?.message ?? '').toString();
+      if (detail.includes('LOGIN_USER_NOT_VERIFIED') || detail.includes('未验证')) {
+        navigate(`/verify-email?email=${encodeURIComponent(email)}`);
+        setError('请先完成邮箱验证');
+        return;
+      }
+      setError(detail || '登录失败');
     }
   };
 
