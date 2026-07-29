@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../../store/useAuthStore';
+import { authApi } from '../../api/auth';
 import { Eye, EyeOff, Mail, Lock, Check, Phone, User } from 'lucide-react';
 
 export function RegisterPage() {
@@ -12,7 +12,6 @@ export function RegisterPage() {
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
-  const register = useAuthStore((s) => s.register);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -28,8 +27,13 @@ export function RegisterPage() {
       return;
     }
     try {
-      await register(email, password, phone || undefined, username || undefined);
-      navigate('/');
+      await authApi.register({
+        email,
+        password,
+        phone: phone || undefined,
+        username: username || undefined,
+      });
+      navigate(`/verify-email?email=${encodeURIComponent(email)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : '注册失败');
     }
