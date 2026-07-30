@@ -141,18 +141,39 @@ def _local_like_search(task_description: str, keywords: list[str]) -> list[dict]
             except (ValueError, TypeError):
                 inventors = [inventors] if inventors else []
 
+        ipc_codes = r["ipc_codes"]
+        if isinstance(ipc_codes, str):
+            try:
+                ipc_codes = _json.loads(ipc_codes)
+            except (ValueError, TypeError):
+                ipc_codes = [ipc_codes] if ipc_codes else []
+
         results.append({
             "id": r["id"],
             "title": r["title"],
             "summary": r["abstract"] or "",
+            "abstract": r["abstract"] or "",
             "applicant": ", ".join(applicants) if isinstance(applicants, list) else str(applicants),
             "inventor": ", ".join(inventors) if isinstance(inventors, list) else str(inventors),
-            "mainIpc": "",
-            "ipc": "",
+            "applicants": applicants if isinstance(applicants, list) else [applicants] if applicants else [],
+            "inventors": inventors if isinstance(inventors, list) else [inventors] if inventors else [],
+            "mainIpc": ipc_codes[0] if isinstance(ipc_codes, list) and ipc_codes else "",
+            "ipc": ", ".join(ipc_codes) if isinstance(ipc_codes, list) else "",
+            "ipcCodes": ipc_codes if isinstance(ipc_codes, list) else [],
             "legalStatus": "",
             "type": "",
             "documentNumber": r["patent_number"] or "",
-            "relevance_score": 0.5,
+            "patentNumber": r["patent_number"] or "",
+            "patent_number": r["patent_number"] or "",
+            "relevance_score": r["relevance_score"] or 0,
+            "relevance": r["relevance_score"] or 0,
+            "relevanceScore": r["relevance_score"] or 0,
+            "filingDate": r["filing_date"] or "",
+            "filing_date": r["filing_date"] or "",
+            "publicationDate": r["publication_date"] or "",
+            "publication_date": r["publication_date"] or "",
+            "applicationDate": r["filing_date"] or "",
+            "documentDate": r["publication_date"] or "",
             "source": "local",
         })
 

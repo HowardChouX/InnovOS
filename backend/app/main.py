@@ -115,7 +115,7 @@ async def startup():
         from app.core.config import settings
         if settings.DATABASE_URL:
             alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-        await asyncio.to_thread(command.upgrade, alembic_cfg, "head")
+        await asyncio.to_thread(command.upgrade, alembic_cfg, "heads")
         logger.info("Alembic 迁移已应用至 head")
     except Exception as e:
         logger.error(f"Alembic 迁移失败: {e}")

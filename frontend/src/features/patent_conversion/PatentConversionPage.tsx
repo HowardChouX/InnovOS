@@ -14,7 +14,6 @@ import {
   Pencil,
   Play,
   Link as LinkIcon,
-  Check,
 } from 'lucide-react';
 
 const STATUS_CONFIG: Record<

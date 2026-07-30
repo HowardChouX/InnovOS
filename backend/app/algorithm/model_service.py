@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 from typing import Any, cast
 
 from app.algorithm.model_registry import model_registry
@@ -22,21 +21,32 @@ from app.algorithm.providers_registry import (
 )
 from app.database import get_db
 
-# ── 环境变量辅助函数（可供其他模块导入） ────────────────────
-
-
 def _get_provider_api_key(provider_id: str) -> str | None:
-    """从环境变量读取供应商 API Key。
+    """从数据库 api_keys 借一把可用的 Key,返回明文。
 
-    格式: AI_{PROVIDER_ID}_API_KEY (大写, 下划线分隔)
+    内部委托 ApiKeyService.lease_key(provider_id)。同步版本,主要用于
+    model_resolver.resolve() 同步路径。chat_completion 主调用应使用
+    ai_client.ProviderKeyPool(带 failover)。
     """
-    env_key = f"AI_{provider_id.upper()}_API_KEY"
-    return os.getenv(env_key) or None
+    try:
+        from app.services.api_key_service import get_api_key_service
+
+        svc = get_api_key_service()
+        lease = svc.lease_key(provider_id=provider_id)
+        return lease.plaintext if lease else None
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(f"_get_provider_api_key({provider_id}): {exc}")
+        return None
 
 
 def _has_provider_api_key(provider_id: str) -> bool:
-    """检查环境变量中是否存在该供应商的 API Key。"""
-    return _get_provider_api_key(provider_id) is not None
+    """检查数据库中是否存在该供应商的 active Key(不租约,纯只读)。"""
+    try:
+        from app.services.api_key_service import get_api_key_service
+
+        return get_api_key_service().has_active_key(provider_id=provider_id)
+    except Exception:
+        return False
 
 
 # ── 供应商字段校验 ──────────────────────────────────────
@@ -174,7 +184,7 @@ class ModelService:
 
         api_key = _get_provider_api_key(provider_id)
         if not api_key:
-            return {"status": "error", "message": "未配置 API Key（请在环境变量中设置）"}
+            return {"status": "error", "message": "未配置 API Key（请在管理后台 → 模型服务 中添加）"}
 
         # 确定测试模型：优先使用客户端传来的模型
         test_model = model or row["api_model"] or ""

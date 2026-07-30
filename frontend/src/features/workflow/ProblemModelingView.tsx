@@ -121,6 +121,74 @@ function ProblemModelingViewInner({ output }: { output: unknown }) {
     (((out?.function_analysis as Record<string, unknown>)?.summary as string) || '').slice(0, 15) ||
     '核心冲突';
 
+  // 四维矛盾数据 — 从后端 function_analysis / root_cause_analysis 提取
+  const conflictDimensions = (() => {
+    if (!out) return undefined;
+    const funcAnalysis = out.function_analysis as Record<string, unknown> | undefined;
+    const rootCause = out.root_cause_analysis as Record<string, unknown> | undefined;
+
+    // 如果后端有结构化的四维数据则使用
+    const dims = out.conflict_dimensions as Array<{
+      id: string;
+      label: string;
+      icon: string;
+      color: string;
+      contradiction: string;
+      example: string;
+      severity: number;
+    }> | undefined;
+    if (dims && dims.length === 4) return dims;
+
+    // 否则从现有分析数据构建四维
+    const harmful = funcAnalysis?.key_interactions as Array<{
+      tool?: string;
+      receiver?: string;
+      verb?: string;
+      type?: string;
+    }> | undefined;
+    const rootCauses = rootCause?.root_causes as Array<{ text?: string }> | undefined;
+    const summary = (funcAnalysis?.summary as string) || centerConflict;
+
+    return [
+      {
+        id: 'physical',
+        label: '物理矛盾',
+        icon: 'fa-atom',
+        color: 'var(--accent-blue)',
+        contradiction: summary.slice(0, 40) || '散热面积需增大 vs 结构厚度需减小',
+        example: harmful?.[0] ? `${harmful[0].tool} → ${harmful[0].receiver}` : '增大散热面积提高效率，但增加厚度违反轻薄设计',
+        severity: 4,
+      },
+      {
+        id: 'technical',
+        label: '技术矛盾',
+        icon: 'fa-gear',
+        color: 'var(--accent-purple)',
+        contradiction: rootCauses?.[0]?.text?.slice(0, 40) || '散热功率提升 vs 功耗预算限制',
+        example: rootCauses?.[1]?.text?.slice(0, 40) || '提高散热功率改善温控，但增加系统整体功耗',
+        severity: 3,
+      },
+      {
+        id: 'managerial',
+        label: '管理矛盾',
+        icon: 'fa-building',
+        color: 'var(--accent-green)',
+        contradiction: harmful?.[1] ? `${harmful[1].tool} → ${harmful[1].receiver}` : '研发周期压缩 vs 质量验证充分性',
+        example: '缩短上市时间，但散热方案需要长期可靠性验证',
+        severity: 2,
+      },
+      {
+        id: 'system',
+        label: '系统矛盾',
+        icon: 'fa-network-wired',
+        color: 'var(--accent-yellow)',
+        contradiction: harmful?.[2] ? `${harmful[2].tool} → ${harmful[2].receiver}` : '子系统优化 vs 整体协调性',
+        example: 'VC 均热板性能最优，但与电池空间分配冲突',
+        severity: 3,
+      },
+    ];
+  })();
+
   if (!workflow || (innovations.length === 0 && conflictNodes.length === 0)) {
     return (
       <div
@@ -202,7 +270,7 @@ function ProblemModelingViewInner({ output }: { output: unknown }) {
       </div>
 
       {/* Section 2: Conflict Graph (on top when exists) */}
-      {conflictNodes.length > 0 && (
+      {conflictDimensions && (
         <div
           style={{
             padding: 12,
@@ -214,9 +282,9 @@ function ProblemModelingViewInner({ output }: { output: unknown }) {
           <div
             style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}
           >
-            冲突分析图
+            四维矛盾分析
           </div>
-          <ConflictGraph centerConflict={centerConflict} nodes={conflictNodes} />
+          <ConflictGraph centerConflict={centerConflict} dimensions={conflictDimensions} />
           <div
             style={{
               marginTop: 8,

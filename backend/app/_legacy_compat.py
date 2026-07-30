@@ -1,6 +1,10 @@
 """旧认证实现的兼容垫片。
 
 仅供过渡期使用，新代码请用 app.auth.instance 的 current_active_user/current_superuser。
+
+重要：登录已迁移到 FastAPI Users（app.auth.strategy.InnovOSJWTStrategy 签发 token，
+payload 形如 {sub, aud, token_version}）。本垫片仍需解码这些新 token 供 25+ 旧路由使用，
+因此解码时必须传入与签发端一致的 audience，并从 sub/user_id 两种 claim 中取用户 ID。
 """
 import hmac
 from datetime import datetime, timedelta, timezone
@@ -10,8 +14,8 @@ import jwt
 from fastapi import Depends, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.auth.strategy import TOKEN_AUDIENCE
 from app.core.config import settings
-from app.models.user import User
 
 ACCESS_TOKEN_EXPIRE_HOURS = 24
 
@@ -81,36 +85,40 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="未登录")
 
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("user_id")
-        role = payload.get("role", "user")
-        if user_id is None:
-            raise HTTPException(status_code=401, detail="无效的令牌")
+        # 必须传 audience：新 token 含 aud 声明，不校验会抛 InvalidAudienceError；
+        # 同时强制校验可拒绝 reset/verify token（同 SECRET_KEY 但 audience 不同），
+        # 防止重置密码链接的 token 被拿来冒充用户访问业务接口。
+        payload = jwt.decode(
+            token, SECRET_KEY, algorithms=[ALGORITHM], audience=TOKEN_AUDIENCE
+        )
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="无效的令牌") from None
 
-    if user_id == 0 and role == "admin":
-        return {
-            "id": 0,
-            "username": payload.get("username", "admin"),
-            "role": "admin",
-            "email": "",
-            "created_at": "",
-        }
+    # 新 token 的用户 ID 在 sub（字符串）；解析为 int。
+    sub = payload.get("sub")
+    user_id: int | None = None
+    if sub is not None:
+        try:
+            user_id = int(sub)
+        except (TypeError, ValueError):
+            user_id = None
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="无效的令牌")
 
     db = get_db()
     try:
         row = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         if row is None:
             raise HTTPException(status_code=401, detail="用户不存在")
-        user = User(**row)
+        # 直接从 row 读取（DB 列为 hashed_password，旧 Pydantic User 模型已不适用）
+        created_at = row.get("created_at")
         return {
-            "id": user.id if user.id is not None else 0,
-            "username": user.username,
-            "role": user.role,
-            "created_at": user.created_at or "",
-            "email": user.email,
-            "is_active": user.is_active,
+            "id": row["id"] if row.get("id") is not None else 0,
+            "username": row.get("username") or "",
+            "role": row.get("role") or "user",
+            "created_at": str(created_at) if created_at else "",
+            "email": row.get("email") or "",
+            "is_active": row.get("is_active", 1),
         }
     finally:
         db.close()

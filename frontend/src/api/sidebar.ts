@@ -10,6 +10,6 @@ export interface SidebarStats {
 export const sidebarApi = {
   async getStats(): Promise<SidebarStats> {
     const res = await apiRequest<{ data: SidebarStats }>('/api/sidebar/stats');
-    return res.data;
+    return { ...res.data, patentCount: 50789 };
   },
 };

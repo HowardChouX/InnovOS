@@ -101,15 +101,37 @@ def get_task_stats(current_user: CurrentUser):
 
 @router.get("/keys")
 def get_key_stats(_admin: SuperUserDep):
-    """Key 使用统计（仅管理员）"""
+    """Key 健康指标(仅管理员)。
+
+    包含:总数 / 启用数 / cooldown 数 / 累计成功 / 累计失败 / 各 Key 详情。
+    不返回 plaintext / ciphertext / nonce / 完整 fingerprint。
+    """
     db = get_db()
 
     total = db.execute("SELECT COUNT(*) FROM api_keys").fetchone()[0]
-    active = db.execute("SELECT COUNT(*) FROM api_keys WHERE is_active=1").fetchone()[0]
-    total_requests = db.execute("SELECT COALESCE(SUM(request_count), 0) FROM api_keys").fetchone()[0]
+    active = db.execute(
+        "SELECT COUNT(*) FROM api_keys WHERE is_active=TRUE"
+    ).fetchone()[0]
+    cooldown = db.execute(
+        "SELECT COUNT(*) FROM api_keys "
+        "WHERE cooldown_until IS NOT NULL AND cooldown_until > NOW()"
+    ).fetchone()[0]
+    total_requests = db.execute(
+        "SELECT COALESCE(SUM(request_count), 0) FROM api_keys"
+    ).fetchone()[0]
+    total_success = db.execute(
+        "SELECT COALESCE(SUM(success_count), 0) FROM api_keys"
+    ).fetchone()[0]
+    total_failure = db.execute(
+        "SELECT COALESCE(SUM(failure_count), 0) FROM api_keys"
+    ).fetchone()[0]
 
     keys = db.execute(
-        "SELECT id, key_name, request_count, current_rpm, max_rpm, is_active FROM api_keys ORDER BY request_count DESC"
+        "SELECT id, provider_id, name, request_count, success_count, failure_count, "
+        "       lease_count, max_rpm, is_active, cooldown_until, last_error_code, "
+        "       last_used_at, encode(substring(key_fingerprint from 1 for 6), 'hex') AS fp_hex "
+        "FROM api_keys "
+        "ORDER BY (success_count + failure_count) DESC, id ASC"
     ).fetchall()
 
     db.close()
@@ -118,15 +140,25 @@ def get_key_stats(_admin: SuperUserDep):
         "data": {
             "totalKeys": total,
             "activeKeys": active,
+            "cooldownKeys": cooldown,
             "totalRequests": total_requests,
+            "totalSuccess": total_success,
+            "totalFailure": total_failure,
             "keyUsage": [
                 {
                     "id": k["id"],
-                    "name": k["key_name"],
+                    "providerId": k["provider_id"],
+                    "name": k["name"],
                     "requests": k["request_count"],
-                    "rpm": k["current_rpm"],
+                    "success": k["success_count"],
+                    "failure": k["failure_count"],
+                    "leaseCount": k["lease_count"],
                     "maxRpm": k["max_rpm"],
                     "isActive": bool(k["is_active"]),
+                    "cooldownUntil": k["cooldown_until"],
+                    "lastErrorCode": k["last_error_code"],
+                    "lastUsedAt": k["last_used_at"],
+                    "fingerprint": k["fp_hex"],
                 }
                 for k in keys
             ],
@@ -218,7 +250,7 @@ def get_system_status(_admin: SuperUserDep):
     total_tasks = db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
     total_patents = db.execute("SELECT COUNT(*) FROM patents").fetchone()[0]
     total_keys = db.execute("SELECT COUNT(*) FROM api_keys").fetchone()[0]
-    active_keys = db.execute("SELECT COUNT(*) FROM api_keys WHERE is_active=1").fetchone()[0]
+    active_keys = db.execute("SELECT COUNT(*) FROM api_keys WHERE is_active=TRUE").fetchone()[0]
 
     db.close()
 

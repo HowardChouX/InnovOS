@@ -1,16 +1,19 @@
 import { useMemo } from 'react';
 
-interface ConflictGraphProps {
-  centerConflict: string;
-  nodes: { label: string; sublabel?: string; description?: string }[];
+interface ConflictDimension {
+  id: string;
+  label: string;
+  icon: string;
+  color: string;
+  contradiction: string;
+  example: string;
+  severity: number;
 }
 
-const COLORS = [
-  'var(--accent-blue)',
-  'var(--accent-green)',
-  'var(--accent-purple)',
-  'var(--accent-yellow)',
-];
+interface ConflictGraphProps {
+  centerConflict: string;
+  dimensions: ConflictDimension[];
+}
 
 /** 计算 n 个节点在正多边形上的坐标 */
 function computePositions(
@@ -26,31 +29,36 @@ function computePositions(
   });
 }
 
-export function ConflictGraph({ centerConflict, nodes }: ConflictGraphProps) {
-  const satelliteNodes = useMemo(() => nodes.slice(0, 4), [nodes]);
+export function ConflictGraph({ centerConflict, dimensions }: ConflictGraphProps) {
+  const nodes = useMemo(() => dimensions.slice(0, 4), [dimensions]);
 
-  // 自适应尺寸
   const viewBoxW = 600;
-  const viewBoxH = Math.max(280, satelliteNodes.length === 1 ? 220 : 300);
+  const viewBoxH = 340;
   const CX = viewBoxW / 2;
   const CY = viewBoxH / 2;
-  const ORBIT_R = Math.min(140, Math.min(viewBoxW, viewBoxH) * 0.38);
-  const CENTER_R = 46;
-  const NODE_W = 136;
-  const NODE_H = 52;
+  const ORBIT_R = 130;
+  const CENTER_R = 42;
+  const NODE_W = 140;
+  const NODE_H = 72;
 
   const positions = useMemo(
-    () => computePositions(satelliteNodes.length, CX, CY, ORBIT_R),
-    [satelliteNodes.length, CX, CY, ORBIT_R],
+    () => computePositions(nodes.length, CX, CY, ORBIT_R),
+    [nodes.length, CX, CY, ORBIT_R],
   );
 
   const labelStyle: React.CSSProperties = {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 600,
     textAlign: 'center',
     lineHeight: 1.3,
     wordBreak: 'break-word',
     overflow: 'hidden',
+  };
+
+  const severityColors = (n: number) => {
+    if (n >= 4) return '#ef4444';
+    if (n >= 3) return '#f97316';
+    return '#eab308';
   };
 
   return (
@@ -77,12 +85,12 @@ export function ConflictGraph({ centerConflict, nodes }: ConflictGraphProps) {
             100% { opacity: 1; transform: scale(1); }
           }
           @keyframes center-pulse {
-            0%, 100% { filter: drop-shadow(0 0 8px rgba(96,165,250,0.2)); }
-            50%      { filter: drop-shadow(0 0 18px rgba(96,165,250,0.4)); }
+            0%, 100% { filter: drop-shadow(0 0 6px rgba(96,165,250,0.2)); }
+            50%      { filter: drop-shadow(0 0 14px rgba(96,165,250,0.35)); }
           }
         `}</style>
 
-        {/* ═══ 轨道圈 ═══ */}
+        {/* 轨道圈 */}
         <circle
           cx={CX}
           cy={CY}
@@ -91,37 +99,35 @@ export function ConflictGraph({ centerConflict, nodes }: ConflictGraphProps) {
           stroke="var(--border)"
           strokeWidth="1"
           strokeDasharray="5 5"
-          opacity="0.5"
+          opacity="0.4"
         />
 
-        {/* ═══ 连线（带绘制动画） ═══ */}
-        {positions.map((pos, i) => {
-          return (
-            <line
-              key={`line-${i}`}
-              x1={CX}
-              y1={CY}
-              x2={pos.cx}
-              y2={pos.cy}
-              stroke={COLORS[i]}
-              strokeWidth="1.5"
-              opacity="0.45"
-              strokeDasharray="200"
-              style={{
-                strokeDashoffset: 200,
-                animation: `line-draw 0.5s ease-out ${0.2 + i * 0.15}s forwards`,
-              }}
-            />
-          );
-        })}
+        {/* 连线 */}
+        {positions.map((pos, i) => (
+          <line
+            key={`line-${i}`}
+            x1={CX}
+            y1={CY}
+            x2={pos.cx}
+            y2={pos.cy}
+            stroke={nodes[i].color}
+            strokeWidth="1.5"
+            opacity="0.4"
+            strokeDasharray="200"
+            style={{
+              strokeDashoffset: 200,
+              animation: `line-draw 0.5s ease-out ${0.2 + i * 0.12}s forwards`,
+            }}
+          />
+        ))}
 
-        {/* ═══ 中心节点 ═══ */}
+        {/* 中心节点 */}
         <g style={{ animation: 'center-pulse 3s ease-in-out infinite' }}>
           <circle
             cx={CX}
             cy={CY}
             r={CENTER_R}
-            fill="var(--accent-dim, rgba(59,130,246,0.12))"
+            fill="rgba(59,130,246,0.12)"
             stroke="var(--accent)"
             strokeWidth="2"
             opacity="0.9"
@@ -131,29 +137,30 @@ export function ConflictGraph({ centerConflict, nodes }: ConflictGraphProps) {
               style={{
                 ...labelStyle,
                 color: 'var(--accent)',
-                fontSize: 14,
+                fontSize: 13,
               }}
             >
-              {centerConflict.length > 14
-                ? centerConflict.slice(0, 14) + '…'
+              {centerConflict.length > 12
+                ? centerConflict.slice(0, 12) + '…'
                 : centerConflict || '核心冲突'}
             </div>
           </foreignObject>
         </g>
 
-        {/* ═══ 卫星节点（逐个动画弹入） ═══ */}
-        {satelliteNodes.map((node, i) => {
+        {/* 卫星节点 */}
+        {nodes.map((dim, i) => {
           const pos = positions[i];
-          const color = COLORS[i];
+          const color = dim.color;
+          const sevColor = severityColors(dim.severity);
           return (
             <g
               key={`node-${i}`}
               style={{
                 opacity: 0,
-                animation: `node-pop 0.35s ease-out ${0.3 + i * 0.15}s forwards`,
+                animation: `node-pop 0.35s ease-out ${0.3 + i * 0.12}s forwards`,
               }}
             >
-              {/* 节点卡片 */}
+              {/* 卡片背景 */}
               <rect
                 x={pos.cx - NODE_W / 2}
                 y={pos.cy - NODE_H / 2}
@@ -164,32 +171,78 @@ export function ConflictGraph({ centerConflict, nodes }: ConflictGraphProps) {
                 stroke={`${color}40`}
                 strokeWidth="1.5"
               />
+
+              {/* 左侧色条 */}
+              <rect
+                x={pos.cx - NODE_W / 2}
+                y={pos.cy - NODE_H / 2}
+                width={3}
+                height={NODE_H}
+                rx={1.5}
+                fill={color}
+                opacity={0.7}
+              />
+
+              {/* 图标 */}
+              <foreignObject
+                x={pos.cx - NODE_W / 2 + 10}
+                y={pos.cy - 20}
+                width={16}
+                height={16}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className={`fa-solid ${dim.icon}`} style={{ fontSize: 10, color }} />
+                </div>
+              </foreignObject>
+
               {/* 标签 */}
               <foreignObject
-                x={pos.cx - NODE_W / 2 + 6}
-                y={pos.cy - NODE_H / 2 + 5}
-                width={NODE_W - 12}
+                x={pos.cx - NODE_W / 2 + 28}
+                y={pos.cy - 22}
+                width={NODE_W - 38}
                 height={NODE_H - 10}
               >
                 <div style={{ overflow: 'hidden' }}>
-                  <div style={{ ...labelStyle, color, fontSize: 12 }}>
-                    {node.label.length > 16
-                      ? node.label.slice(0, 16) + '…'
-                      : node.label}
+                  <div style={{ ...labelStyle, color, fontSize: 11 }}>
+                    {dim.label}
                   </div>
-                  {(node.sublabel || node.description) && (
-                    <div
+                  <div
+                    style={{
+                      fontSize: 9,
+                      color: 'var(--text-tertiary)',
+                      lineHeight: 1.3,
+                      marginTop: 2,
+                    }}
+                  >
+                    {dim.contradiction.length > 20
+                      ? dim.contradiction.slice(0, 20) + '…'
+                      : dim.contradiction}
+                  </div>
+                </div>
+              </foreignObject>
+
+              {/* 严重度指示 */}
+              <foreignObject
+                x={pos.cx - NODE_W / 2 + 10}
+                y={pos.cy + NODE_H / 2 - 14}
+                width={NODE_W - 20}
+                height={10}
+              >
+                <div style={{ display: 'flex', gap: 2, alignItems: 'center', justifyContent: 'center' }}>
+                  {Array.from({ length: 5 }, (_, j) => (
+                    <span
+                      key={j}
                       style={{
-                        fontSize: 10,
-                        color: 'var(--text-tertiary)',
-                        textAlign: 'center',
-                        lineHeight: 1.3,
-                        marginTop: 3,
+                        width: 4,
+                        height: 4,
+                        borderRadius: '50%',
+                        background: j < dim.severity ? sevColor : 'rgba(255,255,255,0.1)',
                       }}
-                    >
-                      {(node.sublabel || node.description || '').slice(0, 20)}
-                    </div>
-                  )}
+                    />
+                  ))}
+                  <span style={{ fontSize: 8, color: 'var(--text-tertiary)', marginLeft: 2 }}>
+                    {dim.severity}/5
+                  </span>
                 </div>
               </foreignObject>
             </g>

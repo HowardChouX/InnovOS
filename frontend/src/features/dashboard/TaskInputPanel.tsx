@@ -93,6 +93,7 @@ export function TaskInputPanel() {
   const isRunning = useWorkflowStore((s) => s.isRunning);
   const cancelAnalysis = useWorkflowStore((s) => s.cancelAnalysis);
   const clearWorkflow = useWorkflowStore((s) => s.clearWorkflow);
+  const fetchWorkflow = useWorkflowStore((s) => s.fetchWorkflow);
 
   // History modal state
   const [showHistory, setShowHistory] = useState(false);
@@ -107,7 +108,7 @@ export function TaskInputPanel() {
     taskId: string;
     title: string;
   }>({ open: false, taskId: '', title: '' });
-  const [historyError, setHistoryError] = useState('');
+  const [, setHistoryError] = useState('');
 
   useEffect(() => {
     knowledgeApi

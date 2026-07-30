@@ -1,4 +1,4 @@
-"""统一供应商管理 API — 供应商管理（密钥来自环境变量）"""
+"""统一供应商管理 API — 供应商 + Key 全 CRUD（Key 由数据库 AES-256-GCM 加密存储）"""
 
 import json
 
@@ -12,6 +12,19 @@ from app.auth import require_admin
 router = APIRouter(prefix="/providers", tags=["providers"])
 
 
+# ── ApiKeyService 工厂 ──
+
+
+def _get_api_key_service():
+    """运行时工厂:从 db + cipher 构造 ApiKeyService。
+
+    测试可通过 monkeypatch 替换。
+    """
+    from app.services.api_key_service import get_api_key_service
+
+    return get_api_key_service()
+
+
 # 模型条目：兼容旧格式字符串和新格式对象
 ModelEntry = str | dict
 
@@ -21,7 +34,8 @@ class AddProviderInput(BaseModel):
     name: str
     protocol: str = "openai"
     api_host: str
-    # API 密钥来自环境变量 AI_{PROVIDER_ID}_API_KEY，不再通过界面输入
+    # API Key 通过 /api/admin/providers/{provider_id}/keys 子路由单独管理,
+    # 支持多 Key + 加密存储 + 公平轮询。
     api_model: str = ""
     models: list[ModelEntry] = []
     max_rpm: int = 60
@@ -30,7 +44,7 @@ class AddProviderInput(BaseModel):
 class UpdateProviderInput(BaseModel):
     name: str | None = None
     api_host: str | None = None
-    # API 密钥来自环境变量 AI_{PROVIDER_ID}_API_KEY，无法通过界面更新
+    # API Key 通过子路由管理,不在此处更新
     api_model: str | None = None
     models: list[ModelEntry] | None = None
     is_enabled: bool | None = None
@@ -93,7 +107,7 @@ async def check_connection(
 
 @router.post("/{provider_id}/detect-models")
 async def detect_models(provider_id: str, user: dict = Depends(require_admin)):
-    """从供应商 API 获取可用模型列表（密钥来自环境变量）"""
+    """从供应商 API 获取可用模型列表（Key 通过 ApiKeyService 从数据库读取）"""
     result = await model_service.detect_models(provider_id)
     return {"data": result, "message": "success"}
 
@@ -186,3 +200,142 @@ def delete_provider_model(
         db.commit()
     db.close()
     return {"message": "模型已删除"}
+
+
+# ═══════════════════════════════════════════════════════════════
+#  API Key 管理子路由(挂载到 /{provider_id}/keys)
+# ═══════════════════════════════════════════════════════════════
+
+
+class CreateKeyInput(BaseModel):
+    """创建 Key 请求体。plaintext 只在创建/替换时提交,永不返回。"""
+
+    name: str
+    apiKey: str
+    priority: int = 100
+    maxRpm: int | None = None
+
+
+class UpdateKeyMetadataInput(BaseModel):
+    name: str | None = None
+    priority: int | None = None
+    maxRpm: int | None = None
+    isActive: bool | None = None
+
+
+class ReplaceKeySecretInput(BaseModel):
+    apiKey: str
+
+
+def _current_user_id(user: dict) -> int:
+    """从 require_admin 返回的 user dict 取 actor_id。"""
+    return int(user.get("user_id") or user.get("id") or 0)
+
+
+@router.post("/{provider_id}/keys")
+def create_api_key(
+    provider_id: str,
+    body: CreateKeyInput,
+    user: dict = Depends(require_admin),
+):
+    """新建一把供应商 API Key(密文存储)。"""
+    if not body.apiKey.strip():
+        raise HTTPException(status_code=422, detail="apiKey 不能为空")
+    svc = _get_api_key_service()
+    try:
+        result = svc.create_key(
+            provider_id=provider_id,
+            name=body.name,
+            plaintext=body.apiKey,
+            priority=body.priority,
+            max_rpm=body.maxRpm,
+            actor_id=_current_user_id(user),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"data": result, "message": "Key 已添加"}
+
+
+@router.get("/{provider_id}/keys")
+def list_api_keys(provider_id: str, user: dict = Depends(require_admin)):
+    """列出供应商所有 Key(掩码 + 短 fingerprint)。"""
+    svc = _get_api_key_service()
+    results = svc.list_keys(provider_id=provider_id)
+    return {"data": results, "message": "success"}
+
+
+@router.patch("/{provider_id}/keys/{key_id}")
+def update_api_key(
+    provider_id: str,
+    key_id: int,
+    body: UpdateKeyMetadataInput,
+    user: dict = Depends(require_admin),
+):
+    """更新 Key 元数据(name / priority / maxRpm / isActive)。不改密文。"""
+    svc = _get_api_key_service()
+    result = svc.update_metadata(
+        key_id=key_id,
+        name=body.name,
+        priority=body.priority,
+        max_rpm=body.maxRpm,
+        is_active=body.isActive,
+        actor_id=_current_user_id(user),
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Key 不存在")
+    return {"data": result, "message": "已更新"}
+
+
+@router.put("/{provider_id}/keys/{key_id}/secret")
+def replace_api_key_secret(
+    provider_id: str,
+    key_id: int,
+    body: ReplaceKeySecretInput,
+    user: dict = Depends(require_admin),
+):
+    """替换 Key 明文(密文 + nonce + fingerprint 全更新,清 cooldown)。"""
+    if not body.apiKey.strip():
+        raise HTTPException(status_code=422, detail="apiKey 不能为空")
+    svc = _get_api_key_service()
+    result = svc.replace_secret(
+        key_id=key_id, plaintext=body.apiKey, actor_id=_current_user_id(user)
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Key 不存在")
+    return {"data": result, "message": "Key 已替换"}
+
+
+@router.post("/{provider_id}/keys/{key_id}/activate")
+def activate_api_key(
+    provider_id: str, key_id: int, user: dict = Depends(require_admin)
+):
+    svc = _get_api_key_service()
+    result = svc.activate(key_id=key_id, actor_id=_current_user_id(user))
+    if not result:
+        raise HTTPException(status_code=404, detail="Key 不存在")
+    return {"data": result, "message": "已启用"}
+
+
+@router.post("/{provider_id}/keys/{key_id}/deactivate")
+def deactivate_api_key(
+    provider_id: str, key_id: int, user: dict = Depends(require_admin)
+):
+    svc = _get_api_key_service()
+    result = svc.deactivate(key_id=key_id, actor_id=_current_user_id(user))
+    if not result:
+        raise HTTPException(status_code=404, detail="Key 不存在")
+    return {"data": result, "message": "已停用"}
+
+
+@router.delete("/{provider_id}/keys/{key_id}")
+def delete_api_key(
+    provider_id: str, key_id: int, user: dict = Depends(require_admin)
+):
+    """软删(is_active=false),保留审计。"""
+    svc = _get_api_key_service()
+    ok = svc.delete_key(key_id=key_id, actor_id=_current_user_id(user))
+    if not ok:
+        raise HTTPException(status_code=404, detail="Key 不存在")
+    return {"message": "Key 已停用"}

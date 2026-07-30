@@ -59,10 +59,4 @@ export const WORKFLOW_STEPS: {
     description: '多维评估，筛选优化，形成最优方案',
     color: 'var(--accent-yellow)',
   },
-  {
-    phaseId: 'video_display',
-    label: '视频展示',
-    description: '创新方案视频化展示，便于汇报与沟通',
-    color: '#f97316',
-  },
 ];

@@ -1,47 +1,9 @@
-# 后端 .dockerignore
-# 排除不需要复制到镜像中的文件
-
-# Python
-__pycache__
-*.pyc
-*.pyo
-.pytest_cache
-.coverage
-htmlcov/
-
-# 虚拟环境
-.venv/
-venv/
-
-# 测试
-tests/
-test_
-
-# IDE
-.vscode/
-.idea/
-
-# 日志
-*.log
-
-# Git
 .git
 .gitignore
-
-# 文档
-*.md
-LICENSE
-
-# Docker
-Dockerfile
-docker-compose*.yml
-.dockerignore
-
-# 环境配置
+__pycache__
+*.pyc
 .env
 .env.*
-
-# 开发配置
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
+tests/
+*.md
+.DS_Store

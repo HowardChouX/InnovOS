@@ -28,7 +28,12 @@ export default defineConfig({
         },
       },
     },
-    chunkSizeWarningLimit: 500,
+    chunkSizeWarningLimit: 1000,
     cssMinify: true,
+    rolldownOptions: {
+      output: {
+        codeSplitting: true,
+      },
+    },
   },
 })

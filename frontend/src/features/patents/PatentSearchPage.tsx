@@ -140,7 +140,7 @@ function PatentDetailModal({ patent, onClose }: { patent: Patent; onClose: () =>
               相关度
             </div>
             <div style={{ fontSize: 13, color: 'var(--accent-green)', fontWeight: 600 }}>
-              {patent.relevanceScore}%
+              {patent.relevance_score}%
             </div>
           </div>
 
@@ -227,7 +227,7 @@ export function PatentSearchPage() {
     >
       <div
         className="card-title"
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+        style={{ justifyContent: 'space-between' }}
       >
         <div>
           <i
@@ -507,7 +507,7 @@ export function PatentSearchPage() {
                     }}
                   >
                     {patent.abstract?.slice(0, 120) || '暂无摘要'}
-                    {patent.abstract?.length > 120 ? '...' : ''}
+                    {(patent.abstract?.length ?? 0) > 120 ? '...' : ''}
                   </div>
                   <div
                     style={{
@@ -548,10 +548,10 @@ export function PatentSearchPage() {
                     flexShrink: 0,
                   }}
                 >
-                  {patent.relevanceScore > 0 && (
+                  {patent.relevance_score != null && patent.relevance_score > 0 && (
                     <>
                       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-green)' }}>
-                        {patent.relevanceScore}%
+                        {patent.relevance_score}%
                       </span>
                       <span style={{ fontSize: 9, color: 'var(--text-tertiary)' }}>相关度</span>
                     </>

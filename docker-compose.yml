@@ -1,7 +1,15 @@
+# InnovOS Docker Compose
+# 使用 bridge 网络，服务之间通过 Docker DNS（service name）通信。
+# 容器间无需访问宿主机网络，端口通过 ports 映射暴露。
+
 services:
-  # ─── PostgreSQL + pgvector ───────────────────────────────────
+
   postgres:
     image: pgvector/pgvector:pg17
+    networks:
+      - innovos-net
+    ports:
+      - "5432:5432"
     env_file: ./.env
     environment:
       POSTGRES_DB: innovos
@@ -11,30 +19,29 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U innovos']
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
     restart: unless-stopped
     deploy:
       resources:
         limits:
           memory: 512M
           cpus: '1.0'
-    logging:
-      driver: json-file
-      options:
-        max-size: '10m'
-        max-file: '3'
 
-  # ─── Redis (rate limiting + caching) ─────────────────────────
   redis:
     image: redis:7-alpine
+    networks:
+      - innovos-net
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
-      interval: 5s
-      timeout: 3s
-      retries: 5
+      interval: 10s
+      timeout: 5s
+      retries: 12
       start_period: 5s
     restart: unless-stopped
     deploy:
@@ -42,37 +49,14 @@ services:
         limits:
           memory: 128M
           cpus: '0.5'
-    logging:
-      driver: json-file
-      options:
-        max-size: '10m'
-        max-file: '3'
 
-  # ─── Mailpit (dev email capture, optional) ──────────────────
-  # 默认不强制启动；如需使用：
-  #   docker compose --profile mail up mailpit
-  #   然后把 .env 中 SMTP_HOST=mailpit SMTP_PORT=1025
-  mailpit:
-    image: axllent/mailpit:latest
-    profiles: ['mail']
-    ports:
-      - '8025:8025'   # Web UI
-      - '1025:1025'   # SMTP
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 64M
-          cpus: '0.2'
-    logging:
-      driver: json-file
-      options:
-        max-size: '10m'
-        max-file: '3'
-
-  # ─── MinIO (S3-compatible object storage) ────────────────────
   minio:
     image: minio/minio:latest
+    networks:
+      - innovos-net
+    ports:
+      - "9000:9000"
+      - "9001:9001"
     command: server /data --console-address ":9001"
     env_file: ./.env
     environment:
@@ -80,12 +64,9 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - minio_data:/data
-    # ports:  # Security: MinIO only needs internal Docker network access.
-    #   - "9000:9000"   # S3 API — production: remove for security
-    #   - "9001:9001"   # Console UI — production: remove for security
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
@@ -95,15 +76,11 @@ services:
         limits:
           memory: 256M
           cpus: '0.5'
-    logging:
-      driver: json-file
-      options:
-        max-size: '10m'
-        max-file: '3'
 
-  # ─── Create MinIO bucket on startup ──────────────────────────
   minio-setup:
     image: minio/mc:latest
+    networks:
+      - innovos-net
     depends_on:
       minio:
         condition: service_healthy
@@ -121,13 +98,15 @@ services:
       "
     restart: 'no'
 
-  # ─── Backend API ─────────────────────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      network: host
+    networks:
+      - innovos-net
     ports:
-      - '8000:8000'
+      - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -138,31 +117,21 @@ services:
     env_file: ./.env
     volumes:
       - backend_uploads:/app/data/uploads
+      - ./backend/alembic:/app/alembic
     environment:
-      # Database
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       DATABASE_URL: postgresql://innovos:${POSTGRES_PASSWORD}@postgres:5432/innovos
-      # JWT
       INNOVOS_JWT_SECRET: ${INNOVOS_JWT_SECRET}
-      # Admin
       INNOVOS_ADMIN_USER: ${INNOVOS_ADMIN_USER}
       INNOVOS_ADMIN_PASSWORD: ${INNOVOS_ADMIN_PASSWORD}
-      # S3 / MinIO
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY: ${MINIO_ROOT_USER}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       S3_BUCKET: ${S3_BUCKET:-innovos-files}
       S3_REGION: ${S3_REGION:-us-east-1}
-      # Public URL for file access
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost}
-      # Redis
       REDIS_URL: redis://redis:6379/0
-      # AI Provider Keys
-      AI_SILICON_API_KEY: ${AI_SILICON_API_KEY}
-      AI_SILICON_API_HOST: ${AI_SILICON_API_HOST:-https://api.siliconflow.cn}
-      AI_DEEPSEEK_API_KEY: ${AI_DEEPSEEK_API_KEY}
-      AI_DEEPSEEK_API_HOST: ${AI_DEEPSEEK_API_HOST:-https://api.deepseek.com}
-      # CNIPR Patent API
+      INNOVOS_ENCRYPT_KEY: ${INNOVOS_ENCRYPT_KEY:?required}
       CNIPR_CLIENT_ID: ${CNIPR_CLIENT_ID}
       CNIPR_CLIENT_SECRET: ${CNIPR_CLIENT_SECRET}
       CNIPR_USERNAME: ${CNIPR_USERNAME:-}
@@ -175,34 +144,31 @@ services:
         limits:
           memory: 2G
           cpus: '2.0'
-    logging:
-      driver: json-file
-      options:
-        max-size: '10m'
-        max-file: '3'
 
-  # ─── Frontend (SPA + nginx reverse proxy) ────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      network: host
+    networks:
+      - innovos-net
+    ports:
+      - "80:80"
     depends_on:
       - backend
-    ports:
-      - '80:80'
     restart: unless-stopped
     deploy:
       resources:
         limits:
           memory: 128M
           cpus: '0.5'
-    logging:
-      driver: json-file
-      options:
-        max-size: '10m'
-        max-file: '3'
+
+networks:
+  innovos-net:
+    driver: bridge
 
 volumes:
   postgres_data:
+  redis_data:
   minio_data:
   backend_uploads:

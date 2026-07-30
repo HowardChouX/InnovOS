@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useWorkflowStore } from '../../store/useWorkflowStore';
 import { useTaskStore } from '../../store/useTaskStore';
 import { workflowApi } from '../../api/workflow';
@@ -16,6 +16,7 @@ interface PatentData {
   patent_number?: string;
   relevance_score?: number;
   source?: string;
+  source_innovation?: string;
 }
 
 function RelevanceBadge({ score }: { score?: number }) {
@@ -56,6 +57,31 @@ export function PatentSearchView({ output }: { output: unknown }) {
     ? (output as PatentData[])
     : ((output as Record<string, unknown>)?.patents as PatentData[]) || [];
 
+  // 按创新方向分组，每个方向只保留最相关的专利
+  const groupedPatents = useMemo(() => {
+    const groups = new Map<string, PatentData[]>();
+
+    // 按 source_innovation 分组
+    for (const patent of patents) {
+      const direction = patent.source_innovation || '其他方向';
+      if (!groups.has(direction)) {
+        groups.set(direction, []);
+      }
+      groups.get(direction)!.push(patent);
+    }
+
+    // 每个方向取最相关的一条（relevance_score 最高的）
+    return Array.from(groups.entries()).map(([direction, pats]) => ({
+      direction,
+      patent: pats.reduce((best, curr) => {
+        const bestScore = best.relevance_score || 0;
+        const currScore = curr.relevance_score || 0;
+        return currScore > bestScore ? curr : best;
+      }, pats[0]),
+      totalCount: pats.length,
+    }));
+  }, [patents]);
+
   if (!workflow || patents.length === 0) {
     return (
       <div
@@ -77,14 +103,15 @@ export function PatentSearchView({ output }: { output: unknown }) {
     return null;
   }
 
-  const allRated = patents.every((_, i: number) => (ratings[String(i)] ?? 0) > 0);
+  // 按创新方向显示，每个方向只需要评一次分
+  const allRated = groupedPatents.every((_, i) => (ratings[String(i)] ?? 0) > 0);
 
   const handleSubmit = async () => {
     if (!selectedTaskId || !allRated || submitting) return;
     setSubmitting(true);
     try {
-      const ratingsPayload = patents.map((patent, i: number) => ({
-        demandId: (patent.id as string) || String(i),
+      const ratingsPayload = groupedPatents.map((grouped, i) => ({
+        demandId: grouped.patent.id || String(i),
         score: ratings[String(i)] || 0,
       }));
       await workflowApi.proceed(selectedTaskId, ratingsPayload);
@@ -122,104 +149,141 @@ export function PatentSearchView({ output }: { output: unknown }) {
             color: 'var(--accent-blue)',
           }}
         >
-          {patents.length} 项
+          {groupedPatents.length} 个方向，共 {patents.length} 项
         </span>
       </div>
 
       <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
-        请对以下专利的相关度进行评分，评分后确认进入下一步
+        每个创新方向显示最相关专利，请评分后确认进入下一步
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minHeight: 0 }}>
-        {patents.map((patent, i: number) => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minHeight: 0 }}>
+        {groupedPatents.map((grouped, i) => (
           <div
             key={i}
             style={{
               display: 'flex',
-              alignItems: 'flex-start',
-              gap: 12,
-              padding: '10px 14px',
+              flexDirection: 'column',
+              gap: 8,
+              padding: '12px 14px',
               borderRadius: 8,
               background: 'rgba(0,0,0,0.2)',
               border: '1px solid var(--border)',
-              flex: '1 1 auto',
-              minHeight: 120,
             }}
           >
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {/* 专利标题 */}
-              <div
+            {/* 方向标题 */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <span
                 style={{
-                  fontSize: 13,
+                  fontSize: 10,
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  background: 'rgba(167,139,250,0.15)',
+                  color: 'var(--accent-purple)',
                   fontWeight: 600,
-                  color: 'var(--text-primary)',
-                  marginBottom: 4,
                 }}
               >
-                {patent.title || '未命名专利'}
-              </div>
-
-              {/* 元数据标签行 */}
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
-                {(patent.documentNumber || patent.patent_number) && (
-                  <span
-                    style={{
-                      fontSize: 10,
-                      padding: '1px 6px',
-                      borderRadius: 3,
-                      background: 'rgba(59,130,246,0.1)',
-                      color: 'var(--accent-blue)',
-                    }}
-                  >
-                    {patent.documentNumber || patent.patent_number}
-                  </span>
-                )}
-                {patent.applicant && (
-                  <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
-                    {patent.applicant}
-                  </span>
-                )}
-                {patent.mainIpc && (
-                  <span
-                    style={{
-                      fontSize: 10,
-                      padding: '1px 6px',
-                      borderRadius: 3,
-                      background: 'rgba(167,139,250,0.1)',
-                      color: 'var(--accent-purple)',
-                    }}
-                  >
-                    IPC: {patent.mainIpc}
-                  </span>
-                )}
-                <RelevanceBadge score={patent.relevance_score} />
-              </div>
-
-              {/* 摘要 */}
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                {(patent.summary || patent.abstract || '').slice(0, 250)}
-                {(patent.summary || patent.abstract || '').length > 250 ? '...' : ''}
-              </div>
+                创新方向 {i + 1}
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                {grouped.direction}
+              </span>
+              {grouped.totalCount > 1 && (
+                <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                  （共检索到 {grouped.totalCount} 项，已展示最相关）
+                </span>
+              )}
             </div>
 
-            {/* 星级评分 */}
-            <div style={{ display: 'flex', gap: 2, cursor: 'pointer', flexShrink: 0 }}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <span
-                  key={star}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setRatings((prev) => ({ ...prev, [String(i)]: star }));
-                  }}
+            {/* 专利卡片 */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 12,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {/* 专利标题 */}
+                <div
                   style={{
-                    fontSize: 18,
-                    color:
-                      star <= (ratings[String(i)] || 0) ? '#fbbf24' : 'rgba(255,255,255,0.15)',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                    marginBottom: 4,
                   }}
                 >
-                  <i className="fa-solid fa-star" />
-                </span>
-              ))}
+                  {grouped.patent.title || '未命名专利'}
+                </div>
+
+                {/* 元数据标签行 */}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
+                  {(grouped.patent.documentNumber || grouped.patent.patent_number) && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        padding: '1px 6px',
+                        borderRadius: 3,
+                        background: 'rgba(59,130,246,0.1)',
+                        color: 'var(--accent-blue)',
+                      }}
+                    >
+                      {grouped.patent.documentNumber || grouped.patent.patent_number}
+                    </span>
+                  )}
+                  {grouped.patent.applicant && (
+                    <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                      {grouped.patent.applicant}
+                    </span>
+                  )}
+                  {grouped.patent.mainIpc && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        padding: '1px 6px',
+                        borderRadius: 3,
+                        background: 'rgba(167,139,250,0.1)',
+                        color: 'var(--accent-purple)',
+                      }}
+                    >
+                      IPC: {grouped.patent.mainIpc}
+                    </span>
+                  )}
+                  <RelevanceBadge score={grouped.patent.relevance_score} />
+                </div>
+
+                {/* 摘要 */}
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  {(grouped.patent.summary || grouped.patent.abstract || '').slice(0, 250)}
+                  {(grouped.patent.summary || grouped.patent.abstract || '').length > 250 ? '...' : ''}
+                </div>
+              </div>
+
+              {/* 星级评分 */}
+              <div style={{ display: 'flex', gap: 2, cursor: 'pointer', flexShrink: 0 }}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <span
+                    key={star}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRatings((prev) => ({ ...prev, [String(i)]: star }));
+                    }}
+                    style={{
+                      fontSize: 18,
+                      color:
+                        star <= (ratings[String(i)] || 0) ? '#fbbf24' : 'rgba(255,255,255,0.15)',
+                    }}
+                  >
+                    <i className="fa-solid fa-star" />
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         ))}

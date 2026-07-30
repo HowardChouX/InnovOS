@@ -33,21 +33,22 @@ http://localhost
 | 变量                  | 必填 | 说明                                        |
 | --------------------- | ---- | ------------------------------------------- |
 | `INNOVOS_JWT_SECRET`  | ✅   | JWT 签名密钥（生产必须设置强随机值）        |
+| `INNOVOS_ENCRYPT_KEY` | ✅   | 主加密密钥:加密数据库中存储的供应商 API Key (AES-256-GCM) |
 | `POSTGRES_PASSWORD`   | ✅   | 数据库密码                                  |
 | `MINIO_ROOT_PASSWORD` | ✅   | MinIO 管理员密码                            |
-| `AI_*_API_KEY`        | 按需 | AI 供应商密钥，格式 `AI_{供应商ID}_API_KEY` |
 
 ### AI 密钥配置
 
-API Key 通过环境变量注入，不存储在数据库中。支持多 Key 轮询：
+API Key **不再通过环境变量配置**。所有 Provider / Key 由管理员登录后,在
+`/admin/model-services` 页面录入数据库,系统使用 **AES-256-GCM** 加密存储
+(主密钥由 `INNOVOS_ENCRYPT_KEY` 派生)。支持多 Key 轮询、failover、cooldown。
 
-```env
-AI_SILICON_API_KEY=sk-xxx
-AI_SILICON_API_HOST=https://api.siliconflow.cn
-AI_DEEPSEEK_API_KEY=sk-yyy
-AI_DEEPSEEK_API_HOST=https://api.deepseek.com
-AI_SILICON_API_KEY_1=sk-zzz    # 多 Key 添加 _1, _2 后缀
-```
+首次启动步骤:
+1. 配置 `INNOVOS_ENCRYPT_KEY`(见 `.env.example`)
+2. 启动后端,以首位管理员账号登录
+3. 进入"模型服务"页面,新建 Provider(SiliconFlow / DeepSeek / OpenAI / 阿里百炼等)
+4. 为 Provider 添加 API Key(掩码显示,保存后永不回显明文)
+5. 在系统设置中分配 chat / embedding / rerank / ocr / extract 默认模型
 
 ## 开发模式
 

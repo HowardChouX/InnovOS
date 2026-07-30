@@ -6,6 +6,7 @@ and information_schema.columns for migration.
 
 import json
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -199,33 +200,80 @@ def init_audit_log(db):
 
 
 def init_api_keys(db):
-    pk = _ddl_int_pk()
-    now = _ddl_now()
-    db.execute(f"""
+    """供应商 API Key 表(AES-256-GCM 密文存储)。
+
+    schema: BIGSERIAL 主键;密文/12字节 nonce/32字节 HMAC fingerprint 分列;
+    包含租约/统计/cooldown/审计列;索引按 priority + lease_count 选择。
+    兼容老库:旧 plaintext 列(api_key/api_base_url/api_model/current_rpm 等)被显式 DROP。
+    """
+    db.execute("""
         CREATE TABLE IF NOT EXISTS api_keys (
-            id {pk},
-            provider_id TEXT DEFAULT '',
-            key_name TEXT NOT NULL,
-            api_key TEXT NOT NULL,
-            api_base_url TEXT DEFAULT 'https://api.deepseek.com',
-            api_model TEXT DEFAULT 'deepseek-chat',
-            is_active INTEGER DEFAULT 1,
-            priority INTEGER DEFAULT 0,
-            max_rpm INTEGER DEFAULT 60,
-            current_rpm INTEGER DEFAULT 0,
-            last_reset_at TEXT,
-            last_used_at TEXT,
-            request_count INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT ({now})
+            id BIGSERIAL PRIMARY KEY,
+            provider_id TEXT NOT NULL,
+
+            -- 管理员可读标签
+            name TEXT NOT NULL,
+
+            -- AES-GCM 密文产物
+            key_ciphertext     BYTEA NOT NULL,
+            key_nonce          BYTEA NOT NULL,
+            encryption_version SMALLINT NOT NULL DEFAULT 1,
+
+            -- 主密钥派生 HMAC 指纹;API 只返回前 12 位 hex
+            key_fingerprint    BYTEA NOT NULL,
+            key_prefix         VARCHAR(12),
+            key_suffix         VARCHAR(8),
+
+            -- 轮询配置
+            priority  INTEGER NOT NULL DEFAULT 100,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            max_rpm   INTEGER,
+
+            -- 跨进程公平选取(原子租用)
+            lease_count   BIGINT NOT NULL DEFAULT 0,
+            request_count BIGINT NOT NULL DEFAULT 0,
+            success_count BIGINT NOT NULL DEFAULT 0,
+            failure_count BIGINT NOT NULL DEFAULT 0,
+
+            last_used_at    TIMESTAMPTZ,
+            last_success_at TIMESTAMPTZ,
+            last_failure_at TIMESTAMPTZ,
+            cooldown_until  TIMESTAMPTZ,
+            last_error_code VARCHAR(64),
+
+            created_by BIGINT,
+            updated_by BIGINT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+            CONSTRAINT ck_api_keys_nonce_length
+                CHECK (OCTET_LENGTH(key_nonce) = 12),
+            CONSTRAINT ck_api_keys_fingerprint_len
+                CHECK (OCTET_LENGTH(key_fingerprint) = 32),
+            CONSTRAINT ck_api_keys_name_not_blank
+                CHECK (BTRIM(name) <> ''),
+            CONSTRAINT ck_api_keys_encryption_version
+                CHECK (encryption_version >= 1)
         );
     """)
-    _ensure_columns(
-        db,
-        "api_keys",
-        [
-            ("provider_id", "TEXT DEFAULT ''"),
-        ],
-    )
+    # 选择索引:按 priority + lease_count + last_used_at 公平轮询
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS ix_api_keys_selection
+        ON api_keys (provider_id, priority, cooldown_until, lease_count, id)
+        WHERE is_active = TRUE;
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS ix_api_keys_provider_active
+        ON api_keys (provider_id, is_active);
+    """)
+
+    # ── 兼容旧字段(已废弃,DROP COLUMN IF EXISTS 幂等) ──
+    for legacy_col in ("api_key", "api_base_url", "api_model", "current_rpm",
+                       "key_name", "last_reset_at"):
+        try:
+            db.execute(f"ALTER TABLE api_keys DROP COLUMN IF EXISTS {legacy_col}")
+        except Exception as e:
+            logger.warning(f"  无法移除 api_keys.{legacy_col}: {e}")
 
 
 def init_notifications(db):
@@ -490,6 +538,11 @@ def _migrate_models_from_json_column(db):
 
 
 def init_model_providers(db):
+    """模型供应商聚合根表 — Provider 端点配置(Host、协议、模型列表、启用状态)。
+
+    Key 不在此表存储。Key 在 api_keys 表 AES-256-GCM 加密保存。
+    含审计列 created_by / updated_by;含按 is_enabled 的部分索引。
+    """
     pk = _ddl_int_pk()
     now = _ddl_now()
     db.execute(f"""
@@ -499,16 +552,14 @@ def init_model_providers(db):
             name TEXT NOT NULL,
             protocol TEXT DEFAULT 'openai',
             api_host TEXT NOT NULL,
-            api_key_encrypted TEXT,
             api_model TEXT DEFAULT '',
             models TEXT DEFAULT '[]',
             max_rpm INTEGER DEFAULT 60,
-            current_rpm INTEGER DEFAULT 0,
-            request_count INTEGER DEFAULT 0,
             is_enabled INTEGER DEFAULT 1,
-            last_used_at TEXT,
-            last_reset_at TEXT,
-            created_at TEXT DEFAULT ({now})
+            created_by BIGINT,
+            updated_by BIGINT,
+            created_at TEXT DEFAULT ({now}),
+            updated_at TEXT DEFAULT ({now})
         );
     """)
     _ensure_columns(
@@ -517,18 +568,29 @@ def init_model_providers(db):
         [
             ("api_model", "TEXT DEFAULT ''"),
             ("max_rpm", "INTEGER DEFAULT 60"),
-            ("current_rpm", "INTEGER DEFAULT 0"),
-            ("request_count", "INTEGER DEFAULT 0"),
-            ("last_used_at", "TEXT"),
-            ("last_reset_at", "TEXT"),
+            ("created_by", "BIGINT"),
+            ("updated_by", "BIGINT"),
+            ("updated_at", f"TEXT DEFAULT ({now})"),
         ],
     )
-    # 迁移：删除废弃的 priority 列
+
+    # 按 is_enabled 的部分索引
     try:
-        db.execute("ALTER TABLE model_providers DROP COLUMN IF EXISTS priority")
-        logger.info("  - 移除 model_providers.priority 列")
+        db.execute("""
+            CREATE INDEX IF NOT EXISTS ix_model_providers_enabled
+            ON model_providers (provider_id) WHERE is_enabled = 1
+        """)
     except Exception as e:
-        logger.warning(f"  无法移除 priority 列: {e}")
+        logger.warning(f"  无法创建 ix_model_providers_enabled: {e}")
+
+    # ── 兼容旧字段(已废弃,DROP COLUMN IF EXISTS 幂等) ──
+    for legacy_col in ("api_key_encrypted", "current_rpm", "request_count",
+                       "last_used_at", "last_reset_at", "priority"):
+        try:
+            db.execute(f"ALTER TABLE model_providers DROP COLUMN IF EXISTS {legacy_col}")
+            logger.info(f"  - 移除 model_providers.{legacy_col}(废弃列)")
+        except Exception as e:
+            logger.warning(f"  无法移除 model_providers.{legacy_col}: {e}")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -656,13 +718,6 @@ def init_all_tables(db):
     init_model_providers(db)
     _ensure_columns(db, "model_providers", [("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))")])
 
-    # ── Drop deprecated columns ───────────────────────────
-    try:
-        db.execute("ALTER TABLE model_providers DROP COLUMN IF EXISTS api_key_encrypted")
-        logger.info("  - 移除 model_providers.api_key_encrypted（废弃列）")
-    except Exception as e:
-        logger.warning(f"  无法移除 api_key_encrypted: {e}")
-
     init_models(db)
     _ensure_columns(
         db,
@@ -672,6 +727,21 @@ def init_all_tables(db):
             ("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))"),
         ],
     )
+
+    # ── 清空 model_providers 与 api_keys(按用户要求:删除所有现有数据,由管理员 UI 重新录入) ──
+    # 默认不执行 TRUNCATE(防止生产数据被静默擦除)。
+    # 仅当环境变量 INNOVOS_RESET_DATA=1 时执行 — 用于首次部署或开发环境显式重置。
+    if os.environ.get("INNOVOS_RESET_DATA") == "1":
+        logger.warning(
+            "INNOVOS_RESET_DATA=1: truncating model_providers / api_keys (legacy data wipe)"
+        )
+        db.execute("TRUNCATE TABLE model_providers RESTART IDENTITY CASCADE")
+        db.execute("TRUNCATE TABLE api_keys RESTART IDENTITY CASCADE")
+        logger.info("  + Truncated model_providers / api_keys")
+    else:
+        logger.info(
+            "Skip legacy TRUNCATE (set INNOVOS_RESET_DATA=1 to force wipe legacy data)"
+        )
 
     # ── Foreign Key constraints ──────────────────────────────────
     logger.info("Adding foreign key constraints...")

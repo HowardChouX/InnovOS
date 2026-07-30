@@ -3,6 +3,11 @@ from fastapi_users.authentication.strategy.jwt import JWTStrategy
 from fastapi_users.jwt import decode_jwt, generate_jwt
 from fastapi_users.manager import BaseUserManager
 
+# JWT audience 声明。与 FastAPI Users JWTStrategy 的默认值一致；
+# 显式抽出为常量，供旧版兼容垫片（app/_legacy_compat.py）解码时引用，
+# 避免「签发端」与「解码端」两处硬编码漂移导致 token 互不识别。
+TOKEN_AUDIENCE = ["fastapi-users:auth"]
+
 
 class InnovOSJWTStrategy(JWTStrategy):
     """JWT + token_version 撤销校验。

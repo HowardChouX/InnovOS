@@ -46,10 +46,11 @@ export async function apiRequest<T>(
   if (!res.ok) {
     if (res.status === 401) {
       const { useAuthStore } = await import('../store/useAuthStore');
-      useAuthStore.getState().logout?.();
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 100);
+      const store = useAuthStore.getState();
+      // Only clear state if user is still logged in (avoid redundant clears on login page)
+      if (store.user) {
+        store.logout?.();
+      }
     }
     throw new Error((data as { detail?: string }).detail || '请求失败');
   }

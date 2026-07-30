@@ -236,17 +236,22 @@ class ModelRuntime:
 
     @staticmethod
     def _test_embedding(api_key: str, api_host: str, model: str) -> dict:
-        """测试嵌入模型。"""
+        """测试嵌入模型(通过 AIClientRegistry OpenAICompatibleAdapter)。"""
         import time
 
-        from openai import OpenAI
+        from app.algorithm.client_registry import AIClientRegistry
 
-        http_client = httpx.Client(timeout=httpx.Timeout(30.0, connect=10.0))
-        client = OpenAI(api_key=api_key, base_url=ModelRuntime.ensure_v1_url(api_host), http_client=http_client)
+        adapter = AIClientRegistry.get("openai")
         start = time.time()
-        resp = client.embeddings.create(model=model, input="test")
+        vectors = adapter.embedding(
+            api_key=api_key,
+            api_host=api_host,
+            model_id=model,
+            texts=["test"],
+            timeout=30.0,
+        )
         latency = (time.time() - start) * 1000
-        dim = len(resp.data[0].embedding) if resp.data else 0
+        dim = len(vectors[0]) if vectors else 0
         return {"status": "ok", "latency_ms": round(latency, 1), "model": model, "type": "embedding", "dimension": dim}
 
     @staticmethod
@@ -305,18 +310,20 @@ class ModelRuntime:
 
     @staticmethod
     def _test_chat(api_key: str, api_host: str, model: str) -> dict:
-        """测试聊天模型。"""
+        """测试聊天模型(通过 AIClientRegistry OpenAICompatibleAdapter)。"""
         import time
 
-        from openai import OpenAI
+        from app.algorithm.client_registry import AIClientRegistry
 
-        http_client = httpx.Client(timeout=httpx.Timeout(30.0, connect=10.0))
-        client = OpenAI(api_key=api_key, base_url=ModelRuntime.ensure_v1_url(api_host), http_client=http_client)
+        adapter = AIClientRegistry.get("openai")
         start = time.time()
-        client.chat.completions.create(
-            model=model,
+        adapter.chat(
+            api_key=api_key,
+            api_host=api_host,
+            model_id=model,
             messages=[{"role": "user", "content": "hi"}],
-            max_tokens=1,
+            temperature=0.0,
+            timeout=30.0,
         )
         latency = (time.time() - start) * 1000
         return {"status": "ok", "latency_ms": round(latency, 1), "model": model, "type": "chat"}

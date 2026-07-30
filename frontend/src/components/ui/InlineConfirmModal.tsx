@@ -12,24 +12,9 @@ interface InlineConfirmModalProps {
   onCancel: () => void;
 }
 
-const colorClasses = {
-  red: {
-    title: 'text-red-400',
-    btn: 'bg-red-500 hover:bg-red-600',
-  },
-  blue: {
-    title: 'text-blue-400',
-    btn: 'bg-blue-500 hover:bg-blue-600',
-  },
-  yellow: {
-    title: 'text-yellow-400',
-    btn: 'bg-yellow-500 hover:bg-yellow-600',
-  },
-  green: {
-    title: 'text-green-400',
-    btn: 'bg-green-500 hover:bg-green-600',
-  },
-} as const;
+/** @deprecated kept for interface compat */
+const colorClasses = { red: {} as const, blue: {} as const, yellow: {} as const, green: {} as const };
+void colorClasses;
 
 export function InlineConfirmModal({
   open,
@@ -37,13 +22,11 @@ export function InlineConfirmModal({
   message,
   confirmText = '确认',
   cancelText = '取消',
-  confirmColor = 'red',
+  confirmColor: _confirmColor = 'red',
   onConfirm,
   onCancel,
 }: InlineConfirmModalProps) {
   if (!open) return null;
-
-  const c = colorClasses[confirmColor];
 
   const modalContent = (
     <div

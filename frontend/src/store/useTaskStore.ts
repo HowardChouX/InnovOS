@@ -11,7 +11,7 @@ interface TaskStore {
   selectedTaskId: string | null;
   loading: boolean;
   error: string | null;
-  fetchTasks: (params?: { page?: number; search?: string; status?: string }) => Promise<void>;
+  fetchTasks: (params?: { page?: number; search?: string; status?: string; pageSize?: number }) => Promise<void>;
   createTask: (input: CreateTaskInput) => Promise<Task | undefined>;
   updateTask: (id: string, input: UpdateTaskInput) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;

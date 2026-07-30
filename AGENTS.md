@@ -148,7 +148,7 @@ frontend/
 - **Job system**: 5 job types in `backend/app/services/knowledge_jobs/` — `prepare-root`, `index-documents`, `check-file-processing-result`, `delete-subtree`, `reindex-subtree`. Enqueued with idempotency keys, retry 3x with exponential backoff. Error callbacks on all async tasks.
 - **Model registry**: `backend/app/algorithm/model_registry.py` loads 2600+ model entries lazily on first access. Capabilities (embedding, rerank, chat) determined by registry lookup → regex inference fallback.
 - **Model config resolution**: 3-tier fallback — knowledge-base-level → global system settings → first available provider.
-- **API Key management**: Provider-based architecture (inspired by CherryStudio). Keys loaded from environment variables (`AI_{PROVIDER_ID}_API_KEY`), pooled with per-provider round-robin + rate limiting. No database encryption.
+- **API Key management**: All Provider/Key information managed by admin via `/admin/model-services` UI. Keys stored in `api_keys` table with **AES-256-GCM** encryption (ciphertext + 12-byte nonce + 32-byte HMAC fingerprint per row). AAD binds ciphertext to `(provider_id, key_id)` to prevent cross-row replay. Master key `INNOVOS_ENCRYPT_KEY` (base64url 32 bytes) is required at startup — fail fast if missing. `key_manager.py` (legacy env-based round-robin) was removed.
 - **JWT Token Version**: `users` 表的 `token_version` 列（INTEGER DEFAULT 0）。每个 JWT payload 含 `token_version`；read_token 时与 DB 对比——不一致即拒绝。管理员撤销：`UPDATE users SET token_version = token_version + 1` 使所有旧 token 失效。
 
 ## Security Features
@@ -183,15 +183,16 @@ frontend/
 
 ## API Key Management
 
-API keys are managed through environment variables, not encrypted database storage:
+API keys are managed through the admin UI and stored encrypted in the database
+(via AES-256-GCM); no environment-variable storage:
 
-1. **Environment variable pattern**: `AI_{PROVIDER_ID}_API_KEY` — the `key_manager.py` scans `os.environ` at runtime for variables matching `AI_*_API_KEY` and groups them by provider.
-2. **Multi-key rotation**: `AI_SILICON_API_KEY_1`, `AI_SILICON_API_KEY_2` etc. for round-robin.
-3. **Key pool**: Keys are grouped by provider (e.g., `silicon`, `deepseek`). The `KeyManager` does round-robin selection within each pool.
-4. **Rate limiting**: Per-key RPM tracking in memory (no DB queries). Default 60 RPM per key.
-5. **Concurrency control**: `asyncio.Semaphore(5)` limits concurrent AI requests.
-6. **No database encryption**: Keys never stored in DB. The old `crypto.py` (AES-256 Fernet + PBKDF2) was removed.
-7. **`INNOVOS_JWT_SECRET`** is required in production (`Secret_KEY` alias); dev auto-generates a temp key.
+1. **Admin UI**: `/admin/model-services` — administrators add / rotate / disable / delete Providers and Keys through the web interface.
+2. **Encryption**: Each row in `api_keys` stores `key_ciphertext (BYTEA)`, `key_nonce (12 bytes BYTEA)`, `encryption_version`, `key_fingerprint (32-byte HMAC-SHA256)`. AAD = `"innovos:api_keys:v1:{provider_id}:{key_id}"` binds ciphertext to its row.
+3. **Master key**: `INNOVOS_ENCRYPT_KEY` (base64url-encoded 32 random bytes) is required at startup. Missing/wrong-length → fail fast.
+4. **API responses**: Never return plaintext, ciphertext, nonce, or full fingerprint — only masked display (`sk-••••••••xxxx`) and short 12-hex-char fingerprint prefix.
+5. **Multi-key rotation**: Multiple keys per provider supported. Priority + lease_count + last_used_at determine fair round-robin (DB `FOR UPDATE SKIP LOCKED`).
+6. **Failover**: Auth/rate-limit/timeout errors trigger next-key swap with cooldown. 5xx does not trigger key swap (Provider-level failure, not key-level).
+7. **Legacy `key_manager.py`** was removed in the model-service refactor.
 
 ## Code Cleanup
 

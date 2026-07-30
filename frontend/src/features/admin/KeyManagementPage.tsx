@@ -8,12 +8,14 @@ import {
 } from '../../api/admin/providers';
 import {
   settingsApi,
+  type AvailableModel,
   type AvailableModelsByCapability,
   type RagConfig,
 } from '../../api/admin/settings';
 import { InlineConfirmModal } from '../../components/ui/InlineConfirmModal';
 import { ModelSelector } from '../../components/ui/ModelSelector';
 import { ModelEditDrawer } from '../../components/ui/ModelEditDrawer';
+import { ProviderKeyPanel } from './ProviderKeyPanel';
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -42,7 +44,7 @@ export function KeyManagementPage() {
   const [checking, setChecking] = useState(false);
   const [showCheckModelPicker, setShowCheckModelPicker] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  // API Key is now managed via environment variables only
+  // API Key 由管理员在"API Key 管理"区块添加(数据库 AES-256-GCM 加密)
   const [editModels, setEditModels] = useState<string[]>([]);
   const [editMaxRpm, setEditMaxRpm] = useState(60);
   const [saving, setSaving] = useState(false);
@@ -566,7 +568,7 @@ export function KeyManagementPage() {
                       color: selected.hasApiKey ? 'var(--accent-green)' : 'var(--text-tertiary)',
                     }}
                   >
-                    {selected.hasApiKey ? '已配置（环境变量）' : '未配置'}
+                    {selected.hasApiKey ? '已配置(数据库)' : '未配置 API Key'}
                   </span>
                   {selected.apiKeyMasked && (
                     <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 8 }}>
@@ -806,7 +808,7 @@ export function KeyManagementPage() {
                     (
                       availableModels as Record<
                         string,
-                        import('../../api/admin/settings').AvailableModel[]
+                        AvailableModel[]
                       > | null
                     )?.[cap] || [];
                   return (
@@ -824,7 +826,7 @@ export function KeyManagementPage() {
                         }}
                       >
                         <option value="">— 未分配 —</option>
-                        {list.map((m: import('../../api/admin/settings').AvailableModel) => (
+                        {list.map((m: AvailableModel) => (
                           <option
                             key={`${m.providerId}:${m.modelId}`}
                             value={`${m.providerId}:${m.modelId}`}
@@ -856,6 +858,13 @@ export function KeyManagementPage() {
               >
                 {savingAssignment ? '保存中...' : '保存分配'}
               </button>
+            </div>
+
+            {/* ─── API Key 管理 ──────── */}
+            <div
+              style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border-light)' }}
+            >
+              <ProviderKeyPanel providerId={selected.providerId} />
             </div>
 
             {/* ─── 全局 RAG 默认配置 ──────── */}
@@ -1320,8 +1329,7 @@ function RagGlobalConfig() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    import('../../api/admin/settings').then(({ settingsApi }) => {
-      settingsApi.getRagConfig().then((res) => {
+    settingsApi.getRagConfig().then((res) => {
         const v: Record<string, string> = {};
         const raw = res.data || {};
         for (const key of [
@@ -1338,7 +1346,6 @@ function RagGlobalConfig() {
         setValues(v);
         setLoaded(true);
       });
-    });
   }, []);
 
   const set = (key: string, val: string) => setValues((prev) => ({ ...prev, [key]: val }));
@@ -1346,7 +1353,7 @@ function RagGlobalConfig() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { settingsApi } = await import('../../api/admin/settings');
+      
       const payload: Record<string, string | null> = {};
       for (const [key, val] of Object.entries(values)) {
         payload[key] = val || null;

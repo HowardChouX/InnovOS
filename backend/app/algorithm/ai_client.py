@@ -1,233 +1,312 @@
 """
-AI客户端
+AI 客户端 — 统一聊天调用入口(messages 风格 + Provider Key Pool failover)。
 
-支持企业级Key池轮询、并发控制、自动切换和限流重试。
-支持 Provider 感知路由：按 provider_id 选择 Key，并从 model_service 解析 base_url。
+合并了旧的 _chat_with_model + _chat_with_key_manager 双路径:
+- model_id 优先 → 解析 ResolvedModel
+- purpose → ModelResolver.resolve_for_purpose()
+- 二者皆无 → RuntimeError
+
+Failover:
+- ProviderKeyPool.lease_key 选一把 Key(公平轮询,DB FOR UPDATE SKIP LOCKED)
+- 调用 OpenAI 兼容协议(_call_openai_chat)
+- 失败分类:
+    auth(401/403) → 长 cooldown,切下一把
+    rate_limit(429) → 短 cooldown,切下一把
+    provider(5xx)  → 长 cooldown,**不切** Key(整 Provider 故障)
+    4xx(参数)      → 不切 Key
+    timeout/network → 切下一把
+- 总尝试上限:min(可用 Key 数, 3)
+- 解密失败 → 禁用 Key + 报告 failure,继续切下一把
 """
+
+from __future__ import annotations
 
 import asyncio
 import json
 import logging
-import random
 import re
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
-import httpx
-from openai import OpenAI
-
-from app.algorithm.key_manager import key_manager
+from app.core.key_crypto import ApiKeyDecryptionError
 
 logger = logging.getLogger(__name__)
 
 
-def pick_model(api_model: str) -> str:
-    """从模型池中随机选择一个模型"""
-    models = [m.strip() for m in api_model.split(",") if m.strip()]
-    return random.choice(models) if models else "deepseek-chat"
+# ── 错误分类 ──
 
 
-def _resolve_base_url(key_config: dict, provider_id: str = "") -> str:
-    """解析 API base_url
+@dataclass
+class CallOutcome:
+    """单次调用的分类结果。"""
 
-    优先级：
-    1. key_config 中的 api_base_url（显式配置）
-    2. model_service 中的 provider api_host（按 provider_id 查询）
-    3. 默认 deepseek
+    should_failover: bool
+    category: str  # "auth" / "rate_limit" / "provider" / "client" / "timeout" / "unknown"
+    cooldown_seconds: int
+
+
+def classify_error(exc: Exception) -> CallOutcome:
+    """根据异常信息分类,决定是否切 Key + cooldown 时长。"""
+    msg = str(exc).lower()
+
+    # 5xx(Provider 故障)— 不切 Key,长 cooldown
+    if re.search(r"\b5\d{2}\b", msg) or "internal server error" in msg or "bad gateway" in msg:
+        return CallOutcome(should_failover=False, category="provider", cooldown_seconds=900)
+
+    # 401/403(鉴权)— 切 Key,15 分钟 cooldown
+    if re.search(r"\b401\b", msg) or re.search(r"\b403\b", msg) or "unauthorized" in msg or "forbidden" in msg:
+        return CallOutcome(should_failover=True, category="auth", cooldown_seconds=900)
+
+    # 429(限流)— 切 Key,默认 60s cooldown
+    if (
+        re.search(r"\b429\b", msg)
+        or re.search(r"rate\s*limit", msg, re.IGNORECASE)
+        or re.search(r"too\s*many", msg, re.IGNORECASE)
+    ):
+        return CallOutcome(should_failover=True, category="rate_limit", cooldown_seconds=60)
+
+    # 4xx(参数错误)— 不切 Key
+    if re.search(r"\b4\d{2}\b", msg):
+        return CallOutcome(should_failover=False, category="client", cooldown_seconds=0)
+
+    # 超时 / 网络 — 切 Key
+    if "timeout" in msg or "timed out" in msg or "connection" in msg:
+        return CallOutcome(should_failover=True, category="timeout", cooldown_seconds=30)
+
+    # 解密失败 — 切 Key(已由 lease_key 内部禁用)
+    if isinstance(exc, ApiKeyDecryptionError):
+        return CallOutcome(should_failover=True, category="auth", cooldown_seconds=1800)
+
+    return CallOutcome(should_failover=False, category="unknown", cooldown_seconds=0)
+
+
+# ── Provider Key Pool(轻量包装 ApiKeyService) ──
+
+
+class ProviderKeyPool:
+    """runtime 用的 Key 池门面。
+
+    内部委托 ApiKeyService.lease_key / mark_success / mark_failure。
+    对 chat_completion 屏蔽底层实现细节。
+
+    所有方法 async 以支持在 FastAPI 事件循环中调用,同时便于测试用
+    AsyncMock 替换。
     """
-    # 如果 key 有显式配置的 url，直接使用
-    if key_config.get("api_base_url"):
-        return key_config["api_base_url"]
 
-    # 从 model_service 解析
-    if provider_id:
-        try:
-            from app.algorithm.model_service import model_service
+    def __init__(self, api_key_service: Any = None) -> None:
+        self._svc = api_key_service
 
-            provider = model_service.get(provider_id)
-            if provider and provider.get("apiHost"):
-                return provider["apiHost"]
-        except Exception as e:
-            logger.warning(f"Failed to resolve base URL from model service: {e}")
+    def _get_service(self):
+        if self._svc is None:
+            from app.database import get_db
+            from app.core.key_crypto import load_api_key_cipher
+            from app.services.api_key_service import ApiKeyService
 
-    return "https://api.deepseek.com"
+            self._svc = ApiKeyService(db=get_db(), cipher=load_api_key_cipher())
+        return self._svc
+
+    async def lease_key(
+        self,
+        *,
+        provider_id: str,
+        exclude_key_ids: set[int] | None = None,
+    ):
+        return self._get_service().lease_key(
+            provider_id=provider_id, exclude_key_ids=exclude_key_ids
+        )
+
+    async def report_success(self, *, key_id: int) -> None:
+        self._get_service().mark_success(key_id=key_id)
+
+    async def report_failure(
+        self,
+        *,
+        key_id: int,
+        category: str,
+        cooldown_until: datetime | None = None,
+    ) -> None:
+        self._get_service().mark_failure(
+            key_id=key_id, category=category, cooldown_until=cooldown_until
+        )
+
+
+# ── OpenAI 协议调用(唯一封装) ──
+
+
+def _call_openai_chat(
+    *,
+    api_key: str,
+    api_host: str,
+    model_id: str,
+    messages: list[dict[str, str]],
+    temperature: float = 0.3,
+    response_format: type = str,
+    timeout: float = 30.0,
+) -> Any:
+    """同步调用 OpenAI-compatible /chat/completions。
+
+    返回 content 字符串;若 response_format=dict 则返回已解析 dict。
+    通过 AIClientRegistry 委派 OpenAICompatibleAdapter(唯一 OpenAI 构造点)。
+    """
+    from app.algorithm.client_registry import AIClientRegistry
+
+    adapter = AIClientRegistry.get("openai")
+    rf: dict | None = {"type": "json_object"} if response_format is dict else None
+    content = adapter.chat(
+        api_key=api_key,
+        api_host=api_host,
+        model_id=model_id,
+        messages=messages,
+        temperature=temperature,
+        response_format=rf,
+        timeout=timeout,
+    )
+    if response_format is dict:
+        return json.loads(content)
+    return content
+
+
+# ── 统一入口 ──
+
+
+MAX_ATTEMPTS = 3
+
+
+def _resolve_endpoint(model_id: str | None, purpose: str | None):
+    """model_id 或 purpose 二选一,返回 ResolvedModelConfig 或 None。
+
+    两者都未传 → 返回 None(由调用方报错)。
+    """
+    from app.algorithm.model_resolver import model_resolver
+
+    if model_id:
+        return model_resolver.resolve(model_id)
+    if purpose:
+        return model_resolver.resolve_for_purpose(purpose)
+    return None
+
+
+def _messages_to_legacy(system_prompt: str, user_prompt: str) -> list[dict[str, str]]:
+    """(system_prompt + user_prompt) → messages 列表。向后兼容旧调用方式。"""
+    msgs = []
+    if system_prompt:
+        msgs.append({"role": "system", "content": system_prompt})
+    if user_prompt:
+        msgs.append({"role": "user", "content": user_prompt})
+    return msgs
 
 
 async def chat_completion(
-    system_prompt: str = "",
-    user_prompt: str = "",
+    messages: list[dict[str, str]] | None = None,
+    *,
+    model_id: str | None = None,
+    purpose: str | None = None,
     temperature: float = 0.3,
     response_format: type = str,
-    max_retries: int = 3,
-    provider_id: str = "",
-    model_id: str = "",
+    timeout: float = 30.0,
+    # 旧签名兼容 — 接收 system_prompt / user_prompt
+    system_prompt: str = "",
+    user_prompt: str = "",
+    **_legacy: Any,
 ) -> Any:
-    """带自动Key切换的AI调用（Provider 感知）
+    """统一聊天调用入口。
 
-    解析优先级：
-    1. model_id 被设置 → 从 model_resolver 解析 "providerId:modelId"
-    2. provider_id 被设置 → 从 key_manager + 该 provider 的 key
-    3. 都未设置 → 轮询所有可用 Key
-
-    Args:
-        system_prompt: 系统提示词
-        user_prompt: 用户提示词
-        temperature: 温度参数
-        response_format: 返回格式（str 或 dict）
-        max_retries: 最大重试次数
-        provider_id: 指定供应商ID
-        model_id: 指定完整模型ID（格式 "providerId:modelId"）
-
-    Returns:
-        AI返回的内容
-
-    Raises:
-        RuntimeError: 所有Key都不可用时抛出
-    """
-    # 如果传了 model_id（"providerId:modelId"），使用模型分配路径
-    if model_id:
-        return await _chat_with_model(
-            model_id=model_id,
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            temperature=temperature,
-            response_format=response_format,
-            max_retries=max_retries,
+    用法:
+        await chat_completion(
+            messages=[{"role": "system", "content": "..."}, {"role": "user", "content": "..."}],
+            model_id="openai:gpt-4",
         )
 
-    # 否则走旧路径：key_manager 轮询
-    return await _chat_with_key_manager(
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        temperature=temperature,
-        response_format=response_format,
-        max_retries=max_retries,
-        provider_id=provider_id,
-    )
+        # 或按用途(由管理员在 system_settings 中分配):
+        await chat_completion(messages=msgs, purpose="chat")
 
+    旧形式也支持(传入 system_prompt + user_prompt 字符串):
+        await chat_completion(system_prompt=..., user_prompt=..., purpose="evaluation")
 
-async def _chat_with_model(
-    model_id: str,
-    system_prompt: str,
-    user_prompt: str,
-    temperature: float,
-    response_format: type,
-    max_retries: int,
-) -> Any:
-    """使用 model_resolver 解析模型配置并发起调用"""
-    from app.algorithm.model_resolver import model_resolver
+    行为:
+    - 都不传 model_id 和 purpose → RuntimeError
+    - Provider 没有 active Key → RuntimeError
+    - 总尝试 ≤ min(可用 Key 数, 3)
+    - 401/403/429/timeout → 切下一把 Key
+    - 5xx → 不切 Key(Provider 故障)
+    - 4xx → 不切 Key(参数错误)
+    """
+    # 兼容性:旧调用形式 system_prompt + user_prompt
+    if messages is None and (system_prompt or user_prompt):
+        messages = _messages_to_legacy(system_prompt, user_prompt)
+    if not messages:
+        raise RuntimeError(
+            "chat_completion requires either messages=[...] or system_prompt/user_prompt"
+        )
 
-    resolved = model_resolver.resolve(model_id)
+    resolved = _resolve_endpoint(model_id, purpose)
     if not resolved:
-        raise RuntimeError(f"模型 '{model_id}' 解析失败：供应商不存在或未配置")
+        raise RuntimeError(
+            f"failed to resolve model: model_id={model_id!r}, purpose={purpose!r}; "
+            "check system_settings and Provider configuration"
+        )
 
-    last_error = None
-    for attempt in range(max_retries):
+    pool = ProviderKeyPool()
+    exclude: set[int] = set()
+    last_error: Exception | None = None
+
+    for attempt in range(MAX_ATTEMPTS):
+        lease = await pool.lease_key(
+            provider_id=resolved.provider_id, exclude_key_ids=exclude
+        )
+        if not lease:
+            # 没有可用 Key 了
+            if last_error:
+                raise RuntimeError(
+                    f"all keys exhausted for provider '{resolved.provider_id}': {last_error}"
+                ) from last_error
+            raise RuntimeError(
+                f"no active API key for provider '{resolved.provider_id}'"
+            )
+
         try:
-            from app.algorithm.model_runtime import ModelRuntime
-
-            with httpx.Client(timeout=httpx.Timeout(30.0, connect=10.0)) as http_client:
-                client = OpenAI(
-                    api_key=resolved.api_key,
-                    base_url=ModelRuntime.ensure_v1_url(resolved.api_host),
-                    http_client=http_client,
-                )
-                messages = []
-                if system_prompt:
-                    messages.append({"role": "system", "content": system_prompt})
-                messages.append({"role": "user", "content": user_prompt})
-
-                kwargs: dict[str, Any] = {
-                    "model": resolved.model_id,
-                    "messages": messages,
-                    "temperature": temperature,
-                }
-                if response_format is dict:
-                    kwargs["response_format"] = {"type": "json_object"}
-
-                resp = client.chat.completions.create(**kwargs)
-                if not resp.choices:
-                    raise RuntimeError(f"AI response has no choices: {resp}")
-                content = resp.choices[0].message.content
-                if not content:
-                    raise RuntimeError("AI response content is empty")
-
-                if response_format is dict:
-                    return json.loads(content)
-                return content
-
-        except Exception as e:
-            last_error = e
-            if attempt < max_retries - 1:
-                await asyncio.sleep(1)
-                continue
-            raise
-
-    raise RuntimeError(f"AI调用失败: {last_error}")
-
-
-async def _chat_with_key_manager(
-    system_prompt: str,
-    user_prompt: str,
-    temperature: float,
-    response_format: type,
-    max_retries: int,
-    provider_id: str = "",
-) -> Any:
-    """旧的 Key 池轮询路径"""
-    last_error = None
-
-    for attempt in range(max_retries):
-        key_config = None
-        try:
-            key_config = await key_manager.get_key_for_request(provider_id)
-            base_url = _resolve_base_url(key_config, provider_id)
-
-            with httpx.Client(timeout=httpx.Timeout(30.0, connect=10.0)) as http_client:
-                client = OpenAI(
-                    api_key=key_config["api_key"],
-                    base_url=base_url,
-                    http_client=http_client,
-                )
-
-                messages = []
-                if system_prompt:
-                    messages.append({"role": "system", "content": system_prompt})
-                messages.append({"role": "user", "content": user_prompt})
-
-                kwargs: dict[str, Any] = {
-                    "model": pick_model(key_config["api_model"]),
-                    "messages": messages,
-                    "temperature": temperature,
-                }
-                if response_format is dict:
-                    kwargs["response_format"] = {"type": "json_object"}
-
-                resp = client.chat.completions.create(**kwargs)
-                if not resp.choices:
-                    raise RuntimeError(f"AI response has no choices: {resp}")
-                content = resp.choices[0].message.content
-                if not content:
-                    raise RuntimeError("AI response content is empty")
-
-                if response_format is dict:
-                    return json.loads(content)
-                return content
-
-        except Exception as e:
-            last_error = e
-            error_msg = str(e).lower()
-
-            # 环境变量模式：不再标记 Key 失败（无法禁用环境变量中的 Key）
-            # 遇到限流或鉴权错误，等待后重试
-            if re.search(r'\b429\b', error_msg) or re.search(r'\brate\s*limit\b', error_msg, re.IGNORECASE) or re.search(r'\btoo\s*many\b', error_msg, re.IGNORECASE):
-                await asyncio.sleep(2)
-                if attempt < max_retries - 1:
-                    continue
+            result = _call_openai_chat(
+                api_key=lease.plaintext,
+                api_host=resolved.api_host,
+                model_id=resolved.model_id,
+                messages=messages,
+                temperature=temperature,
+                response_format=response_format,
+                timeout=timeout,
+            )
+        except Exception as exc:
+            last_error = exc
+            outcome = classify_error(exc)
+            cooldown_until = (
+                datetime.now(timezone.utc) + timedelta(seconds=outcome.cooldown_seconds)
+                if outcome.cooldown_seconds > 0
+                else None
+            )
+            await pool.report_failure(
+                key_id=lease.key_id,
+                category=outcome.category,
+                cooldown_until=cooldown_until,
+            )
+            logger.warning(
+                "chat_completion: key=%s failed category=%s cooldown=%ss; attempt %d/%d",
+                lease.key_id,
+                outcome.category,
+                outcome.cooldown_seconds,
+                attempt + 1,
+                MAX_ATTEMPTS,
+            )
+            if not outcome.should_failover:
                 raise
+            exclude.add(lease.key_id)
+            if attempt < MAX_ATTEMPTS - 1:
+                await asyncio.sleep(min(2 ** attempt, 4))
+            continue
 
-            if attempt < max_retries - 1:
-                await asyncio.sleep(1)
-                continue
-            raise
+        # 成功
+        await pool.report_success(key_id=lease.key_id)
+        return result
 
-    raise RuntimeError(f"AI调用失败: {last_error}")
+    raise RuntimeError(
+        f"all {MAX_ATTEMPTS} attempts failed for provider '{resolved.provider_id}': {last_error}"
+    )

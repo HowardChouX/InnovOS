@@ -1,27 +1,11 @@
-import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 
 import { NAV_ITEMS } from '../../utils/constants';
 import { useAuthStore } from '../../store/useAuthStore';
-import { sidebarApi, type SidebarStats } from '../../api/sidebar';
 
 export function Sidebar() {
   const location = useLocation();
   const isAdmin = useAuthStore((s) => s.isAdmin);
-  const [stats, setStats] = useState<SidebarStats | null>(null);
-  const [statsError, setStatsError] = useState(false);
-
-  useEffect(() => {
-    sidebarApi
-      .getStats()
-      .then((data) => {
-        setStats(data);
-        setStatsError(false);
-      })
-      .catch(() => {
-        setStatsError(true);
-      });
-  }, []);
 
   const items = [...NAV_ITEMS];
 
@@ -128,101 +112,6 @@ export function Sidebar() {
           </div>
         )}
       </nav>
-
-      {/* System Status */}
-      <div
-        style={{
-          padding: '12px',
-          borderTop: '1px solid var(--border-light)',
-          fontSize: 11,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            marginBottom: 10,
-            color: 'var(--text-secondary)',
-          }}
-        >
-          <span style={{ fontWeight: 600 }}>系统状态</span>
-          {statsError ? (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                color: 'var(--accent-red)',
-                fontSize: 10,
-              }}
-            >
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: 'var(--accent-red)',
-                }}
-              />
-              状态未知
-            </span>
-          ) : (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                color: 'var(--accent-green)',
-                fontSize: 10,
-              }}
-            >
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: 'var(--accent-green)',
-                }}
-              />
-              运行正常
-            </span>
-          )}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {[
-            { label: '今日任务', value: stats?.todayTasks ?? '-' },
-            { label: '已完成', value: stats?.completedTasks ?? '-' },
-            { label: '进行中', value: stats?.analyzingTasks ?? '-' },
-          ].map((item) => (
-            <div
-              key={item.label}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                color: 'var(--text-tertiary)',
-              }}
-            >
-              <span>{item.label}</span>
-              <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{item.value}</span>
-            </div>
-          ))}
-          <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 6, marginTop: 2 }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                color: 'var(--text-tertiary)',
-              }}
-            >
-              <span>专利数据量</span>
-              <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-                {stats?.patentCount?.toLocaleString() ?? '-'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
     </aside>
   );
 }

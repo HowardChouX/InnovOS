@@ -76,8 +76,8 @@ export function ProfilePage() {
   if (!user) return null;
 
   const roleLabel = user.role === 'admin' ? '管理员' : '普通用户';
-  const createdAt = user.created_at
-    ? new Date(user.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
+  const createdAt = (user as any).created_at
+    ? new Date((user as any).created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
     : '-';
 
   const inputClass =

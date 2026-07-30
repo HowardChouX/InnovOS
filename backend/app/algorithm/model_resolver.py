@@ -135,6 +135,43 @@ class ModelResolver:
             api_host=row["api_host"],
         )
 
+    # ── 用途驱动的解析(P0 新增) ──
+
+    PURPOSE_TO_SETTING_KEY: dict[str, str] = {
+        "chat": "chat_model",
+        "evaluation": "chat_model",
+        "conversion": "chat_model",
+        "extract": "extract_model",
+        "embedding": "embedding_model",
+        "rerank": "rerank_model",
+        "ocr": "ocr_model",
+    }
+
+    @classmethod
+    def purpose_to_setting_key(cls, purpose: str) -> str:
+        """把业务用途映射到 system_settings 的 key 名。
+
+        未知 purpose → ValueError。
+        """
+        try:
+            return cls.PURPOSE_TO_SETTING_KEY[purpose]
+        except KeyError as exc:
+            raise ValueError(
+                f"unknown purpose: {purpose!r}; "
+                f"valid: {sorted(cls.PURPOSE_TO_SETTING_KEY.keys())}"
+            ) from exc
+
+    @classmethod
+    def resolve_for_purpose(cls, purpose: str) -> ResolvedModelConfig | None:
+        """按用途解析模型:purpose → setting_key → composite_id → resolve()."""
+        setting_key = cls.purpose_to_setting_key(purpose)
+        settings = cls.get_assigned_settings()
+        composite = settings.get(setting_key) or ""
+        if not composite:
+            logger.warning(f"resolve_for_purpose({purpose!r}): setting '{setting_key}' 未配置")
+            return None
+        return cls.resolve(composite)
+
 
 # Singleton
 model_resolver = ModelResolver()

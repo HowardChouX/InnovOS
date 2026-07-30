@@ -15,6 +15,8 @@ RUN find /app/.venv/bin -type f -exec sed -i '1s|#!/build/.venv/bin/python|#!/us
 ENV PATH="/app/.venv/bin:$PATH"
 WORKDIR /app
 COPY app/ ./app/
+COPY alembic/ ./alembic/
+COPY alembic.ini .
 RUN chown -R innovos:innovos /app
 USER innovos
 EXPOSE 8000

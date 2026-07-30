@@ -7,7 +7,6 @@ import { PatentSearchView } from './PatentSearchView';
 import { SolutionGenView } from './SolutionGenView';
 import { EvaluationView } from './EvaluationView';
 import { CompletedView } from './CompletedView';
-import { VideoDisplayView } from './VideoDisplayView';
 import { EmptyState, getStepOutput } from './workflowStepUtils';
 import { WORKFLOW_STEPS } from '../../types/workflow';
 import { StepRunningIndicator } from '../../components/ui/StepRunningIndicator';
@@ -18,7 +17,6 @@ const PHASE_VIEWS: Record<string, React.ComponentType<{ output: unknown }>> = {
   patent_search: PatentSearchView,
   solution_gen: SolutionGenView as React.ComponentType<{ output: unknown }>,
   evaluation: EvaluationView as React.ComponentType<{ output: unknown }>,
-  video_display: VideoDisplayView,
   completed: CompletedView,
 };
 
@@ -35,7 +33,6 @@ export function WorkflowStepResults() {
       'patent_search',
       'solution_gen',
       'evaluation',
-      'video_display',
     ];
     if ((workflow.status as string) === 'awaiting_rating' || workflow.status === 'completed') {
       let lastComplete = '';

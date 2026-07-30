@@ -75,6 +75,7 @@ async def evaluate_solution(solution_id: int, user_id: int) -> dict:
             user_prompt=user_prompt,
             temperature=0.3,
             response_format=dict,
+            purpose="evaluation",
         )
 
         scores = result.get("innovation", {}).get("score", 0)

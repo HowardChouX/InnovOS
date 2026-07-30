@@ -27,7 +27,6 @@ import {
   FileText,
   WandSparkles,
   TrendingUp,
-  FileSignature,
   Video,
 } from 'lucide-react';
 

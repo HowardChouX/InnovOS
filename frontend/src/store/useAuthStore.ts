@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { authApi, AuthUser } from '../api/auth';
+import { authApi } from '../api/auth';
+import type { AuthUser } from '../types/auth';
 
 interface AuthStore {
   user: AuthUser | null;
@@ -18,7 +19,7 @@ interface AuthStore {
   init: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthStore>((set, get) => ({
+export const useAuthStore = create<AuthStore>((set, _get) => ({
   user: null,
   loading: true,
   isAdmin: false,

@@ -217,6 +217,7 @@ async def check_infringement(solution_id: int, user: dict = Depends(get_current_
             system_prompt=INFRINGEMENT_SYSTEM,
             user_prompt=user_prompt,
             response_format=dict,
+            purpose="conversion",
         )
         if isinstance(result, str):
             try:

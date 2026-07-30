@@ -19,10 +19,48 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # 0. 确保 users 表存在（兜底 CREATE TABLE IF NOT EXISTS）
+    #    此前该表由 init_users() 在 pg_schema.py 中创建，ae3e618 refactor
+    #    将 DDL 迁至 Alembic；新部署/重建库需要此 CREATE 兜底。
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username TEXT,
+            role TEXT DEFAULT 'user',
+            email TEXT DEFAULT '',
+            hashed_password TEXT NOT NULL,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            is_superuser BOOLEAN NOT NULL DEFAULT FALSE,
+            is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+            phone VARCHAR(20),
+            token_version INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')),
+            updated_at TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))
+        );
+    """)
+    op.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email ON users (email)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_users_username ON users (username)")
+    # DROP legacy unique constraint on username (FastAPI Users doesn't use it)
+    op.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_username_key")
+    op.execute("DROP INDEX IF EXISTS ix_users_username")
+    # Remove the old password_hash column if it exists
+    op.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='users' AND column_name='password_hash'
+            ) THEN
+                ALTER TABLE users RENAME COLUMN password_hash TO hashed_password;
+            END IF;
+        END$$;
+    """)
+
     # 1. 加新列（幂等 DDL，符合 One-shot 规则的可重复声明）
     op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superuser BOOLEAN DEFAULT FALSE")
     op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE")
     op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)")
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER DEFAULT 0")
 
     # 2. is_active INTEGER -> BOOLEAN（处理 DEFAULT 1 的 cast 冲突）
     op.execute("ALTER TABLE users ALTER COLUMN is_active DROP DEFAULT")

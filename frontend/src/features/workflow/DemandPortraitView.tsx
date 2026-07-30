@@ -4,7 +4,7 @@ import { useTaskStore } from '../../store/useTaskStore';
 import { workflowApi } from '../../api/workflow';
 import { StepRunningIndicator } from '../../components/ui/StepRunningIndicator';
 
-interface Demand {
+export interface Demand {
   id: string;
   source: string;
   category: string;

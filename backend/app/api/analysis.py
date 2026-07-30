@@ -397,7 +397,11 @@ async def _search_knowledge_bases(user_id: int, base_ids: list[str], query: str,
 
 
 def _create_ai_base() -> AIBase | None:
-    """从全局设置创建 AIBase 实例给分析器用"""
+    """从全局设置创建 AIBase 实例给分析器用。
+
+    AIBase 通过 key_provider() callback 取 Key(Key 来自数据库加密存储)。
+    不再持有长期 api_key。
+    """
     try:
         from app.algorithm.model_resolver import model_resolver
 
@@ -405,13 +409,32 @@ def _create_ai_base() -> AIBase | None:
         chat_model = s.get("chat_model") or ""
         if not chat_model or ":" not in chat_model:
             return None
-        resolved = model_resolver.resolve(chat_model)
-        if not resolved:
+        provider_id, model_id = model_resolver.parse_composite_id(chat_model)
+        if not provider_id or not model_id:
             return None
+
+        # 构造 key_provider:每次从 ApiKeyService 借一把 Key
+        from app.core.key_crypto import load_api_key_cipher
+        from app.database import get_db
+        from app.services.api_key_service import ApiKeyService
+
+        db = get_db()
+        cipher = load_api_key_cipher()
+        svc = ApiKeyService(db=db, cipher=cipher)
+        exclude_ids: set[int] = set()
+
+        def key_provider() -> str | None:
+            nonlocal exclude_ids
+            lease = svc.lease_key(provider_id=provider_id, exclude_key_ids=exclude_ids)
+            if lease:
+                exclude_ids.add(lease.key_id)
+                return lease.plaintext
+            return None
+
         return AIBase(
-            api_key=resolved.api_key,
-            base_url=resolved.api_host,
-            model=resolved.model_id,
+            model_id=model_id,
+            api_host=None,  # 由 model_runtime 解析
+            key_provider=key_provider,
         )
     except Exception as e:
         logger.warning(f"Failed to create AIBase: {e}")

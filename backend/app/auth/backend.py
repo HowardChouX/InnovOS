@@ -4,7 +4,7 @@ from fastapi_users.authentication import (
     CookieTransport,
 )
 
-from app.auth.strategy import InnovOSJWTStrategy
+from app.auth.strategy import TOKEN_AUDIENCE, InnovOSJWTStrategy
 from app.core.config import settings
 
 # Cookie 为主通道，保持 __Host-token 名称（前端零改动）
@@ -22,6 +22,7 @@ def get_jwt_strategy() -> InnovOSJWTStrategy:
     return InnovOSJWTStrategy(
         secret=settings.SECRET_KEY,
         lifetime_seconds=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        token_audience=TOKEN_AUDIENCE,
     )
 
 
