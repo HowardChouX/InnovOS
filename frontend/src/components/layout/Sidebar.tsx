@@ -89,9 +89,9 @@ export function Sidebar() {
               管理员
             </div>
             {[
-              { label: '模型服务', path: '/admin/keys', icon: 'fa-server' },
-              { label: '用户管理', path: '/admin/users', icon: 'fa-users' },
-              { label: '专利数据库', path: '/admin/patents', icon: 'fa-database' },
+              { label: '模型服务', path: '/admin/keys' },
+              { label: '用户管理', path: '/admin/users' },
+              { label: '专利数据库', path: '/admin/patents' },
             ].map((item) => {
               const active = location.pathname === item.path;
               return (
@@ -99,9 +99,7 @@ export function Sidebar() {
                   key={item.path}
                   to={item.path}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
+                    display: 'block',
                     padding: '9px 12px',
                     borderRadius: 8,
                     textDecoration: 'none',
@@ -123,10 +121,6 @@ export function Sidebar() {
                     }
                   }}
                 >
-                  <i
-                    className={`fa-solid ${item.icon}`}
-                    style={{ width: 16, textAlign: 'center', fontSize: 12 }}
-                  />
                   <span>{item.label}</span>
                 </Link>
               );
