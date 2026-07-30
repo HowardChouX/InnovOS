@@ -91,5 +91,25 @@ class EmailService:
             return
         self._send(user.email, "InnovOS 邮箱验证码", body)
 
+    def send_password_reset_otp_sync(self, user, code: str, request=None) -> None:
+        """发送密码重置 6 位 OTP。和注册验证走相同的发送策略。"""
+        body = (
+            f"<h2>您的 InnovOS 密码重置验证码</h2>"
+            f"<p>验证码：<b>{code}</b></p>"
+            f"<p>10 分钟内有效，请勿泄露给他人。</p>"
+        )
+        if not self.host:
+            if settings.ENVIRONMENT == "production" and not settings.EMAIL_OTP_SOFT_FAIL:
+                raise EmailUnavailable()
+            if settings.ENVIRONMENT == "development":
+                logger.info(
+                    "[DEV RESET OTP] email=%s code=%s ttl=%ss",
+                    user.email, code, settings.OTP_TTL_SECONDS,
+                )
+                return
+            logger.warning("SMTP_HOST 未配置，跳过密码重置邮件发送 to=%s", user.email)
+            return
+        self._send(user.email, "InnovOS 密码重置验证码", body)
+
 
 email_service = EmailService()

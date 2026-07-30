@@ -152,7 +152,8 @@ class _FakeDB:
                 expires_at TEXT NOT NULL,
                 consumed_at TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                last_sent_at TEXT DEFAULT CURRENT_TIMESTAMP
+                last_sent_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                purpose TEXT NOT NULL DEFAULT 'email_verification'
             );
             """
         )

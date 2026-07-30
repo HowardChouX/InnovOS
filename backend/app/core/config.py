@@ -100,6 +100,13 @@ class Settings(BaseSettings):
     OTP_PEPPER: str = Field(default="", validation_alias=AliasChoices("INNOVOS_OTP_PEPPER", "OTP_PEPPER"))
     EMAIL_OTP_SOFT_FAIL: bool = False
 
+    # ── Password reset session token ──
+    # 独立 secret,避免和业务 JWT 共用导致 reset_token 泄露时影响会话安全。
+    # 不配则回退到 SECRET_KEY。
+    RESET_SESSION_JWT_SECRET: str = ""
+    RESET_SESSION_JWT_AUDIENCE: str = "innovos:password_reset"
+    RESET_SESSION_TOKEN_TTL_SECONDS: int = 600
+
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value and value == "changethis":
             msg = f'The value of {var_name} is "changethis", for security, please change it.'
