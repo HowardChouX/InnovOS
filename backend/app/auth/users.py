@@ -46,8 +46,10 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         self, user: User, token: str,
         request: Optional[Request] = None,
     ):
-        from app.services.email_service import email_service
-        email_service.send_reset_password_email_sync(user, token, request)
+        """InnovOS 不依赖此回调 — 重置密码走自研 OTP 流程(/api/auth/password-reset/*)。
+        fastapi-users 的内置 reset router 仍保留挂载(向后兼容),但 InnovOS 前端不调用。
+        """
+        pass
 
     async def on_after_request_verify(
         self, user: User, token: str,
