@@ -9,8 +9,10 @@ const LoginPage = lazyPage(() => import('../features/auth/LoginPage'));
 const RegisterPage = lazyPage(() => import('../features/auth/RegisterPage'));
 const VerifyEmailPage = lazyPage(() => import('../features/auth/VerifyEmailPage'));
 const ForgotPasswordPage = lazyPage(() => import('../features/auth/ForgotPasswordPage'));
+const VerifyResetOtpPage = lazyPage(() => import('../features/auth/VerifyResetOtpPage'));
 const ResetPasswordPage = lazyPage(() => import('../features/auth/ResetPasswordPage'));
 const PlaceholderPage = lazyPage(() => import('../features/PlaceholderPage'));
+void PlaceholderPage;
 const PatentSearchPage = lazyPage(() => import('../features/patents/PatentSearchPage'));
 const KnowledgeBasePage = lazyPage(() => import('../features/knowledge/KnowledgeBasePage'));
 const KeyManagementPage = lazyPage(() => import('../features/admin/KeyManagementPage'));
@@ -33,6 +35,7 @@ export const routes: RouteObject[] = [
   { path: '/register', element: <RegisterPage /> },
   { path: '/verify-email', element: <VerifyEmailPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  { path: '/verify-reset', element: <VerifyResetOtpPage /> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
   {
     path: '/',

@@ -1,18 +1,34 @@
-import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { authApi } from '../../api/auth';
-import { Eye, EyeOff, Lock, Check, ArrowLeft, XCircle } from 'lucide-react';
+import { Eye, EyeOff, Lock, Check, ArrowLeft } from 'lucide-react';
+
+interface LocationState {
+  email?: string;
+  reset_token?: string;
+}
 
 export function ResetPasswordPage() {
-  const [searchParams] = useSearchParams();
-  // FastAPI Users reset token 来自 query string ?token=xxx
-  const token = searchParams.get('token') ?? '';
+  const location = useLocation();
+  const state = location.state as LocationState | null;
+  const email = state?.email ?? '';
+  const reset_token = state?.reset_token ?? '';
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!email || !reset_token) {
+      navigate('/forgot-password', { replace: true });
+    }
+  }, [email, reset_token, navigate]);
+
+  if (!email || !reset_token) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,13 +41,9 @@ export function ResetPasswordPage() {
       setError('密码至少 8 个字符');
       return;
     }
-    if (!token) {
-      setError('重置链接无效或已过期');
-      return;
-    }
     setLoading(true);
     try {
-      await authApi.resetPassword(token, password);
+      await authApi.setNewPassword(reset_token, password);
       navigate('/login?reset=ok');
     } catch (err) {
       setError(err instanceof Error ? err.message : '重置失败，链接可能已过期');
@@ -39,27 +51,6 @@ export function ResetPasswordPage() {
       setLoading(false);
     }
   };
-
-  if (!token) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center p-4 bg-slate-950"
-        style={{ background: 'radial-gradient(circle at top right, #1a2540 0%, #0b1120 40%)' }}
-      >
-        <div className="w-full max-w-sm bg-slate-800/60 backdrop-blur-sm border border-slate-700 rounded-xl p-6 space-y-4 text-center">
-          <XCircle className="w-12 h-12 text-red-400 mx-auto" />
-          <h2 className="text-white font-bold text-lg">链接无效</h2>
-          <p className="text-slate-400 text-sm">重置链接缺失或已过期，请重新申请。</p>
-          <Link
-            to="/forgot-password"
-            className="inline-flex items-center gap-1 text-cyan-400 hover:text-cyan-300 text-sm transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" /> 重新申请
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div

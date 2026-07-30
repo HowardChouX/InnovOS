@@ -51,7 +51,10 @@ export const authApi = {
     return apiRequest<AuthUser>('/api/users/me');
   },
 
-  /** 忘记密码 — 触发邮件发送，返回 202（防探测） */
+  /**
+   * 忘记密码 — 触发邮件发送，返回 202（防探测）。
+   * @deprecated 旧 URL token 流程保留以备回滚;新流程走 requestPasswordResetOtp + verifyPasswordResetOtp + setNewPassword。
+   */
   forgotPassword(email: string): Promise<void> {
     return apiRequest<void>('/api/auth/forgot-password', {
       method: 'POST',
@@ -64,6 +67,30 @@ export const authApi = {
     return apiRequest<void>('/api/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify({ token, password }),
+    });
+  },
+
+  /** 请求密码重置 OTP(替代 forgotPassword) */
+  requestPasswordResetOtp(email: string): Promise<void> {
+    return apiRequest<void>('/api/auth/password-reset/request-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  /** 验证密码重置 OTP,返回短期 reset_token */
+  verifyPasswordResetOtp(email: string, code: string): Promise<{ verified: boolean; reset_token: string }> {
+    return apiRequest('/api/auth/password-reset/verify', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    });
+  },
+
+  /** 用 reset_token + 新密码提交改密 */
+  setNewPassword(reset_token: string, new_password: string): Promise<{ reset: boolean }> {
+    return apiRequest('/api/auth/password-reset/set-password', {
+      method: 'POST',
+      body: JSON.stringify({ reset_token, new_password }),
     });
   },
 

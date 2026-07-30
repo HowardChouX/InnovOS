@@ -83,6 +83,20 @@ def auth_app(auth_session):
         fastapi_users.get_users_router(UserRead, UserUpdate),
         prefix="/api/users", tags=["users"],
     )
+
+    # Mount custom password-reset router so HTTP route integration tests
+    # can exercise the 4 new endpoints (request-otp / resend-otp / verify /
+    # set-password) via auth_client without depending on the full app_.
+    from app.api.password_reset import router as password_reset_router
+    app.include_router(password_reset_router)
+    # Register EmailVerificationError handler so route exceptions become
+    # proper JSON responses (401 InvalidResetSession, 429 rate-limited, etc.)
+    from app.exceptions.email_verification import (
+        EmailVerificationError,
+        email_verification_exception_handler,
+    )
+    app.add_exception_handler(EmailVerificationError, email_verification_exception_handler)
+
     for exc in (UserAlreadyExists, UserNotExists, UserInactive,
                 UserAlreadyVerified, InvalidVerifyToken,
                 InvalidResetPasswordToken, InvalidPasswordException):

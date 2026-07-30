@@ -102,4 +102,48 @@ describe('authApi', () => {
       }),
     );
   });
+
+  describe('password reset OTP API', () => {
+    beforeEach(() => vi.restoreAllMocks());
+
+    it('requestPasswordResetOtp posts to /api/auth/password-reset/request-otp', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true, status: 202, text: () => Promise.resolve(''),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+      const { authApi } = await import('../auth');
+      await authApi.requestPasswordResetOtp('a@b.com');
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/auth/password-reset/request-otp'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ email: 'a@b.com' }) }),
+      );
+    });
+
+    it('verifyPasswordResetOtp returns reset_token', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true, status: 200,
+        text: () => Promise.resolve(JSON.stringify({ verified: true, reset_token: 'jwt-xxx' })),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+      const { authApi } = await import('../auth');
+      const r = await authApi.verifyPasswordResetOtp('a@b.com', '199622');
+      expect(r.reset_token).toBe('jwt-xxx');
+    });
+
+    it('setNewPassword posts reset_token + new_password', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true, status: 200, text: () => Promise.resolve('{"reset":true}'),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+      const { authApi } = await import('../auth');
+      await authApi.setNewPassword('jwt-xxx', 'newpass1234');
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/auth/password-reset/set-password'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ reset_token: 'jwt-xxx', new_password: 'newpass1234' }),
+        }),
+      );
+    });
+  });
 });
