@@ -14,6 +14,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from tests.conftest_auth import *  # noqa: F401, F403
+
 
 # ── SQLite-backed fake DB mimicking psycopg2 cursor API ──────────────────
 
@@ -102,7 +104,9 @@ class _FakeDB:
     """
 
     def __init__(self) -> None:
-        self._conn = sqlite3.connect(":memory:")
+        self._conn = sqlite3.connect(
+            ":memory:", check_same_thread=False,
+        )
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(
             """
@@ -286,3 +290,35 @@ def test_invalid_reset_session_status():
     e = InvalidResetSession()
     assert e.status == 401
     assert e.code == "RESET_SESSION_INVALID"
+
+
+# ── HTTP route integration tests ──────────────────────────────────────
+
+
+class TestPasswordResetRoutes:
+    """HTTP 路由集成测试。"""
+
+    def test_request_otp_route_exists(self, auth_client, db):
+        """路由存在且接受 POST。未知邮箱静默返回 202（防探测）。"""
+        r = auth_client.post(
+            "/api/auth/password-reset/request-otp",
+            json={"email": "nobody@example.com"},
+        )
+        # 防探测:未知邮箱也返回 202
+        assert r.status_code == 202, r.text
+
+    def test_set_password_route_exists(self, auth_client):
+        """路由存在,错误 token 返回 401。"""
+        r = auth_client.post(
+            "/api/auth/password-reset/set-password",
+            json={"reset_token": "garbage.token.here", "new_password": "newpass1234"},
+        )
+        assert r.status_code == 401, r.text
+
+    def test_set_password_short_password_rejected(self, auth_client):
+        """短密码被 schema 校验拒绝 (422)。"""
+        r = auth_client.post(
+            "/api/auth/password-reset/set-password",
+            json={"reset_token": "any.token.here", "new_password": "short"},
+        )
+        assert r.status_code == 422, r.text

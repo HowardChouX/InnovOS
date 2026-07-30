@@ -145,31 +145,11 @@ async def startup():
     except Exception as e:
         logger.warning(f"首任超级用户种子失败（非致命）: {e}")
 
-    # 4. 自动种子化有环境变量 API Key 的内置供应商
-    try:
-        from app.algorithm.providers_registry import BUILTIN_PROVIDERS
-        from app.algorithm.model_service import _has_provider_api_key, model_service
+    # 4. ~~ 自动种子化有环境变量 API Key 的内置供应商 ~~
+    # 已废弃:环境变量不再承载 API Key,所有 Provider / Key 由管理员通过
+    # /admin/model-providers 页面录入数据库。管理员登录后手动添加。
 
-        db = get_db()
-        existing = {r["provider_id"] for r in db.execute("SELECT provider_id FROM model_providers").fetchall()}
-        for pid, raw_info in BUILTIN_PROVIDERS.items():
-            if pid in existing or not _has_provider_api_key(pid):
-                continue
-            info = cast(dict, raw_info)
-            db.execute(
-                """INSERT INTO model_providers
-                   (provider_id, name, protocol, api_host, models, max_rpm, is_enabled)
-                   VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING""",
-                (pid, info["name"], info["protocol"], info["api_host"], "[]", 60, 1),
-            )
-            logger.info("自动种子化供应商: %s（%s）", pid, info["name"])
-        db.commit()
-        db.close()
-        logger.info("内置供应商种子化完成")
-    except Exception as e:
-        logger.warning(f"种子化供应商失败（非致命）: {e}")
-
-    # 5. 初始化知识库作业系统
+    # 4.5 初始化知识库作业系统
     from app.services.knowledge_orchestration_service import knowledge_orchestration_service
 
     await knowledge_orchestration_service.start()
@@ -239,6 +219,7 @@ async def shutdown():
 
 # ── FastAPI Users 路由 ──────────────────────────────────
 from app.api.email_verification import router as email_verification_router
+from app.api.password_reset import router as password_reset_router
 from app.auth.backend import auth_backend
 from app.auth.exceptions import fastapi_users_exception_handler
 from app.auth.instance import fastapi_users
@@ -272,6 +253,7 @@ app_.include_router(
     prefix="/api/users", tags=["users"],
 )
 app_.include_router(email_verification_router)
+app_.include_router(password_reset_router)
 app_.add_exception_handler(EmailVerificationError, email_verification_exception_handler)
 for exc in (
     UserAlreadyExists, UserNotExists,
@@ -364,68 +346,44 @@ def health_check():
         checks["backend"] = {"status": "error", "message": str(e)}
         overall = "degraded"
 
-    # AI API check — 遍历所有已配置的 AI 供应商，分别报告健康状态
-    _ai_results: list[dict] = []
-    for env_key, val in sorted(os.environ.items()):
-        upper = env_key.upper()
-        if not (upper.startswith("AI_") and upper.endswith("_API_KEY") and val):
-            continue
-        provider_part = upper[3:-8]  # AI_{PROVIDER}_API_KEY
-        host_env = f"AI_{provider_part}_API_HOST"
-        ai_host = os.getenv(host_env, "https://api.deepseek.com")
-        model_env = f"AI_{provider_part}_API_MODEL"
-        ai_model = os.getenv(model_env, "deepseek-chat")
+    # AI API check — 遍历已配置的 AI 供应商(数据库)
+    # 不再读环境变量;通过 ApiKeyService.has_active_key 检测每 Provider
+    try:
+        from app.core.key_crypto import load_api_key_cipher
+        from app.services.api_key_service import ApiKeyService
 
-        provider_result: dict = {"provider": provider_part.lower(), "model": ai_model, "host": ai_host[:40]}
-        try:
-            import httpx
-            from openai import OpenAI
+        db = get_db()
+        cipher = load_api_key_cipher()
+        svc = ApiKeyService(db=db, cipher=cipher)
 
-            from app.algorithm.ai_client import pick_model
+        rows = db.execute(
+            "SELECT provider_id FROM model_providers WHERE is_enabled=1 ORDER BY provider_id"
+        ).fetchall()
+        _ai_results: list[dict] = []
+        for r in rows:
+            pid = r["provider_id"]
+            has_key = svc.has_active_key(provider_id=pid)
+            _ai_results.append({
+                "provider": pid,
+                "hasActiveKey": has_key,
+                "status": "ok" if has_key else "warning",
+            })
 
-            client = OpenAI(
-                api_key=val,
-                base_url=ai_host,
-                http_client=httpx.Client(timeout=httpx.Timeout(10.0, connect=5.0)),
-            )
-            start = time.time()
-            client.chat.completions.create(
-                model=pick_model(ai_model),
-                messages=[{"role": "user", "content": "hi"}],
-                max_tokens=1,
-            )
-            ai_time = round((time.time() - start) * 1000, 1)
-            provider_result["status"] = "ok" if ai_time < 3000 else "warning"
-            provider_result["responseMs"] = ai_time
-        except Exception as e:
-            err_msg = str(e)
-            if "401" in err_msg or "invalid" in err_msg.lower():
-                provider_result["status"] = "error"
-                provider_result["message"] = "Key无效或已过期"
-            elif "429" in err_msg or "rate" in err_msg.lower():
-                provider_result["status"] = "warning"
-                provider_result["message"] = "请求限流"
-            elif "insufficient" in err_msg or "exceeded" in err_msg.lower():
-                provider_result["status"] = "warning"
-                provider_result["message"] = "额度不足"
-            else:
-                provider_result["status"] = "error"
-                provider_result["message"] = err_msg[:60]
-        _ai_results.append(provider_result)
-
-    if not _ai_results:
-        checks["aiApi"] = {"status": "skipped", "message": "未配置任何 API Key"}
-    else:
-        _ok_count = sum(1 for r in _ai_results if r["status"] == "ok")
-        _err_count = sum(1 for r in _ai_results if r["status"] == "error")
-        if _err_count == len(_ai_results):
-            checks["aiApi"] = {"status": "error", "count": len(_ai_results), "providers": _ai_results}
-        elif _err_count > 0:
-            checks["aiApi"] = {"status": "warning", "count": len(_ai_results), "providers": _ai_results}
+        if not _ai_results:
+            checks["aiApi"] = {"status": "skipped", "message": "无启用的供应商"}
         else:
-            checks["aiApi"] = {"status": "ok", "count": len(_ai_results), "providers": _ai_results}
-        # AI API 失败不影响系统整体健康状态（它是可选服务）
-        # overall 不因为 AI API 而降级
+            _ok_count = sum(1 for r in _ai_results if r["status"] == "ok")
+            _warn_count = sum(1 for r in _ai_results if r["status"] == "warning")
+            if _ok_count == 0:
+                checks["aiApi"] = {"status": "warning", "count": len(_ai_results), "providers": _ai_results,
+                                   "message": "所有启用的供应商都没有可用 Key"}
+            else:
+                checks["aiApi"] = {"status": "ok", "count": _ok_count,
+                                   "providers": _ai_results,
+                                   "warning_count": _warn_count}
+    except Exception as e:
+        logger.warning(f"AI API health check skipped: {e}")
+        checks["aiApi"] = {"status": "skipped", "message": str(e)[:80]}
 
     return {
         "status": overall,

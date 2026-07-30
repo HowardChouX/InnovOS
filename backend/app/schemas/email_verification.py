@@ -23,3 +23,8 @@ class OtpIssuedOut(BaseModel):
 class OtpVerifiedOut(BaseModel):
     verified: bool
     already: bool = False
+
+
+class ResetPasswordSetIn(BaseModel):
+    reset_token: str = Field(min_length=10)
+    new_password: str = Field(min_length=8, max_length=128)
