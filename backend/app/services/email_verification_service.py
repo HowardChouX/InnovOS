@@ -1,4 +1,5 @@
 # app/services/email_verification_service.py
+import asyncio
 import hashlib
 import logging
 import secrets
@@ -256,19 +257,20 @@ class EmailVerificationService:
 
         流程:
         1. 解码 token → user_id
-        2. 通过 SyncSQLAlchemyUserDatabase + UserManager 调用 _update(password=...)
+        2. 通过 SQLAlchemy Session + UserManager 调用 _update(password=...)
            (fastapi_users 内部会调用 password_helper.hash 走 bcrypt)
         """
         user_id = self.consume_reset_session(token)
-        with db_session() as db:
-            from app.db.models import User
-            from app.auth.sync_db import SyncSQLAlchemyUserDatabase
-            from app.auth.users import UserManager
+        from app.db.session import _get_session_factory
+        from app.db.models import User
+        from app.auth.sync_db import SyncSQLAlchemyUserDatabase
+        from app.auth.users import UserManager
 
-            user_db = SyncSQLAlchemyUserDatabase(db, User)
+        factory = _get_session_factory()
+        session = factory()
+        try:
+            user_db = SyncSQLAlchemyUserDatabase(session, User)
             manager = UserManager(user_db)
-            # 同步上下文内调 async 方法:用一次性 event loop
-            import asyncio
             loop = asyncio.new_event_loop()
             try:
                 user = loop.run_until_complete(manager.get(user_id))
@@ -280,6 +282,8 @@ class EmailVerificationService:
                 )
             finally:
                 loop.close()
+        finally:
+            session.close()
         return {"reset": True}
 
     def purge_expired(self, retention_days: int = 30) -> int:
