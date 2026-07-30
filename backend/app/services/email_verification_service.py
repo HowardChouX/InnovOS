@@ -276,6 +276,13 @@ class EmailVerificationService:
                 user = loop.run_until_complete(manager.get(user_id))
                 if not user:
                     raise InvalidResetSession()
+                # 禁止与旧密码相同
+                same_password, _ = manager.password_helper.verify_and_update(
+                    new_password, user.hashed_password,
+                )
+                if same_password:
+                    from app.exceptions.password_reset import WeakPassword
+                    raise WeakPassword("新密码不能与旧密码相同")
                 # password 字段是 fastapi_users 内部约定,会触发 hashed_password 重算
                 loop.run_until_complete(
                     manager._update(user, {"password": new_password})
