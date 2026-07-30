@@ -46,9 +46,7 @@ export function Sidebar() {
               key={item.path}
               to={item.path}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
+                display: 'block',
                 padding: '9px 12px',
                 borderRadius: 8,
                 textDecoration: 'none',
@@ -70,10 +68,6 @@ export function Sidebar() {
                 }
               }}
             >
-              <i
-                className={`fa-solid ${item.icon}`}
-                style={{ width: 16, textAlign: 'center', fontSize: 12 }}
-              />
               <span>{item.label}</span>
             </Link>
           );
