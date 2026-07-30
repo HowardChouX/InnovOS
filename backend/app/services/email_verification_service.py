@@ -19,16 +19,10 @@ from app.exceptions.email_verification import (
     EmailNotFound,
     OtpRateLimited,
 )
+from app.exceptions.password_reset import InvalidResetSession
 from app.services.email_service import email_service
 
 logger = logging.getLogger(__name__)
-
-# InvalidResetSession 由 Task 5 引入。这里 forward-import 并用 try/except 保护,
-# 让本任务在 Task 5 之前也能独立 import + 通过测试。
-try:
-    from app.exceptions.password_reset import InvalidResetSession
-except ImportError:
-    InvalidResetSession = None  # type: ignore[assignment,misc]
 
 
 def _hash_code(code: str) -> str:
@@ -250,10 +244,6 @@ class EmailVerificationService:
 
         注意:这一步不写入数据库,token 本身的有效性由 JWT exp/aud 决定。
         """
-        if InvalidResetSession is None:
-            raise RuntimeError(
-                "InvalidResetSession not imported; Task 5 (exceptions) not done yet"
-            )
         try:
             return _decode_reset_session_token(token)
         except (jwt.PyJWTError, KeyError, ValueError):
@@ -269,10 +259,6 @@ class EmailVerificationService:
         2. 通过 SyncSQLAlchemyUserDatabase + UserManager 调用 _update(password=...)
            (fastapi_users 内部会调用 password_helper.hash 走 bcrypt)
         """
-        if InvalidResetSession is None:
-            raise RuntimeError(
-                "InvalidResetSession not imported; Task 5 (exceptions) not done yet"
-            )
         user_id = self.consume_reset_session(token)
         with db_session() as db:
             from app.db.models import User

@@ -278,3 +278,11 @@ from app.exceptions.email_verification import (
     CodeInvalid as CodeInvalidE,
     CodeExhausted as CodeExhaustedE,
 )
+
+
+def test_invalid_reset_session_status():
+    """InvalidResetSession 异常元数据正确。"""
+    from app.exceptions.password_reset import InvalidResetSession
+    e = InvalidResetSession()
+    assert e.status == 401
+    assert e.code == "RESET_SESSION_INVALID"
