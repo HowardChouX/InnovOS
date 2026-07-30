@@ -18,14 +18,14 @@ export const ROUTES = {
 } as const;
 
 export const NAV_ITEMS = [
-  { label: '工作台', path: ROUTES.HOME, icon: 'fa-house' },
-  { label: '需求分析', path: ROUTES.DEMAND, icon: 'fa-clipboard-list' },
-  { label: '问题定义', path: ROUTES.PROBLEM, icon: 'fa-bullseye' },
-  { label: '专利检索', path: ROUTES.PATENTS, icon: 'fa-file-alt' },
-  { label: '方案生成', path: ROUTES.SOLUTION, icon: 'fa-wand-magic-sparkles' },
-  { label: '方案评估', path: ROUTES.EVALUATION, icon: 'fa-chart-line' },
-  { label: '视频展示', path: ROUTES.VIDEO, icon: 'fa-video' },
-  { label: '项目管理', path: ROUTES.PROJECT, icon: 'fa-diagram-project' },
+  { label: '工作台', path: ROUTES.HOME },
+  { label: '需求分析', path: ROUTES.DEMAND },
+  { label: '问题定义', path: ROUTES.PROBLEM },
+  { label: '专利检索', path: ROUTES.PATENTS },
+  { label: '方案生成', path: ROUTES.SOLUTION },
+  { label: '方案评估', path: ROUTES.EVALUATION },
+  { label: '视频展示', path: ROUTES.VIDEO },
+  { label: '项目管理', path: ROUTES.PROJECT },
 ] as const;
 
 export const TASK_STATUS_MAP: Record<string, { label: string; color: string }> = {
