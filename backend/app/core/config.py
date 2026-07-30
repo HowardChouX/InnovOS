@@ -104,7 +104,7 @@ class Settings(BaseSettings):
     # 独立 secret,避免和业务 JWT 共用导致 reset_token 泄露时影响会话安全。
     # 不配则回退到 SECRET_KEY。
     RESET_SESSION_JWT_SECRET: str = ""
-    RESET_SESSION_JWT_AUDIENCE: str = "innovos:password_reset"
+    RESET_SESSION_JWT_AUDIENCE: str = "password-reset:consume"
     RESET_SESSION_TOKEN_TTL_SECONDS: int = 600
 
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
