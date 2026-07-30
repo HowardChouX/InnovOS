@@ -554,7 +554,8 @@ def init_email_verifications(db):
             expires_at TIMESTAMPTZ NOT NULL,
             consumed_at TIMESTAMPTZ,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            last_sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            last_sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            purpose VARCHAR(32) NOT NULL DEFAULT 'email_verification'
         )
         """
     )
@@ -569,6 +570,10 @@ def init_email_verifications(db):
     db.execute(
         "CREATE INDEX IF NOT EXISTS email_verifications_active_idx "
         "ON email_verifications(consumed_at) WHERE consumed_at IS NULL"
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS email_verifications_email_purpose_idx "
+        "ON email_verifications(email, purpose)"
     )
 
 
