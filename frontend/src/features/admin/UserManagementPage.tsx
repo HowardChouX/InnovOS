@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { usersApi, type User } from '../../api/users';
 import { notificationsApi } from '../../api/notifications';
 import { GlassPanel } from '../../components/ui/GlassPanel';
@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   Lightbulb,
   Clock,
+  Cpu,
 } from 'lucide-react';
 
 type ModalType = 'notify' | 'batchNotify' | 'edit' | null;
@@ -432,6 +433,13 @@ export function UserManagementPage() {
 
                 {/* Action buttons */}
                 <div className="flex gap-1 w-[200px] justify-end">
+                  <Link
+                    to={`/admin/users/${u.id}/model-services`}
+                    className="w-7 h-7 rounded flex items-center justify-center bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/15 transition-colors"
+                    title="AI 模型服务"
+                  >
+                    <Cpu className="w-3 h-3" />
+                  </Link>
                   <button
                     onClick={() => openEditModal(u)}
                     className="w-7 h-7 rounded flex items-center justify-center bg-slate-500/8 border border-[var(--border-light)] text-slate-400 hover:bg-slate-500/15 hover:text-slate-300 transition-colors cursor-pointer"

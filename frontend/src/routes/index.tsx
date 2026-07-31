@@ -16,6 +16,8 @@ void PlaceholderPage;
 const PatentSearchPage = lazyPage(() => import('../features/patents/PatentSearchPage'));
 const KnowledgeBasePage = lazyPage(() => import('../features/knowledge/KnowledgeBasePage'));
 const KeyManagementPage = lazyPage(() => import('../features/admin/KeyManagementPage'));
+const UsageStatsPage = lazyPage(() => import('../features/admin/UsageStatsPage'));
+const UserModelServicesPage = lazyPage(() => import('../features/admin/UserModelServicesPage'));
 const UserManagementPage = lazyPage(() => import('../features/admin/UserManagementPage'));
 const PatentDbPage = lazyPage(() => import('../features/admin/PatentDbPage'));
 const PatentConversionPage = lazyPage(
@@ -25,7 +27,9 @@ const GuidePage = lazyPage(() => import('../features/guide/GuidePage'));
 const ProfilePage = lazyPage(() => import('../features/profile/ProfilePage'));
 const NotFoundPage = lazyPage(() => import('../features/NotFoundPage'));
 const DemandMockPage = lazyPage(() => import('../features/workflow/DemandMockPage'));
-const ProblemDefinitionMockPage = lazyPage(() => import('../features/workflow/ProblemDefinitionMockPage'));
+const ProblemDefinitionMockPage = lazyPage(
+  () => import('../features/workflow/ProblemDefinitionMockPage'),
+);
 const SolutionMockPage = lazyPage(() => import('../features/workflow/SolutionMockPage'));
 const EvaluationMockPage = lazyPage(() => import('../features/workflow/EvaluationMockPage'));
 const VideoDisplayMockPage = lazyPage(() => import('../features/workflow/VideoDisplayMockPage'));
@@ -62,6 +66,22 @@ export const routes: RouteObject[] = [
             element: (
               <AdminRoute>
                 <KeyManagementPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: 'admin/users/:userId/model-services',
+            element: (
+              <AdminRoute>
+                <UserModelServicesPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: 'admin/usage',
+            element: (
+              <AdminRoute>
+                <UsageStatsPage />
               </AdminRoute>
             ),
           },

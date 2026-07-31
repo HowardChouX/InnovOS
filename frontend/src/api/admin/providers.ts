@@ -1,131 +1,92 @@
 import { apiRequest } from '../client';
 
-// 模型条目：兼容旧格式字符串和新格式对象（含 capabilities）
-export type ModelEntry =
-  | string
-  | {
-      id: string;
-      capabilities?: string[];
-      name?: string;
-      label?: string;
-      providerId?: string;
-      modelId?: string;
-      contextWindow?: number;
-      maxOutputTokens?: number;
-      endpointTypes?: string[];
-      pricing?: Record<string, number>;
-      isEnabled?: boolean;
-      group?: string;
-    };
-
-/** 从 ModelEntry 中提取模型 ID */
-export function getModelId(m: ModelEntry): string {
-  return typeof m === 'string' ? m : m.id;
-}
+export type ProviderHealth = 'healthy' | 'degraded' | 'unhealthy';
 
 export interface Provider {
-  id?: number;
   providerId: string;
   name: string;
-  protocol: string;
+  notes: string;
   apiHost: string;
-  hasApiKey: boolean;
-  apiKeyMasked?: string;
-  apiModel?: string;
-  models: ModelEntry[];
+  apiModel: string;
   isEnabled: boolean;
-  maxRpm?: number;
-  currentRpm?: number;
-  requestCount?: number;
+  health?: ProviderHealth;
   createdAt?: string;
-  isConfigured?: boolean;
-  website?: string;
-  keyUrl?: string;
-  docsUrl?: string;
-  category?: string;
+  updatedAt?: string;
+}
+
+export interface AddProviderInput {
+  provider_id: string;
+  name: string;
+  notes?: string;
+  api_host: string;
+  api_key: string;
+  api_model?: string;
+}
+
+export interface UpdateProviderInput {
+  name?: string;
+  notes?: string;
+  api_host?: string;
+  api_key?: string;
+  api_model?: string;
+  is_enabled?: boolean;
 }
 
 export const providersApi = {
-  listBuiltin: (): Promise<{ data: Provider[] }> =>
-    apiRequest<{ data: Provider[] }>('/api/admin/providers/builtin'),
+  list: (): Promise<{ data: Provider[] }> =>
+    apiRequest<{ data: Provider[] }>('/api/admin/providers'),
 
-  add: (data: {
-    provider_id: string;
-    name: string;
-    protocol?: string;
-    api_host: string;
-    api_model?: string;
-    models?: ModelEntry[];
-    priority?: number;
-    max_rpm?: number;
-  }) =>
-    apiRequest('/api/admin/providers', {
+  add: (data: AddProviderInput): Promise<{ data: Provider }> =>
+    apiRequest<{ data: Provider }>('/api/admin/providers', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  update: (
-    providerId: string,
-    data: {
-      name?: string;
-      api_host?: string;
-      api_model?: string;
-      models?: ModelEntry[];
-      is_enabled?: boolean;
-      priority?: number;
-      max_rpm?: number;
-    },
-  ) =>
-    apiRequest(`/api/admin/providers/${providerId}`, {
+  update: (providerId: string, data: UpdateProviderInput): Promise<{ data: Provider }> =>
+    apiRequest<{ data: Provider }>(`/api/admin/providers/${encodeURIComponent(providerId)}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
 
-  delete: (providerId: string) =>
-    apiRequest(`/api/admin/providers/${providerId}`, { method: 'DELETE' }),
+  delete: (providerId: string): Promise<{ message: string }> =>
+    apiRequest<{ message: string }>(`/api/admin/providers/${encodeURIComponent(providerId)}`, {
+      method: 'DELETE',
+    }),
+
+  detect: (
+    apiHost: string,
+    apiKey: string,
+  ): Promise<{ data: { models: Array<{ id: string; name: string }> } }> =>
+    apiRequest<{ data: { models: Array<{ id: string; name: string }> } }>(
+      '/api/admin/providers/detect',
+      {
+        method: 'POST',
+        body: JSON.stringify({ api_host: apiHost, api_key: apiKey }),
+      },
+    ),
+
+  detectModels: (
+    providerId: string,
+  ): Promise<{ data: { models: Array<{ id: string; name: string }> } }> =>
+    apiRequest<{ data: { models: Array<{ id: string; name: string }> } }>(
+      `/api/admin/providers/${encodeURIComponent(providerId)}/detect-models`,
+      { method: 'POST' },
+    ),
 
   check: (
     providerId: string,
     model?: string,
-  ): Promise<{ data: { status: string; latency_ms?: number; message?: string; model?: string } }> =>
-    apiRequest(`/api/admin/providers/${providerId}/check`, {
-      method: 'POST',
-      body: JSON.stringify(model ? { model } : {}),
-    }),
-
-  detectModels: (providerId: string): Promise<{ data: { models: ModelEntry[] } }> =>
-    apiRequest(`/api/admin/providers/${providerId}/detect-models`, { method: 'POST' }),
-
-  updateModel: (
-    providerId: string,
-    modelId: string,
-    data: {
-      is_enabled?: boolean;
-      name?: string;
-      group?: string;
-      endpoint_types?: string[];
-      capabilities?: string[];
-      context_window?: number;
-      max_output_tokens?: number;
-    },
-  ): Promise<{ data: unknown }> =>
-    apiRequest(`/api/admin/providers/${providerId}/models/${encodeURIComponent(modelId)}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-
-  /** 批量健康检查 — 并行测试多个模型连接，返回每个模型的状态/延迟/错误 */
-  batchCheckModels: (
-    providerId: string,
-    models: string[],
   ): Promise<{
     data: {
-      providerId: string;
-      models: Array<{ modelId: string; status: string; latency?: number; error?: string | null }>;
+      status: 'ok' | 'error' | 'not_found' | 'no_key' | 'no_model';
+      status_code?: number;
+      latency_ms?: number;
+      model?: string;
+      message?: string;
     };
   }> =>
-    apiRequest(`/api/admin/providers/${providerId}/models/check`, {
+    apiRequest(`/api/admin/providers/${encodeURIComponent(providerId)}/check`, {
       method: 'POST',
-      body: JSON.stringify({ models }),
+      body: JSON.stringify(model ? { model } : {}),
     }),
 };
