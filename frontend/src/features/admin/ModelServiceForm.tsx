@@ -230,6 +230,11 @@ export function ModelServiceForm({ open, mode, initial, onClose, onSave }: Model
               placeholder="https://api.example.com/v1"
               autoComplete="off"
               name="innovos_api_host"
+              data-form-type="other"
+              data-lpignore="true"
+              data-1p-ignore="true"
+              data-bwignore="true"
+              spellCheck={false}
             />
           </div>
           <div>
@@ -241,10 +246,12 @@ export function ModelServiceForm({ open, mode, initial, onClose, onSave }: Model
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder={mode === 'add' ? 'sk-...' : '（留空保留旧 Key）'}
-                autoComplete="off"
+                autoComplete="new-password"
                 name="innovos_api_key"
                 data-1p-ignore="true"
                 data-bwignore="true"
+                data-lpignore="true"
+                data-form-type="other"
                 spellCheck={false}
               />
               <button type="button" style={secondaryBtn} onClick={() => setShowKey(!showKey)}>
