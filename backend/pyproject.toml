@@ -43,10 +43,9 @@ test = [
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 asyncio_mode = "auto"
-# Prevent Database.get_db() from trying to connect to PostgreSQL during tests
-env = [
-    "DATABASE_URL=postgresql://test:test@localhost:5432/test",
-]
+# Tests use the auto_mock_db fixture in conftest.py to mock the database
+# connection. No real DATABASE_URL should be set (it would short-circuit
+# the fixture and cause real connection attempts).
 
 [tool.coverage.run]
 source = ["app"]

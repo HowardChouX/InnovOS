@@ -9,8 +9,21 @@ Pytest 配置 — 为所有测试自动隔离数据库依赖。
 """
 import os
 
-# 在 app.core.config.settings 实例化前注入 OTP_PEPPER，确保单例创建时即拿到测试值
+# 在 app.core.config.settings 实例化前注入测试用环境变量。
+# 这些 setdefault 不会覆盖 .env 里已有的值 —— 但 conftest 是测试专属入口，
+# 所以这里用 强制赋值 让测试 100% 不命中真实 QQ SMTP,避免每次测试都把
+# 退信推回用户邮箱。
 os.environ.setdefault("INNOVOS_OTP_PEPPER", "test-pepper")
+# 强制把 SMTP 指到本地 Mailpit(1025);即使本地没有 Mailpit,soft-fail
+# 也会让 Python 端吞错,不会发真实邮件。
+os.environ["SMTP_HOST"] = "localhost"
+os.environ["SMTP_PORT"] = "1025"
+os.environ["SMTP_USER"] = ""
+os.environ["SMTP_PASSWORD"] = ""
+os.environ["SMTP_FROM_EMAIL"] = "noreply@innovos.local"
+os.environ["SMTP_SSL"] = "false"
+os.environ["SMTP_TLS"] = "false"
+os.environ["EMAIL_OTP_SOFT_FAIL"] = "true"
 
 import sys
 import json
@@ -21,10 +34,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 # ── 全局 Mock 数据库 ──
+# Originally a sync generator with `yield`; converted to a no-yield
+# autouse function in 2026-07-31 (model-service refactor) to work
+# around pytest-asyncio 1.4.0's "did not yield a value" error in
+# auto mode. The monkeypatch state is auto-restored by pytest
+# after each test, so yield is not needed.
 @pytest.fixture(autouse=True)
-def auto_mock_db(monkeypatch):
-    if os.getenv("DATABASE_URL", "").startswith("postgresql"):
-        return
+def auto_mock_db(monkeypatch, request):
+    # NOTE: do NOT skip when DATABASE_URL is set — that defeats the
+    # purpose of this autouse mock. Always apply the mock for tests.
     monkeypatch.setattr("app.database.init_db", lambda: None)
     mock_conn = MagicMock()
     mock_get_db = lambda: mock_conn
@@ -35,11 +53,36 @@ def auto_mock_db(monkeypatch):
     except AttributeError:
         pass
     # 预导入可能引用 get_db 的模块，确保 monkeypatch 生效
+    # 注意:有些模块做 `from app.database import get_db`,需要直接 patch 该模块
     import app.api.models
     monkeypatch.setattr("app.api.models.get_db", mock_get_db)
+    # 新增:2026-07-31 model-service refactor — services modules import get_db directly
+    # Patch every module that imports get_db at module level. For modules
+    # that import it lazily (e.g. inside a function), we use a sentinel
+    # approach via sys.modules monkey-patching at the call site — easier
+    # to just skip those.
+    for mod_name in [
+        "app.services.provider_health_service",
+        "app.services.usage_logger",
+        "app.services.failover_router",
+        "app.services.usage_log_cleanup",
+    ]:
+        try:
+            mod = __import__(mod_name, fromlist=["get_db"])
+            monkeypatch.setattr(mod, "get_db", mock_get_db)
+        except (ImportError, AttributeError):
+            pass
     # Mock 环境变量读取 API Key（密钥不再来自 crypto 模块）
-    monkeypatch.setattr("app.algorithm.model_service._get_provider_api_key", lambda pid: f"env_key_{pid}" if pid else "")
-    yield mock_conn
+    # NOTE: 2026-07-31 model-service refactor removed _get_provider_api_key
+    # (replaced with ApiKeyService.lease_key). Skip patching it.
+    try:
+        monkeypatch.setattr("app.algorithm.model_service._get_provider_api_key", lambda pid: f"env_key_{pid}" if pid else "")
+    except AttributeError:
+        pass
+    # Return the mock_conn as a fixture value (for tests that request it)
+    # — but since we removed yield, we attach to the request instead.
+    request.node._auto_mock_db_conn = mock_conn
+    return mock_conn
 
 
 # ── FastAPI TestClient fixture ──
