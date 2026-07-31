@@ -15,6 +15,7 @@ cd frontend && npm install
 
 # Start development (both frontend and backend)
 make dev
+# PG socket: /tmp (override with PG_SOCKET_DIR=...). PG stopped by `make stop`.
 
 # Start individually
 cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
