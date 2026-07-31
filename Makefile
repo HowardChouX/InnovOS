@@ -6,17 +6,23 @@ PG_SOCKET_DIR  ?= /tmp
 PG_LOG         ?= /tmp/pg.log
 PG_PORT        ?= 5432
 
+# PID files for backgrounded dev processes (absolute paths via abspath)
+DEV_PID_DIR    ?= .dev-pids
+BACKEND_PID    := $(DEV_PID_DIR)/backend.pid
+FRONTEND_PID   := $(DEV_PID_DIR)/frontend.pid
+
 # ══════════════════════════════════════════════
 #  开发环境 — 一键启动全部服务
 # ══════════════════════════════════════════════
 
 dev:
+	@mkdir -p $(abspath $(DEV_PID_DIR))
 	@$(MAKE) start-db
 	@echo "=== Starting backend (port 8000) ==="
-	@cd backend && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload &
+	@cd backend && sh -c 'uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload & echo $$! > $(abspath $(BACKEND_PID))'
 	@sleep 2
 	@echo "=== Starting frontend (port 5173) ==="
-	@cd frontend && npm run dev
+	@cd frontend && sh -c 'npm run dev & echo $$! > $(abspath $(FRONTEND_PID))'
 
 start-db:
 	@if pg_isready -h $(PG_SOCKET_DIR) -p $(PG_PORT) -q 2>/dev/null; then \
@@ -36,8 +42,8 @@ start-db:
 
 stop:
 	@echo "=== Stopping frontend / backend ==="
-	@pgrep -f "uvicorn app.main" | grep -vw $$ | xargs -r kill 2>/dev/null; true
-	@pgrep -f "vite" | grep -vw $$ | xargs -r kill 2>/dev/null; true
+	@if [ -f $(abspath $(FRONTEND_PID)) ]; then kill $$(cat $(abspath $(FRONTEND_PID))) 2>/dev/null || true; rm -f $(abspath $(FRONTEND_PID)); fi
+	@if [ -f $(abspath $(BACKEND_PID)) ]; then kill $$(cat $(abspath $(BACKEND_PID))) 2>/dev/null || true; rm -f $(abspath $(BACKEND_PID)); fi
 	@echo "=== Stopping PostgreSQL ==="
 	@sudo -u postgres pg_ctl -D $(PG_DATA_DIR) -o "-k $(PG_SOCKET_DIR)" -m fast stop 2>/dev/null; true
 	@echo "Stopped."
