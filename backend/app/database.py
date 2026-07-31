@@ -20,6 +20,7 @@ import re
 import threading
 from contextlib import contextmanager
 from typing import Any
+from urllib.parse import urlparse
 
 import psycopg2
 import psycopg2.extras
@@ -28,7 +29,48 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
+def _build_pg_dsn(url: str) -> str:
+    """Convert SQLAlchemy URL ('postgresql+psycopg2://...?host=/tmp') to psycopg2 DSN.
+
+    psycopg2 does not understand the '+psycopg2' driver prefix or query-string
+    fields like 'host=/tmp'; we strip the driver and merge query fields into
+    keyword args. Returns a libpq-style DSN string.
+    """
+    if not url:
+        raise RuntimeError(
+            "DATABASE_URL environment variable not set. "
+            "Example: postgresql://user:password@host:5432/innovos"
+        )
+    # Strip SQLAlchemy driver prefix: postgresql+psycopg2:// -> postgresql://
+    cleaned = re.sub(r"^postgresql\+\w+://", "postgresql://", url)
+    parsed = urlparse(cleaned)
+    if not parsed.scheme.startswith("postgresql"):
+        raise RuntimeError(f"Unsupported DATABASE_URL scheme: {parsed.scheme}")
+    # libpq key=value DSN
+    parts = []
+    if parsed.hostname:
+        parts.append(f"host={parsed.hostname}")
+    if parsed.port:
+        parts.append(f"port={parsed.port}")
+    if parsed.path and parsed.path.lstrip("/"):
+        parts.append(f"dbname={parsed.path.lstrip('/')}")
+    if parsed.username:
+        parts.append(f"user={parsed.username}")
+    if parsed.password:
+        parts.append(f"password={parsed.password}")
+    # Merge non-DSN query params (e.g. ?host=/tmp for local socket) into DSN.
+    # Skip keys already covered above so libpq doesn't complain about dupes.
+    skip = {"host", "port", "dbname", "user", "password"}
+    for k, v in parsed.query_params if hasattr(parsed, "query_params") else []:
+        if k in skip:
+            continue
+        parts.append(f"{k}={v}")
+    return " ".join(parts)
+
+
 DATABASE_URL = settings.DATABASE_URL or ""
+_PG_DSN = _build_pg_dsn(DATABASE_URL)
 
 _QMARK = re.compile(r"\?")
 
@@ -147,7 +189,7 @@ def _get_pg_db():
                         "DATABASE_URL environment variable not set. Example: postgresql://user:password@host:5432/innovos"
                     )
                 logger.info(f"Connecting to PostgreSQL: {DATABASE_URL[:30]}...")
-                _pg_pool = _pool.ThreadedConnectionPool(1, 50, DATABASE_URL)
+                _pg_pool = _pool.ThreadedConnectionPool(1, 50, dsn=_PG_DSN)
     raw_conn = _pg_pool.getconn()
     return _PostgresDatabase(raw_conn)
 

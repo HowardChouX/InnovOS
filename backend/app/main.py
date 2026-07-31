@@ -73,7 +73,7 @@ async def rate_limit_middleware(request: Request, call_next):
     path = request.url.path.rstrip("/") or "/"
     ip = get_client_ip(request)
 
-    if path == "/api/auth/login":
+    if path == "/api/auth/jwt/login":
         allowed, remaining, reset = auth_limiter.check(ip)
         if not allowed:
             return JSONResponse(

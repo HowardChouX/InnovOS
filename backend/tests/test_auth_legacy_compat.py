@@ -32,7 +32,7 @@ def _issue_token(user_id: int, token_version: int = 0) -> str:
 def _request_with_cookie(token: str):
     """构造仅含 cookies 的最小 Request 替身。"""
     req = MagicMock()
-    req.cookies = {"__Host-token": token}
+    req.cookies = {"token": token}
     return req
 
 

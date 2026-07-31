@@ -150,8 +150,13 @@ class BackupService:
     @staticmethod
     def _pg_dump(db_url: str, output_path: str) -> None:
         """执行 pg_dump 并压缩。"""
+        # SQLAlchemy URL ('postgresql+psycopg2://...?host=/tmp') 转 libpq DSN，
+        # 否则 pg_dump 不认 '+psycopg2' 前缀和 query-string 字段。
+        from app.database import _build_pg_dsn
+
+        dsn = _build_pg_dsn(db_url)
         result = subprocess.run(
-            ["pg_dump", db_url],
+            ["pg_dump", dsn],
             capture_output=True,
             timeout=300,  # 5 分钟超时
         )

@@ -24,6 +24,10 @@ ALGORITHM = "HS256"
 
 _security_optional = HTTPBearer(auto_error=False)
 
+# Cookie 名：生产 __Host-token，开发 token（HTTP 下 Secure cookie 无法发送）
+_COOKIE_NAME = "__Host-token" if settings.ENVIRONMENT == "production" else "token"
+_COOKIE_SECURE = settings.ENVIRONMENT == "production"
+
 
 def create_access_token(data: dict[str, Any]) -> str:
     """兼容旧 API：签发 JWT。"""
@@ -39,12 +43,12 @@ def create_access_token(data: dict[str, Any]) -> str:
 
 
 def set_token_cookie(response: Response, token: str) -> None:
-    """兼容旧 API：设置 __Host-token cookie。"""
+    """设置 token cookie（环境自适应 cookie 名）。"""
     response.set_cookie(
-        key="__Host-token",
+        key=_COOKIE_NAME,
         value=token,
         httponly=True,
-        secure=True,
+        secure=_COOKIE_SECURE,
         samesite="lax",
         max_age=ACCESS_TOKEN_EXPIRE_HOURS * 3600,
         path="/",
@@ -52,15 +56,15 @@ def set_token_cookie(response: Response, token: str) -> None:
 
 
 def clear_token_cookie(response: Response) -> None:
-    """兼容旧 API：清除 token cookie。"""
+    """清除 token cookie。"""
     response.set_cookie(
-        key="__Host-token", value="", httponly=True, secure=True,
+        key=_COOKIE_NAME, value="", httponly=True, secure=_COOKIE_SECURE,
         max_age=0, path="/",
     )
 
 
 def _verify_admin_credentials(username: str, password: str) -> bool:
-    """兼容旧 API：常量时间比较管理员凭据。"""
+    """常量时间比较管理员凭据。"""
     admin_user = settings.FIRST_SUPERUSER or ""
     admin_pass = settings.FIRST_SUPERUSER_PASSWORD or ""
     return hmac.compare_digest(username, admin_user) and hmac.compare_digest(password, admin_pass)
@@ -70,31 +74,24 @@ def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_security_optional),
 ) -> dict[str, Any]:
-    """兼容旧 API：返回 dict 用户对象。
-
-    新代码请用 app.auth.instance.current_active_user（返回 ORM User）。
-    """
+    """返回 dict 用户对象。新代码请用 app.auth.instance.current_active_user。"""
     from app.database import get_db
 
     token: str | None = None
     if credentials:
         token = credentials.credentials
     if not token:
-        token = request.cookies.get("__Host-token")
+        token = request.cookies.get(_COOKIE_NAME)
     if not token:
         raise HTTPException(status_code=401, detail="未登录")
 
     try:
-        # 必须传 audience：新 token 含 aud 声明，不校验会抛 InvalidAudienceError；
-        # 同时强制校验可拒绝 reset/verify token（同 SECRET_KEY 但 audience 不同），
-        # 防止重置密码链接的 token 被拿来冒充用户访问业务接口。
         payload = jwt.decode(
             token, SECRET_KEY, algorithms=[ALGORITHM], audience=TOKEN_AUDIENCE
         )
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="无效的令牌") from None
 
-    # 新 token 的用户 ID 在 sub（字符串）；解析为 int。
     sub = payload.get("sub")
     user_id: int | None = None
     if sub is not None:
@@ -110,7 +107,6 @@ def get_current_user(
         row = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         if row is None:
             raise HTTPException(status_code=401, detail="用户不存在")
-        # 直接从 row 读取（DB 列为 hashed_password，旧 Pydantic User 模型已不适用）
         created_at = row.get("created_at")
         return {
             "id": row["id"] if row.get("id") is not None else 0,
@@ -125,7 +121,7 @@ def get_current_user(
 
 
 def require_admin(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
-    """兼容旧 API：要求管理员。"""
+    """要求管理员。"""
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="需要管理员权限")
     return user

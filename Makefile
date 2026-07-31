@@ -1,4 +1,4 @@
-.PHONY: dev stop test lint quality format clean install build security docker-up docker-down db-backup setup-hooks
+.PHONY: dev stop stop-apps test lint quality format clean install build security docker-up docker-down db-backup setup-hooks
 
 # PostgreSQL local cluster (sudo pg_ctl) — overridable from env
 PG_DATA_DIR    ?= /var/lib/postgres/data
@@ -17,9 +17,10 @@ FRONTEND_PID   := $(DEV_PID_DIR)/frontend.pid
 
 dev:
 	@mkdir -p $(abspath $(DEV_PID_DIR))
+	@$(MAKE) stop-apps
 	@$(MAKE) start-db
 	@echo "=== Starting backend (port 8000) ==="
-	@cd backend && sh -c 'uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload & echo $$! > $(abspath $(BACKEND_PID))'
+	@cd backend && sh -c 'nohup uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload >/tmp/backend.log 2>&1 & echo $$! > $(abspath $(BACKEND_PID))'
 	@sleep 2
 	@echo "=== Starting frontend (port 5173) ==="
 	@cd frontend && sh -c 'npm run dev & echo $$! > $(abspath $(FRONTEND_PID))'
@@ -47,6 +48,10 @@ stop:
 	@echo "=== Stopping PostgreSQL ==="
 	@sudo -u postgres pg_ctl -D $(PG_DATA_DIR) -o "-k $(PG_SOCKET_DIR)" -m fast stop 2>/dev/null; true
 	@echo "Stopped."
+
+stop-apps:
+	@if [ -f $(abspath $(FRONTEND_PID)) ]; then kill $$(cat $(abspath $(FRONTEND_PID))) 2>/dev/null || true; rm -f $(abspath $(FRONTEND_PID)); fi
+	@if [ -f $(abspath $(BACKEND_PID)) ]; then kill $$(cat $(abspath $(BACKEND_PID))) 2>/dev/null || true; rm -f $(abspath $(BACKEND_PID)); fi
 
 # ══════════════════════════════════════════════
 #  代码质量门禁（提交前运行）

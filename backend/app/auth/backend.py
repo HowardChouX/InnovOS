@@ -7,12 +7,20 @@ from fastapi_users.authentication import (
 from app.auth.strategy import TOKEN_AUDIENCE, InnovOSJWTStrategy
 from app.core.config import settings
 
-# Cookie 为主通道，保持 __Host-token 名称（前端零改动）
-# __Host- 前缀要求: Secure=True, Path=/, 无 Domain
+# Cookie 为主通道。
+# 生产环境使用 __Host-token（要求 Secure=True, Path=/, 无 Domain）
+# 开发环境使用 token（HTTP localhost 下 Secure cookie 不会发送，需降级）
+if settings.ENVIRONMENT == "production":
+    _cookie_name = "__Host-token"
+    _cookie_secure = True
+else:
+    _cookie_name = "token"
+    _cookie_secure = False
+
 cookie_transport = CookieTransport(
-    cookie_name="__Host-token",
+    cookie_name=_cookie_name,
     cookie_max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    cookie_secure=True,
+    cookie_secure=_cookie_secure,
     cookie_httponly=True,
     cookie_samesite="lax",
 )
