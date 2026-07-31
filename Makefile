@@ -19,17 +19,20 @@ dev:
 	@cd frontend && npm run dev
 
 start-db:
-	@pg_isready -h $(PG_SOCKET_DIR) -p $(PG_PORT) -q 2>/dev/null && { echo "=== PostgreSQL already running on $(PG_SOCKET_DIR):$(PG_PORT) ==="; exit 0; } || true
-	@echo "=== Starting PostgreSQL (socket: $(PG_SOCKET_DIR)) ==="
-	@sudo -u postgres pg_ctl -D $(PG_DATA_DIR) -o "-k $(PG_SOCKET_DIR)" -l $(PG_LOG) start
-	@echo "=== Waiting for PostgreSQL to accept connections ==="
-	@for i in $$(seq 1 20); do \
-		pg_isready -h $(PG_SOCKET_DIR) -p $(PG_PORT) -q && { echo "=== PostgreSQL ready ==="; exit 0; }; \
-		sleep 0.5; \
-	done; \
-	echo "ERROR: PostgreSQL did not become ready in 10s. Last 20 lines of $(PG_LOG):" >&2; \
-	sudo -u postgres tail -20 $(PG_LOG) >&2; \
-	exit 1
+	@if pg_isready -h $(PG_SOCKET_DIR) -p $(PG_PORT) -q 2>/dev/null; then \
+		echo "=== PostgreSQL already running on $(PG_SOCKET_DIR):$(PG_PORT) ==="; \
+	else \
+		echo "=== Starting PostgreSQL (socket: $(PG_SOCKET_DIR)) ==="; \
+		sudo -u postgres pg_ctl -D $(PG_DATA_DIR) -o "-k $(PG_SOCKET_DIR)" -l $(PG_LOG) start; \
+		echo "=== Waiting for PostgreSQL to accept connections ==="; \
+		for i in $$(seq 1 20); do \
+			pg_isready -h $(PG_SOCKET_DIR) -p $(PG_PORT) -q 2>/dev/null && { echo "=== PostgreSQL ready ==="; exit 0; }; \
+			sleep 0.5; \
+		done; \
+		echo "ERROR: PostgreSQL did not become ready in 10s. Last 20 lines of $(PG_LOG):" >&2; \
+		sudo -u postgres tail -20 $(PG_LOG) >&2; \
+		exit 1; \
+	fi
 
 stop:
 	@echo "=== Stopping frontend / backend ==="
