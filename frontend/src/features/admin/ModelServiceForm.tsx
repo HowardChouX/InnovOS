@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { providersApi, type Provider } from '../../api/admin/providers';
 
@@ -62,6 +62,27 @@ export function ModelServiceForm({ open, mode, initial, onClose, onSave }: Model
   const [detecting, setDetecting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Belt-and-suspenders reset: every time the modal goes from closed→open,
+  // explicitly clear all fields. This catches HMR full-remount cases where
+  // the `key` prop might not change but a stale state was preserved.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (open) {
+      setProviderId(initial?.providerId ?? '');
+      setName(initial?.name ?? '');
+      setNotes(initial?.notes ?? '');
+      setApiHost(initial?.apiHost ?? '');
+      setApiKey('');
+      setApiModel(initial?.apiModel ?? '');
+      setShowKey(false);
+      setDetected([]);
+      setDetecting(false);
+      setSaving(false);
+      setError(null);
+    }
+  }, [open, initial]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (!open) return null;
 
