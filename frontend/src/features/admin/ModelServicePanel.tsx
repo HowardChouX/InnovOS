@@ -31,6 +31,10 @@ export function ModelServicePanel() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [formMode, setFormMode] = useState<'add' | 'edit' | null>(null);
+  // Bumped on every open so the form's `key` changes — forces React to
+  // fully unmount + remount the form, discarding any stale useState
+  // (e.g. HMR-preserved or browser-autofilled values).
+  const [dialogNonce, setDialogNonce] = useState(0);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
 
   const load = useCallback(async () => {
@@ -120,6 +124,7 @@ export function ModelServicePanel() {
             onClick={() => {
               setEditingProvider(null);
               setFormMode('add');
+              setDialogNonce((n) => n + 1);
             }}
             style={{
               padding: '6px 14px',
@@ -224,6 +229,7 @@ export function ModelServicePanel() {
                   onClick={() => {
                     setEditingProvider(p);
                     setFormMode('edit');
+                    setDialogNonce((n) => n + 1);
                   }}
                   style={{
                     padding: '4px 10px',
@@ -259,6 +265,7 @@ export function ModelServicePanel() {
 
       {formMode !== null && (
         <ModelServiceForm
+          key={`${formMode ?? 'add'}-${editingProvider?.providerId ?? 'new'}-${dialogNonce}`}
           open
           mode={formMode}
           initial={editingProvider}

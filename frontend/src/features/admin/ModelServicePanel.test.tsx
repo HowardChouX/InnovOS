@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ModelServicePanel } from './ModelServicePanel';
 
@@ -72,5 +72,33 @@ describe('ModelServicePanel', () => {
     await waitFor(() => {
       expect(screen.getByText(/还没有任何模型服务，点右上角"添加"创建第一条/)).toBeInTheDocument();
     });
+  });
+});
+
+describe('ModelServicePanel — form remount on each open', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders empty form fields when opening the Add modal', async () => {
+    render(
+      <MemoryRouter>
+        <ModelServicePanel />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/\+ 添加/)).toBeInTheDocument();
+    });
+    // Click + 添加
+    fireEvent.click(screen.getByText(/\+ 添加/));
+    // The form should render with all 5 fields empty
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('https://api.example.com/v1')).toBeInTheDocument();
+    });
+    expect(
+      (screen.getByPlaceholderText('https://api.example.com/v1') as HTMLInputElement).value,
+    ).toBe('');
+    expect((screen.getByPlaceholderText('sk-...') as HTMLInputElement).value).toBe('');
+    expect((screen.getByPlaceholderText('例如 my-deepseek') as HTMLInputElement).value).toBe('');
   });
 });
