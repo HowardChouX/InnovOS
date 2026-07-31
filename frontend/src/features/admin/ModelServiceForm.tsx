@@ -174,6 +174,8 @@ export function ModelServiceForm({ open, mode, initial, onClose, onSave }: Model
               onChange={(e) => setProviderId(e.target.value)}
               placeholder="例如 my-deepseek"
               disabled={mode === 'edit'}
+              autoComplete="off"
+              name="innovos_provider_id"
             />
           </div>
           <div>
@@ -183,6 +185,8 @@ export function ModelServiceForm({ open, mode, initial, onClose, onSave }: Model
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="DeepSeek (生产)"
+              autoComplete="off"
+              name="innovos_provider_name"
             />
           </div>
           <div>
@@ -192,6 +196,8 @@ export function ModelServiceForm({ open, mode, initial, onClose, onSave }: Model
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="选填"
+              autoComplete="off"
+              name="innovos_provider_notes"
             />
           </div>
           <div>
@@ -201,6 +207,8 @@ export function ModelServiceForm({ open, mode, initial, onClose, onSave }: Model
               value={apiHost}
               onChange={(e) => setApiHost(e.target.value)}
               placeholder="https://api.example.com/v1"
+              autoComplete="off"
+              name="innovos_api_host"
             />
           </div>
           <div>
@@ -212,6 +220,11 @@ export function ModelServiceForm({ open, mode, initial, onClose, onSave }: Model
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder={mode === 'add' ? 'sk-...' : '（留空保留旧 Key）'}
+                autoComplete="off"
+                name="innovos_api_key"
+                data-1p-ignore="true"
+                data-bwignore="true"
+                spellCheck={false}
               />
               <button type="button" style={secondaryBtn} onClick={() => setShowKey(!showKey)}>
                 {showKey ? '隐藏' : '显示'}
@@ -227,6 +240,8 @@ export function ModelServiceForm({ open, mode, initial, onClose, onSave }: Model
                 onChange={(e) => setApiModel(e.target.value)}
                 list={`models-${providerId}`}
                 placeholder="例如 gpt-4o-mini"
+                autoComplete="off"
+                name="innovos_default_model"
               />
               <button
                 type="button"
