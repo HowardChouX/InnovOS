@@ -1,445 +1,264 @@
-"""
-统一模型服务管理 — 供应商管理
+"""Thin model service layer (post-refactor).
 
-每个供应商条目包含：API 地址、模型、轮询配置。
-API 密钥来自环境变量，不存储在数据库中。
+Stores the catalog of model service entries (rows in `model_providers`).
+Each entry has exactly one encrypted API key in `api_keys`
+(priority=0, name='default') created/updated via `ApiKeyService`.
 """
-
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
-from typing import Any, cast
+from typing import Any, Optional
 
-from app.algorithm.model_registry import model_registry
-from app.algorithm.providers_registry import (
-    BUILTIN_PROVIDERS,
-    get_model_id,
-    infer_capabilities,
-    normalize_model,
-)
+import httpx
+
+from app.core.key_crypto import load_api_key_cipher
 from app.database import get_db
-
-def _get_provider_api_key(provider_id: str) -> str | None:
-    """从数据库 api_keys 借一把可用的 Key,返回明文。
-
-    内部委托 ApiKeyService.lease_key(provider_id)。同步版本,主要用于
-    model_resolver.resolve() 同步路径。chat_completion 主调用应使用
-    ai_client.ProviderKeyPool(带 failover)。
-    """
-    try:
-        from app.services.api_key_service import get_api_key_service
-
-        svc = get_api_key_service()
-        lease = svc.lease_key(provider_id=provider_id)
-        return lease.plaintext if lease else None
-    except Exception as exc:  # noqa: BLE001
-        logger.debug(f"_get_provider_api_key({provider_id}): {exc}")
-        return None
-
-
-def _has_provider_api_key(provider_id: str) -> bool:
-    """检查数据库中是否存在该供应商的 active Key(不租约,纯只读)。"""
-    try:
-        from app.services.api_key_service import get_api_key_service
-
-        return get_api_key_service().has_active_key(provider_id=provider_id)
-    except Exception:
-        return False
-
-
-# ── 供应商字段校验 ──────────────────────────────────────
-
-ALLOWED_MODEL_PROVIDER_FIELDS = {
-    "name",
-    "protocol",
-    "api_host",
-    "api_model",
-    "models",
-    "is_enabled",
-    "max_rpm",
-}
-
-
-def _validate_columns(fields: list[str], allowed: set[str]) -> None:
-    for f in fields:
-        if f not in allowed:
-            raise ValueError(f"Invalid column: {f}")
-
+from app.services.api_key_service import ApiKeyService
 
 logger = logging.getLogger(__name__)
 
 
 class ModelService:
-    """统一模型服务管理器。"""
+    # ── Read ──
 
-    def list_all(self) -> list[dict]:
-        """获取所有已配置的供应商。"""
+    def list_all(self) -> list[dict[str, Any]]:
         db = get_db()
-        rows = db.execute("SELECT * FROM model_providers ORDER BY id ASC").fetchall()
-        db.close()
+        try:
+            rows = db.execute(
+                "SELECT provider_id, name, notes, api_host, api_model, is_enabled, "
+                "created_at, updated_at "
+                "FROM model_providers ORDER BY id ASC"
+            ).fetchall()
+        finally:
+            db.close()
         return [self._row_to_dict(r) for r in rows]
 
-    def get(self, provider_id: str) -> dict | None:
+    def get(self, provider_id: str) -> Optional[dict[str, Any]]:
         db = get_db()
-        row = db.execute("SELECT * FROM model_providers WHERE provider_id=?", (provider_id,)).fetchone()
-        db.close()
+        try:
+            row = db.execute(
+                "SELECT provider_id, name, notes, api_host, api_model, is_enabled, "
+                "created_at, updated_at "
+                "FROM model_providers WHERE provider_id=%s",
+                (provider_id,),
+            ).fetchone()
+        finally:
+            db.close()
         return self._row_to_dict(row) if row else None
 
-    def add(self, data: dict) -> dict:
+    # ── Write ──
+
+    def upsert(
+        self,
+        *,
+        provider_id: str,
+        name: str,
+        notes: str = "",
+        api_host: str,
+        api_key_plaintext: str,
+        api_model: str = "",
+    ) -> dict[str, Any]:
+        if not provider_id or not provider_id.strip():
+            raise ValueError("provider_id is required")
+        if not name.strip():
+            raise ValueError("name is required")
+        if not api_host.strip():
+            raise ValueError("api_host is required")
+        if not api_key_plaintext:
+            raise ValueError("api_key is required")
+
         db = get_db()
-        cursor = db.execute(
-            """INSERT INTO model_providers
-               (provider_id, name, protocol, api_host, api_model, models, max_rpm, is_enabled)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""",
-            (
-                data["provider_id"],
-                data["name"],
-                data.get("protocol", "openai"),
-                data["api_host"],
-                data.get("api_model", ""),
-                json.dumps(data.get("models", [])),
-                data.get("max_rpm", 60),
-                1 if data.get("is_enabled", True) else 0,
-            ),
-        )
-        db.commit()
-        row = cursor.fetchone()
-        if row is None:
-            raise RuntimeError(f"INSERT failed for provider {data.get('provider_id')}")
-        inserted_id = row["id"]
-        row = db.execute("SELECT * FROM model_providers WHERE id=?", (inserted_id,)).fetchone()
-        db.close()
-        return self._row_to_dict(row)
-
-    def update(self, provider_id: str, data: dict) -> dict | None:
-        db = get_db()
-        row = db.execute("SELECT * FROM model_providers WHERE provider_id=?", (provider_id,)).fetchone()
-        if not row:
-            db.close()
-            return None
-
-        updates, params = [], []
-        for field in ["name", "protocol", "api_host", "api_model"]:
-            if field in data and data[field] is not None:
-                updates.append(f"{field}=?")
-                params.append(data[field])
-        if "models" in data:
-            updates.append("models=?")
-            params.append(json.dumps(data["models"]))
-        if "is_enabled" in data:
-            updates.append("is_enabled=?")
-            params.append(1 if data["is_enabled"] else 0)
-        if "max_rpm" in data:
-            updates.append("max_rpm=?")
-            params.append(data["max_rpm"])
-        # API Key 不再通过 UI 更新，密钥来自环境变量
-
-        if updates:
-            params.append(provider_id)
-            _validate_columns([u.split("=")[0].strip() for u in updates], ALLOWED_MODEL_PROVIDER_FIELDS)
-            db.execute(f"UPDATE model_providers SET {', '.join(updates)} WHERE provider_id=?", params)
+        try:
+            existing = db.execute(
+                "SELECT id FROM model_providers WHERE provider_id=%s",
+                (provider_id,),
+            ).fetchone()
+            if existing is None:
+                db.execute(
+                    "INSERT INTO model_providers (provider_id, name, notes, api_host, "
+                    "api_model, protocol, models, max_rpm, is_enabled) "
+                    "VALUES (%s, %s, %s, %s, %s, 'openai', '[]', 60, TRUE)",
+                    (provider_id, name, notes or "", api_host, api_model or ""),
+                )
+            else:
+                db.execute(
+                    "UPDATE model_providers SET name=%s, notes=%s, api_host=%s, "
+                    "api_model=%s WHERE provider_id=%s",
+                    (name, notes or "", api_host, api_model or "", provider_id),
+                )
             db.commit()
+        finally:
+            db.close()
 
-        row = db.execute("SELECT * FROM model_providers WHERE provider_id=?", (provider_id,)).fetchone()
-        db.close()
-        return self._row_to_dict(row)
+        self._upsert_api_key(provider_id=provider_id, plaintext=api_key_plaintext)
+        return self.get(provider_id)  # type: ignore[return-value]
+
+    def update(
+        self,
+        provider_id: str,
+        *,
+        name: Optional[str] = None,
+        notes: Optional[str] = None,
+        api_host: Optional[str] = None,
+        api_model: Optional[str] = None,
+        is_enabled: Optional[bool] = None,
+    ) -> Optional[dict[str, Any]]:
+        current = self.get(provider_id)
+        if current is None:
+            return None
+        merged = {
+            "name": name if name is not None else current["name"],
+            "notes": notes if notes is not None else current["notes"],
+            "api_host": api_host if api_host is not None else current["apiHost"],
+            "api_model": api_model if api_model is not None else current["apiModel"],
+            "is_enabled": is_enabled if is_enabled is not None else current["isEnabled"],
+        }
+        db = get_db()
+        try:
+            db.execute(
+                "UPDATE model_providers SET name=%s, notes=%s, api_host=%s, "
+                "api_model=%s, is_enabled=%s WHERE provider_id=%s",
+                (merged["name"], merged["notes"], merged["api_host"],
+                 merged["api_model"], merged["is_enabled"], provider_id),
+            )
+            db.commit()
+        finally:
+            db.close()
+        return self.get(provider_id)
 
     def delete(self, provider_id: str) -> bool:
         db = get_db()
-        db.execute("DELETE FROM model_providers WHERE provider_id=?", (provider_id,))
-        db.commit()
-        db.close()
-        return True
-
-    def toggle(self, provider_id: str) -> dict | None:
-        """启用/禁用切换。"""
-        db = get_db()
-        row = db.execute("SELECT is_enabled FROM model_providers WHERE provider_id=?", (provider_id,)).fetchone()
-        if not row:
+        try:
+            cur = db.execute(
+                "DELETE FROM model_providers WHERE provider_id=%s",
+                (provider_id,),
+            )
+            db.commit()
+            return (cur.rowcount or 0) > 0
+        finally:
             db.close()
-            return None
-        new_val = 0 if row["is_enabled"] else 1
-        db.execute("UPDATE model_providers SET is_enabled=? WHERE provider_id=?", (new_val, provider_id))
-        db.commit()
-        row = db.execute("SELECT * FROM model_providers WHERE provider_id=?", (provider_id,)).fetchone()
-        db.close()
-        return self._row_to_dict(row)
 
-    async def check_connection(self, provider_id: str, model: str | None = None) -> dict:
-        """检查连接（测试延迟）。"""
-        db = get_db()
-        row = db.execute(
-            "SELECT api_host, api_model, models FROM model_providers WHERE provider_id=?",
-            (provider_id,),
-        ).fetchone()
-        db.close()
+    # ── Internal helpers ──
 
-        if not row:
-            builtin = BUILTIN_PROVIDERS.get(provider_id)
-            if not builtin:
-                return {"status": "error", "message": "供应商不存在"}
-            return {"status": "error", "message": "未配置 API Key"}
-
-        api_key = _get_provider_api_key(provider_id)
-        if not api_key:
-            return {"status": "error", "message": "未配置 API Key（请在管理后台 → 模型服务 中添加）"}
-
-        # 确定测试模型：优先使用客户端传来的模型
-        test_model = model or row["api_model"] or ""
-        if not test_model:
-            models_raw = self._parse_models(row)
-            models = [normalize_model(m) for m in models_raw]
-            test_model = get_model_id(models[0]) if models else "deepseek-chat"
-
-        try:
-            from app.algorithm.model_runtime import ModelRuntime
-
-            return ModelRuntime.test_connection(provider_id, test_model, api_key_override=api_key)
-        except Exception as e:
-            return {"status": "error", "message": str(e)[:100]}
-
-    async def detect_models(self, provider_id: str) -> dict:
-        """从供应商 /v1/models 端点获取可用模型列表。
-
-        API 密钥从环境变量读取，不再需要 api_key_override 参数。
-        """
-        db = get_db()
-        row = db.execute(
-            "SELECT api_host FROM model_providers WHERE provider_id=?",
-            (provider_id,),
-        ).fetchone()
-        db.close()
-
-        if not row:
-            builtin_raw = BUILTIN_PROVIDERS.get(provider_id)
-            if not builtin_raw:
-                return {"models": []}
-            builtin = cast(dict[str, Any], builtin_raw)
-            api_host = builtin["api_host"]
+    def _upsert_api_key(self, *, provider_id: str, plaintext: str) -> None:
+        key_svc = ApiKeyService(db=get_db(), cipher=load_api_key_cipher())
+        existing = key_svc.list_keys(provider_id=provider_id)
+        if existing:
+            key_svc.replace_secret(
+                key_id=existing[0]["id"],
+                plaintext=plaintext,
+                actor_id=None,
+            )
         else:
-            api_host = row["api_host"]
-
-        api_key = _get_provider_api_key(provider_id)
-        if not api_key:
-            return {"models": []}
-
-        try:
-            import httpx
-
-            async with httpx.AsyncClient(timeout=15) as client:
-                base = api_host.rstrip("/")
-                models_url = f"{base}/models" if base.endswith("/v1") else f"{base}/v1/models"
-                resp = await client.get(
-                    models_url,
-                    headers={"Authorization": f"Bearer {api_key}"},
-                )
-                if resp.status_code != 200:
-                    logger.warning("detect_models %s: HTTP %d %s", provider_id, resp.status_code, resp.text[:200])
-                    return {"models": [], "error": f"HTTP {resp.status_code}"}
-                data = resp.json()
-                model_ids = sorted(m["id"] for m in data.get("data", []) if m.get("id"))
-                return {"models": model_registry.enrich_models(provider_id, model_ids)}
-        except Exception as e:
-            logger.warning("detect_models %s failed: %s", provider_id, e)
-            return {"models": [], "error": str(e)[:100]}
-
-    def list_builtin(self) -> list[dict]:
-        """内置供应商 + 已配置的供应商合并列表。"""
-        configured_all = {p["providerId"]: p for p in self.list_all()}
-        result = []
-
-        # 1. 内置供应商
-        for pid, raw_info in BUILTIN_PROVIDERS.items():
-            info = cast(dict[str, Any], raw_info)
-            c = configured_all.pop(pid, None)  # pop 掉已处理的
-            # hasApiKey 同时检查 DB 记录和环境变量（兼容首次部署场景）
-            has_key = _has_provider_api_key(pid) or bool(c and c["hasApiKey"])
-            result.append(
-                {
-                    "providerId": info["id"],
-                    "name": info["name"],
-                    "protocol": info["protocol"],
-                    "apiHost": info["api_host"],
-                    "models": c["models"] if c else [],
-                    "website": info.get("website", ""),
-                    "keyUrl": info.get("key_url", ""),
-                    "category": info.get("category", "other"),
-                    "isConfigured": c is not None,
-                    "isEnabled": c["isEnabled"] if c else False,
-                    "hasApiKey": has_key,
-                    "apiKeyMasked": "",  # 不再暴露密钥
-                    "apiModel": c["apiModel"] if c else "",
-                    "requestCount": c.get("requestCount", 0) if c else 0,
-                    "priority": c.get("priority", 0) if c else 0,
-                }
+            key_svc.create_key(
+                provider_id=provider_id,
+                name="default",
+                plaintext=plaintext,
+                priority=0,
+                max_rpm=None,
+                actor_id=None,
             )
 
-        # 2. 自定义供应商（不在内置列表中的已配置提供商）
-        for _pid, c in configured_all.items():
-            result.append(
-                {
-                    "providerId": c["providerId"],
-                    "name": c["name"],
-                    "protocol": c["protocol"],
-                    "apiHost": c["apiHost"],
-                    "models": c["models"],
-                    "category": "custom",
-                    "isConfigured": True,
-                    "isEnabled": c["isEnabled"],
-                    "hasApiKey": c["hasApiKey"],
-                    "apiKeyMasked": "",
-                    "apiModel": c.get("apiModel", ""),
-                    "requestCount": c.get("requestCount", 0),
-                    "priority": c.get("priority", 0),
-                }
+    def _lease_key_plaintext(self, provider_id: str) -> Optional[str]:
+        key_svc = ApiKeyService(db=get_db(), cipher=load_api_key_cipher())
+        lease = key_svc.lease_key(provider_id=provider_id)
+        return lease.plaintext if lease else None
+
+    # ── Async operations: detect / check ──
+
+    async def detect_models(
+        self,
+        provider_id: str,
+        *,
+        api_host: Optional[str] = None,
+        api_key: Optional[str] = None,
+    ) -> dict[str, Any]:
+        host = api_host
+        key = api_key
+        if host is None or key is None:
+            current = self.get(provider_id)
+            if current is None:
+                raise LookupError(f"provider {provider_id!r} not found")
+            if host is None:
+                host = current["apiHost"]
+            if key is None:
+                key = self._lease_key_plaintext(provider_id)
+        if not host or not key:
+            raise ValueError("api_host and api_key are required for detect")
+
+        base = host.rstrip("/")
+        if base.endswith("/v1/models") or "/v1/models" in base:
+            url = base
+        else:
+            url = f"{base}/v1/models"
+
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.get(
+                url, headers={"Authorization": f"Bearer {key}"}
             )
-
-        return result
-
-    def reconcile_models(self, provider_id: str, detected_models: list) -> dict | None:
-        """比较 API 发现的模型 vs 已存储模型，返回差异。
-
-        调用方应先 call `detect_models()` (async), 再传入其结果。
-
-        匹配 CherryStudio buildModelListSyncPreview() 逻辑。
-        返回 { added: [...], removed: [...], unchanged: [...] }
-        或 None (provider 不存在)。
-        """
-        db = get_db()
-        row = db.execute("SELECT models FROM model_providers WHERE provider_id=?", (provider_id,)).fetchone()
-        db.close()
-        if not row:
-            return None
-
-        stored_raw = self._parse_models(row)
-        stored_ids = set()
-        for m in stored_raw:
-            mid = get_model_id(m)
+            r.raise_for_status()
+            data = r.json()
+        models = []
+        for entry in data.get("data", []) or []:
+            mid = entry.get("id")
             if mid:
-                stored_ids.add(mid)
+                models.append({"id": mid, "name": mid})
+        return {"models": models}
 
-        detected_ids = {get_model_id(m) for m in detected_models}
-
-        added = sorted(detected_ids - stored_ids)
-        removed = sorted(stored_ids - detected_ids)
-        unchanged = sorted(stored_ids & detected_ids)
-
-        enriched_added = model_registry.enrich_models(provider_id, added)
-
+    async def check_connection(
+        self,
+        provider_id: str,
+        model: Optional[str] = None,
+    ) -> dict[str, Any]:
+        import time
+        current = self.get(provider_id)
+        if current is None:
+            return {"status": "not_found"}
+        key = self._lease_key_plaintext(provider_id)
+        if not key:
+            return {"status": "no_key"}
+        model_id = model or current.get("apiModel") or ""
+        if not model_id:
+            return {"status": "no_model"}
+        base = current["apiHost"].rstrip("/")
+        url = f"{base}/v1/chat/completions" if not base.endswith("/chat/completions") else base
+        body = {
+            "model": model_id,
+            "messages": [{"role": "user", "content": "ping"}],
+            "max_tokens": 1,
+        }
+        started = time.perf_counter()
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            try:
+                resp = await client.post(
+                    url,
+                    headers={"Authorization": f"Bearer {key}"},
+                    json=body,
+                )
+            except Exception as exc:  # noqa: BLE001
+                return {"status": "error", "message": str(exc)[:200]}
+        latency_ms = int((time.perf_counter() - started) * 1000)
         return {
-            "added": enriched_added,
-            "removed": [{"id": mid} for mid in removed],
-            "unchanged": [{"id": mid} for mid in unchanged],
+            "status": "ok" if resp.status_code < 400 else "error",
+            "status_code": resp.status_code,
+            "latency_ms": latency_ms,
+            "model": model_id,
         }
 
-    def reconcile_apply(self, provider_id: str, to_add: list[str], to_remove: list[str]) -> dict | None:
-        """应用 reconcile diff: 添加/删除模型。"""
-        db = get_db()
-        row = db.execute("SELECT models FROM model_providers WHERE provider_id=?", (provider_id,)).fetchone()
-        if not row:
-            db.close()
-            return None
-
-        stored_raw = self._parse_models(row)
-        stored_by_id: dict[str, dict] = {}
-        for m in stored_raw:
-            mid = get_model_id(m)
-            if mid:
-                stored_by_id[mid] = normalize_model(m)
-
-        for rid in to_remove:
-            stored_by_id.pop(rid, None)
-
-        to_add_enriched = model_registry.enrich_models(provider_id, to_add)
-        for entry in to_add_enriched:
-            sid = entry.get("id")
-            if sid:
-                stored_by_id[sid] = entry
-
-        new_models = list(stored_by_id.values())
-        db.execute("UPDATE model_providers SET models=? WHERE provider_id=?", (json.dumps(new_models), provider_id))
-        db.commit()
-        self._sync_models_table(db, provider_id, new_models)
-        row = db.execute("SELECT * FROM model_providers WHERE provider_id=?", (provider_id,)).fetchone()
-        db.close()
-        return self._row_to_dict(row)
-
-    def _sync_models_table(self, db, provider_id: str, models: list[dict]):
-        """同步 models 表与 JSON 列数据。"""
-        db.execute("DELETE FROM models WHERE provider_id=?", (provider_id,))
-        for entry in models:
-            mid = get_model_id(entry)
-            if not mid:
-                continue
-            caps = json.dumps(entry.get("capabilities", infer_capabilities(mid)))
-            db.execute(
-                """INSERT INTO models (provider_id, model_id, capabilities)
-                   VALUES (?, ?, ?) ON CONFLICT (provider_id, model_id)
-                   DO UPDATE SET capabilities=excluded.capabilities""",
-                (provider_id, mid, caps),
-            )
+    # ── Internal: row → dict ──
 
     @staticmethod
-    def _parse_models(row) -> list:
-        """解析 models 列：兼容 PostgreSQL（已 parsing 为 list）和 JSON 字符串。"""
-        val = row["models"]
-        if isinstance(val, list):
-            return val
-        return json.loads(val) if val else []
-
-    def _enrich_model(self, provider_id: str, entry) -> dict:
-        """对单个模型条目做 registry enrichment + 正则兜底。"""
-        model_id = get_model_id(entry)
-        info = model_registry.get_model_info(model_id, provider_id)
-        caps = info.get("capabilities", infer_capabilities(model_id))
-        result = {"id": model_id, "capabilities": caps}
-        ep = info.get("endpointTypes")
-        if ep:
-            result["endpointTypes"] = ep
-        return result
-
-    async def batch_check_models(self, provider_id: str, model_ids: list[str]) -> dict:
-        """批量检查指定的模型连接状态。"""
-
-        async def _check(mid: str) -> dict:
-            try:
-                result = await self.check_connection(provider_id, mid)
-                return {
-                    "modelId": mid,
-                    "status": result.get("status", "error"),
-                    "latency": result.get("latency"),
-                    "error": result.get("message") if result.get("status") == "error" else None,
-                }
-            except Exception as e:
-                return {"modelId": mid, "status": "error", "latency": None, "error": str(e)}
-
-        tasks = [_check(mid) for mid in model_ids]
-        results = await asyncio.gather(*tasks)
-        results.sort(key=lambda r: model_ids.index(r["modelId"]))
-        return {"providerId": provider_id, "models": results}
-
-    def _row_to_dict(self, row) -> dict:
-        provider_id = row["provider_id"]
-        raw_models = self._parse_models(row)
-
+    def _row_to_dict(row) -> dict[str, Any]:
+        d = dict(row) if not isinstance(row, dict) else row
         return {
-            "id": row["id"],
-            "providerId": provider_id,
-            "name": row["name"],
-            "protocol": row["protocol"],
-            "apiHost": row["api_host"],
-            "hasApiKey": _has_provider_api_key(provider_id),
-            "apiKeyMasked": "",  # 不再暴露密钥
-            "apiModel": row["api_model"],
-            "models": [self._enrich_model(provider_id, m) for m in raw_models],
-            "maxRpm": row["max_rpm"],
-            "currentRpm": row["current_rpm"],
-            "requestCount": row["request_count"],
-            "isEnabled": bool(row["is_enabled"]),
-            "lastUsedAt": row["last_used_at"],
-            "createdAt": row["created_at"],
+            "providerId": d.get("provider_id"),
+            "name": d.get("name") or "",
+            "notes": d.get("notes") or "",
+            "apiHost": d.get("api_host") or "",
+            "apiModel": d.get("api_model") or "",
+            "isEnabled": bool(d.get("is_enabled", True)),
+            "createdAt": str(d.get("created_at") or ""),
+            "updatedAt": str(d.get("updated_at") or ""),
         }
 
 
