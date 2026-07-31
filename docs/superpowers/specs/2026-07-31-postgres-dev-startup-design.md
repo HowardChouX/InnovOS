@@ -56,9 +56,7 @@ cluster at `/var/lib/postgres/data` and existing `postgres` system user.
 ```
 make dev
   └─ make start-db
-      ├─ mkdir -p $(PG_SOCKET_DIR)                                       # 0700
-      ├─ # NB: postgres user must be able to write the socket dir
-      │     $(PG_SOCKET_DIR) is /tmp; we ensure it exists and is writable
+      ├─ # /tmp is sticky-world-writable — already exists; nothing to create
       ├─ pg_isready -h $(PG_SOCKET_DIR) -p 5432 -q                       # idempotent
       │   └─ exits 0 → already running, skip
       └─ exits non-zero → sudo -u postgres pg_ctl \
@@ -124,7 +122,10 @@ matches the `local` auth record — no `pg_hba.conf` change required.
   returns immediately, so the parent shell is unaffected.
 - `make stop` swallows failures from `pg_ctl stop` (PG may already be down) with
   `|| true` so the target never fails.
-- `mkdir -p $(PG_SOCKET_DIR)` is idempotent.
+- `start-db` does not need to create `$(PG_SOCKET_DIR)` when it is `/tmp`
+  (already present). If callers override `PG_SOCKET_DIR` to a non-existent
+  path, `pg_ctl` will still fail and the user must `mkdir -p` it themselves;
+  this is documented.
 
 ### 4.5 Idempotency
 
