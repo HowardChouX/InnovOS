@@ -36,8 +36,8 @@ start-db:
 
 stop:
 	@echo "=== Stopping frontend / backend ==="
-	@pkill -f "uvicorn app.main" 2>/dev/null; true
-	@pkill -f "vite" 2>/dev/null; true
+	@pgrep -f "uvicorn app.main" | grep -vw $$ | xargs -r kill 2>/dev/null; true
+	@pgrep -f "vite" | grep -vw $$ | xargs -r kill 2>/dev/null; true
 	@echo "=== Stopping PostgreSQL ==="
 	@sudo -u postgres pg_ctl -D $(PG_DATA_DIR) -o "-k $(PG_SOCKET_DIR)" -m fast stop 2>/dev/null; true
 	@echo "Stopped."
