@@ -61,6 +61,24 @@ make format      # 自动格式化
 make quality     # 完整质量门禁
 ```
 
+### PostgreSQL socket path
+
+`make dev` starts the local PostgreSQL cluster via `sudo pg_ctl`. The default
+Unix socket directory is redirected to `/tmp` (via `pg_ctl -o "-k /tmp"`)
+because `/run/postgresql` is not present on this machine. The backend
+connects through `DATABASE_URL=...@localhost:5432/innovos?host=/tmp` so
+psycopg2 uses the same socket.
+
+To use a different socket directory, override `PG_SOCKET_DIR`:
+
+```bash
+make dev PG_SOCKET_DIR=/home/you/.pgsock
+```
+
+You will need to create the directory yourself first.
+
+> 提示：`@localhost:5432` 是 URL 占位，实际连接路径由 `?host=/tmp` 决定（Unix socket）。
+
 ## 项目结构
 
 ```
