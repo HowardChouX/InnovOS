@@ -257,16 +257,18 @@ export function ModelServicePanel() {
         </div>
       )}
 
-      <ModelServiceForm
-        open={formMode !== null}
-        mode={formMode ?? 'add'}
-        initial={editingProvider}
-        onClose={() => setFormMode(null)}
-        onSave={() => {
-          setFormMode(null);
-          load();
-        }}
-      />
+      {formMode !== null && (
+        <ModelServiceForm
+          open
+          mode={formMode}
+          initial={editingProvider}
+          onClose={() => setFormMode(null)}
+          onSave={() => {
+            setFormMode(null);
+            load();
+          }}
+        />
+      )}
     </div>
   );
 }
