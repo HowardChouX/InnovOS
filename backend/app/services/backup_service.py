@@ -145,6 +145,13 @@ class BackupService:
         # 2. 清理过期备份
         await asyncio.to_thread(self._cleanup_old_backups)
 
+        # 3. 清理过期 model_call_log 行(默认 90 天)
+        try:
+            from app.services import usage_log_cleanup
+            await asyncio.to_thread(usage_log_cleanup.run)
+        except Exception:
+            logger.exception("model_call_log 保留期清理失败")
+
         return db_path if os.path.exists(db_path) else None
 
     @staticmethod
