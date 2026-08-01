@@ -1,6 +1,7 @@
 # app/exceptions/sms_verification.py
 from dataclasses import dataclass
 from typing import Any
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
@@ -12,7 +13,7 @@ class SmsVerificationError(Exception):
     message: str
     detail: dict[str, Any] | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__init__(self.message)
 
 
