@@ -1,60 +1,47 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { authApi } from '../../api/auth';
-import { Mail, ShieldCheck } from 'lucide-react';
+import { Smartphone, ShieldCheck } from 'lucide-react';
 
 interface LocationState {
-  email?: string;
+  phone?: string;
 }
 
 export function VerifyResetOtpPage() {
   const location = useLocation();
   const state = location.state as LocationState | null;
-  const email = state?.email ?? '';
+  const phone = state?.phone ?? '';
   const navigate = useNavigate();
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const [cooldown, setCooldown] = useState(60);
   const refs = useRef<Array<HTMLInputElement | null>>([null, null, null, null, null, null]);
 
   useEffect(() => {
-    if (!email) navigate('/forgot-password', { replace: true });
-  }, [email, navigate]);
+    if (!phone) navigate('/forgot-password', { replace: true });
+  }, [phone, navigate]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
-    const t = setTimeout(() => setCooldown(c => c - 1), 1000);
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
     return () => clearTimeout(t);
   }, [cooldown]);
 
   const code = useMemo(() => digits.join(''), [digits]);
 
+  // 验证码收集完成后，携带 phone + code 进入设置新密码页（后端在改密时一并核验）
   useEffect(() => {
-    if (code.length === 6) void submit(code);
+    if (code.length === 6) {
+      navigate('/reset-password', { state: { phone, code }, replace: true });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
-
-  async function submit(full: string) {
-    setSubmitting(true);
-    setError('');
-    try {
-      const r = await authApi.verifyPasswordResetOtp(email, full);
-      navigate('/reset-password', { state: { email, reset_token: r.reset_token }, replace: true });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '验证失败');
-      setDigits(['', '', '', '', '', '']);
-      refs.current[0]?.focus();
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   async function resend() {
     if (cooldown > 0) return;
     setError('');
     try {
-      await authApi.requestPasswordResetOtp(email);
+      await authApi.requestPasswordResetSms(phone);
       setCooldown(60);
     } catch (e) {
       setError(e instanceof Error ? e.message : '重发失败');
@@ -63,7 +50,7 @@ export function VerifyResetOtpPage() {
 
   function setDigit(i: number, v: string) {
     const ch = v.replace(/\D/g, '').slice(-1);
-    setDigits(prev => prev.map((d, idx) => (idx === i ? ch : d)));
+    setDigits((prev) => prev.map((d, idx) => (idx === i ? ch : d)));
     if (ch && i < 5) refs.current[i + 1]?.focus();
   }
 
@@ -92,7 +79,11 @@ export function VerifyResetOtpPage() {
         </div>
 
         <form
-          onSubmit={e => { e.preventDefault(); if (code.length === 6) void submit(code); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (code.length === 6)
+              navigate('/reset-password', { state: { phone, code }, replace: true });
+          }}
           className="bg-slate-800/60 backdrop-blur-sm border border-slate-700 rounded-xl p-6 space-y-4"
         >
           <h2 className="text-white font-bold text-lg text-center">验证重置码</h2>
@@ -104,20 +95,21 @@ export function VerifyResetOtpPage() {
           )}
 
           <div className="flex items-center gap-2 text-slate-300 text-sm">
-            <Mail className="w-4 h-4" />
-            <span>已发送验证码至 {email}</span>
+            <Smartphone className="w-4 h-4" />
+            <span>已发送验证码至手机 {phone}</span>
           </div>
 
           <div className="flex justify-between gap-2" onPaste={handlePaste}>
             {digits.map((d, i) => (
               <input
                 key={i}
-                ref={el => { refs.current[i] = el; }}
+                ref={(el) => {
+                  refs.current[i] = el;
+                }}
                 inputMode="numeric"
                 maxLength={1}
                 value={d}
-                onChange={e => setDigit(i, e.target.value)}
-                disabled={submitting}
+                onChange={(e) => setDigit(i, e.target.value)}
                 className="w-10 h-12 text-center text-xl text-white bg-slate-900/50 border border-slate-700 rounded-lg focus:outline-none focus:border-cyan-500"
                 aria-label={`验证码第 ${i + 1} 位`}
               />
@@ -135,15 +127,15 @@ export function VerifyResetOtpPage() {
 
           <button
             type="submit"
-            disabled={code.length !== 6 || submitting}
+            disabled={code.length !== 6}
             className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-2 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            {submitting ? '验证中...' : '验证'}
+            下一步
           </button>
 
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <ShieldCheck className="w-3 h-3" />
-            <span>10 分钟内有效</span>
+            <span>5 分钟内有效</span>
           </div>
         </form>
       </div>

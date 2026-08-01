@@ -4,15 +4,15 @@ import { authApi } from '../../api/auth';
 import { Eye, EyeOff, Lock, Check, ArrowLeft } from 'lucide-react';
 
 interface LocationState {
-  email?: string;
-  reset_token?: string;
+  phone?: string;
+  code?: string;
 }
 
 export function ResetPasswordPage() {
   const location = useLocation();
   const state = location.state as LocationState | null;
-  const email = state?.email ?? '';
-  const reset_token = state?.reset_token ?? '';
+  const phone = state?.phone ?? '';
+  const code = state?.code ?? '';
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -21,12 +21,12 @@ export function ResetPasswordPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!email || !reset_token) {
+    if (!phone || !code) {
       navigate('/forgot-password', { replace: true });
     }
-  }, [email, reset_token, navigate]);
+  }, [phone, code, navigate]);
 
-  if (!email || !reset_token) {
+  if (!phone || !code) {
     return null;
   }
 
@@ -43,10 +43,10 @@ export function ResetPasswordPage() {
     }
     setLoading(true);
     try {
-      await authApi.setNewPassword(reset_token, password);
+      await authApi.resetPasswordWithSms(phone, code, password);
       navigate('/login?reset=ok');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '重置失败，链接可能已过期');
+      setError(err instanceof Error ? err.message : '重置失败，验证码可能已过期');
     } finally {
       setLoading(false);
     }

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { authApi } from '../../api/auth';
-import { Mail, ShieldCheck } from 'lucide-react';
+import { Smartphone, ShieldCheck } from 'lucide-react';
 
-export function VerifyEmailPage() {
+export function VerifyPhonePage() {
   const [params] = useSearchParams();
-  const email = params.get('email') ?? '';
+  const phone = params.get('phone') ?? '';
   const navigate = useNavigate();
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [error, setError] = useState('');
@@ -14,12 +14,12 @@ export function VerifyEmailPage() {
   const refs = useRef<Array<HTMLInputElement | null>>([null, null, null, null, null, null]);
 
   useEffect(() => {
-    if (!email) navigate('/register', { replace: true });
-  }, [email, navigate]);
+    if (!phone) navigate('/register', { replace: true });
+  }, [phone, navigate]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
-    const t = setTimeout(() => setCooldown(c => c - 1), 1000);
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
     return () => clearTimeout(t);
   }, [cooldown]);
 
@@ -34,8 +34,8 @@ export function VerifyEmailPage() {
     setSubmitting(true);
     setError('');
     try {
-      await authApi.verifyEmailOtp(email, full);
-      navigate(`/login?email=${encodeURIComponent(email)}`);
+      await authApi.verifySmsCode(phone, full, 'register');
+      navigate(`/login?phone=${encodeURIComponent(phone)}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : '验证失败');
       setDigits(['', '', '', '', '', '']);
@@ -49,7 +49,7 @@ export function VerifyEmailPage() {
     if (cooldown > 0) return;
     setError('');
     try {
-      await authApi.resendEmailOtp(email);
+      await authApi.sendSmsCode(phone, 'register');
       setCooldown(60);
     } catch (e) {
       setError(e instanceof Error ? e.message : '重发失败');
@@ -58,7 +58,7 @@ export function VerifyEmailPage() {
 
   function setDigit(i: number, v: string) {
     const ch = v.replace(/\D/g, '').slice(-1);
-    setDigits(prev => prev.map((d, idx) => (idx === i ? ch : d)));
+    setDigits((prev) => prev.map((d, idx) => (idx === i ? ch : d)));
     if (ch && i < 5) refs.current[i + 1]?.focus();
   }
 
@@ -87,10 +87,13 @@ export function VerifyEmailPage() {
         </div>
 
         <form
-          onSubmit={e => { e.preventDefault(); if (code.length === 6) void submit(code); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (code.length === 6) void submit(code);
+          }}
           className="bg-slate-800/60 backdrop-blur-sm border border-slate-700 rounded-xl p-6 space-y-4"
         >
-          <h2 className="text-white font-bold text-lg text-center">验证邮箱</h2>
+          <h2 className="text-white font-bold text-lg text-center">验证手机号</h2>
 
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg px-3 py-2">
@@ -99,19 +102,21 @@ export function VerifyEmailPage() {
           )}
 
           <div className="flex items-center gap-2 text-slate-300 text-sm">
-            <Mail className="w-4 h-4" />
-            <span>已发送验证码至 {email}</span>
+            <Smartphone className="w-4 h-4" />
+            <span>已发送验证码至手机 {phone}</span>
           </div>
 
           <div className="flex justify-between gap-2" onPaste={handlePaste}>
             {digits.map((d, i) => (
               <input
                 key={i}
-                ref={el => { refs.current[i] = el; }}
+                ref={(el) => {
+                  refs.current[i] = el;
+                }}
                 inputMode="numeric"
                 maxLength={1}
                 value={d}
-                onChange={e => setDigit(i, e.target.value)}
+                onChange={(e) => setDigit(i, e.target.value)}
                 disabled={submitting}
                 className="w-10 h-12 text-center text-xl text-white bg-slate-900/50 border border-slate-700 rounded-lg focus:outline-none focus:border-cyan-500"
                 aria-label={`验证码第 ${i + 1} 位`}
@@ -145,7 +150,7 @@ export function VerifyEmailPage() {
 
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <ShieldCheck className="w-3 h-3" />
-            <span>10 分钟内有效</span>
+            <span>5 分钟内有效</span>
           </div>
         </form>
       </div>

@@ -4,9 +4,9 @@ import { authApi } from '../../api/auth';
 import { Eye, EyeOff, Mail, Lock, Check, Phone, User } from 'lucide-react';
 
 export function RegisterPage() {
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
-  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -21,19 +21,19 @@ export function RegisterPage() {
       setError('两次密码不一致');
       return;
     }
-    // 简单手机号校验（11 位数字，1 开头）
-    if (phone && !/^1\d{10}$/.test(phone)) {
+    // 手机号校验（11 位数字，1 开头）
+    if (!/^1\d{10}$/.test(phone)) {
       setError('手机号格式不正确（11 位数字，1 开头）');
       return;
     }
     try {
       await authApi.register({
-        email,
+        phone,
         password,
-        phone: phone || undefined,
+        email: email || undefined,
         username: username || undefined,
       });
-      navigate(`/verify-email?email=${encodeURIComponent(email)}`);
+      navigate(`/verify-phone?phone=${encodeURIComponent(phone)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : '注册失败');
     }
@@ -64,7 +64,28 @@ export function RegisterPage() {
             </div>
           )}
 
-          {/* Email */}
+          {/* Phone (primary identifier) */}
+          <div>
+            <label className="text-sm text-slate-400 mb-1 block">
+              手机号 <span className="text-red-400">*</span>
+            </label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                maxLength={11}
+                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+                placeholder="11 位手机号"
+                autoComplete="tel"
+              />
+            </div>
+            <p className="text-xs text-slate-500 mt-1">用于登录与接收短信验证码</p>
+          </div>
+
+          {/* Email (notification only) */}
           <div>
             <label className="text-sm text-slate-400 mb-1 block">
               邮箱 <span className="text-red-400">*</span>
@@ -81,25 +102,7 @@ export function RegisterPage() {
                 autoComplete="email"
               />
             </div>
-            <p className="text-xs text-slate-500 mt-1">用于登录与接收验证 / 重置邮件</p>
-          </div>
-
-          {/* Phone (profile only, not for login) */}
-          <div>
-            <label className="text-sm text-slate-400 mb-1 block">手机号（可选）</label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                maxLength={11}
-                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
-                placeholder="11 位手机号"
-                autoComplete="tel"
-              />
-            </div>
-            <p className="text-xs text-slate-500 mt-1">仅用于档案展示，不参与登录</p>
+            <p className="text-xs text-slate-500 mt-1">用于接收通知（不参与登录）</p>
           </div>
 
           {/* Username (display name, optional) */}

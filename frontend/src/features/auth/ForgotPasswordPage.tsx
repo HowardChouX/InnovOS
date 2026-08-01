@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authApi } from '../../api/auth';
-import { Mail, ArrowLeft } from 'lucide-react';
+import { Phone, ArrowLeft } from 'lucide-react';
 
 export function ForgotPasswordPage() {
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -12,10 +12,14 @@ export function ForgotPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!/^1\d{10}$/.test(phone)) {
+      setError('手机号格式不正确（11 位数字，1 开头）');
+      return;
+    }
     setLoading(true);
     try {
-      await authApi.requestPasswordResetOtp(email);
-      navigate('/verify-reset', { state: { email } });
+      await authApi.requestPasswordResetSms(phone);
+      navigate('/verify-reset', { state: { phone } });
     } catch (err) {
       setError(err instanceof Error ? err.message : '提交失败，请稍后重试');
     } finally {
@@ -41,7 +45,7 @@ export function ForgotPasswordPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <p className="text-slate-400 text-sm">
-              输入注册时的邮箱，我们会向您发送 6 位验证码。
+              输入注册时的手机号，我们会向您发送 6 位验证码。
             </p>
 
             {error && (
@@ -51,17 +55,18 @@ export function ForgotPasswordPage() {
             )}
 
             <div>
-              <label className="text-sm text-slate-400 mb-1 block">邮箱</label>
+              <label className="text-sm text-slate-400 mb-1 block">手机号</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
-                  type="email"
+                  type="tel"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  maxLength={11}
                   className="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
-                  placeholder="you@example.com"
-                  autoComplete="email"
+                  placeholder="11 位手机号"
+                  autoComplete="tel"
                 />
               </div>
             </div>

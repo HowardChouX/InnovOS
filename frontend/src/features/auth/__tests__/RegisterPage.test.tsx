@@ -4,24 +4,33 @@ import { vi } from 'vitest';
 
 vi.mock('../../../api/auth', () => ({
   authApi: {
-    register: vi.fn().mockResolvedValue({ id: 1, email: 'a@b.com' }),
+    register: vi.fn().mockResolvedValue({ id: 1, phone: '13800000000' }),
   },
 }));
 
 import { RegisterPage } from '../RegisterPage';
 
-test('注册成功跳 /verify-email', async () => {
+test('注册成功跳 /verify-phone', async () => {
   render(
     <MemoryRouter initialEntries={['/register']}>
       <Routes>
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/verify-email" element={<div>VERIFY</div>} />
+        <Route path="/verify-phone" element={<div>VERIFY</div>} />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
-  fireEvent.change(screen.getByPlaceholderText('you@example.com'), { target: { value: 'a@b.com' } });
-  fireEvent.change(screen.getByPlaceholderText('至少 8 个字符'), { target: { value: 'password123' } });
-  fireEvent.change(screen.getByPlaceholderText('再次输入密码'), { target: { value: 'password123' } });
+  fireEvent.change(screen.getByPlaceholderText('11 位手机号'), {
+    target: { value: '13800000000' },
+  });
+  fireEvent.change(screen.getByPlaceholderText('you@example.com'), {
+    target: { value: 'a@b.com' },
+  });
+  fireEvent.change(screen.getByPlaceholderText('至少 8 个字符'), {
+    target: { value: 'password123' },
+  });
+  fireEvent.change(screen.getByPlaceholderText('再次输入密码'), {
+    target: { value: 'password123' },
+  });
   fireEvent.click(screen.getByRole('button', { name: '注册' }));
   await waitFor(() => expect(screen.getByText('VERIFY')).toBeInTheDocument());
 });

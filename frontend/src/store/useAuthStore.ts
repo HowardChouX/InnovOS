@@ -6,20 +6,15 @@ interface AuthStore {
   user: AuthUser | null;
   loading: boolean;
   isAdmin: boolean;
-  /** 邮箱密码登录 */
-  login: (email: string, password: string) => Promise<void>;
-  /** 注册：email + password + 可选 phone/username（注册后不自动登录，需邮箱验证） */
-  register: (
-    email: string,
-    password: string,
-    phone?: string,
-    username?: string,
-  ) => Promise<void>;
+  /** 手机号密码登录 */
+  login: (phone: string, password: string) => Promise<void>;
+  /** 注册：phone + password + 可选 email/username（注册后不自动登录，需短信验证） */
+  register: (phone: string, password: string, email?: string, username?: string) => Promise<void>;
   logout: () => Promise<void>;
   init: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthStore>((set, _get) => ({
+export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   loading: true,
   isAdmin: false,
@@ -35,16 +30,16 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
     }
   },
 
-  login: async (email, password) => {
-    await authApi.login(email, password);
+  login: async (phone, password) => {
+    await authApi.login(phone, password);
     // 登录后拉取最新用户信息
     const user = await authApi.me();
     set({ user, isAdmin: user.is_superuser });
   },
 
-  register: async (email, password, phone, username) => {
-    // 注册成功后用户未登录：等待邮箱验证完成后手动登录。
-    await authApi.register({ email, password, phone, username });
+  register: async (phone, password, email, username) => {
+    // 注册成功后用户未登录：等待短信验证完成后手动登录。
+    await authApi.register({ phone, password, email, username });
   },
 
   logout: async () => {

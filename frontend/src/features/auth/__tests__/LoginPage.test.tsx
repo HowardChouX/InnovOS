@@ -14,12 +14,12 @@ describe('LoginPage', () => {
     expect(screen.getByText('创新智能操作系统')).toBeInTheDocument();
   });
 
-  it('renders login form with email input', () => {
+  it('renders login form with phone input', () => {
     renderWithRouter(<LoginPage />);
-    const emailInput = screen.getByPlaceholderText('you@example.com');
-    expect(emailInput).toBeInTheDocument();
-    expect(emailInput).toHaveAttribute('type', 'email');
-    expect(emailInput).toBeRequired();
+    const phoneInput = screen.getByPlaceholderText('11 位手机号');
+    expect(phoneInput).toBeInTheDocument();
+    expect(phoneInput).toHaveAttribute('type', 'tel');
+    expect(phoneInput).toBeRequired();
   });
 
   it('renders login form with password input', () => {

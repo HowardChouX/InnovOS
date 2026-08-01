@@ -10,7 +10,7 @@ vi.mock('../../../store/useAuthStore', () => ({
 
 import { LoginPage } from '../LoginPage';
 
-test('未验证用户登录 → 跳 /verify-email', async () => {
+test('未验证用户登录 → 跳 /verify-phone', async () => {
   loginMock.mockRejectedValueOnce(
     Object.assign(new Error('Request failed'), {
       detail: 'LOGIN_USER_NOT_VERIFIED',
@@ -20,13 +20,13 @@ test('未验证用户登录 → 跳 /verify-email', async () => {
     <MemoryRouter initialEntries={['/login']}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/verify-email" element={<div>VERIFY_PAGE</div>} />
+        <Route path="/verify-phone" element={<div>VERIFY_PAGE</div>} />
         <Route path="/" element={<div>HOME</div>} />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
-  fireEvent.change(screen.getByPlaceholderText('you@example.com'), {
-    target: { value: 'a@b.com' },
+  fireEvent.change(screen.getByPlaceholderText('11 位手机号'), {
+    target: { value: '13800000000' },
   });
   fireEvent.change(screen.getByPlaceholderText('输入密码'), {
     target: { value: 'password123' },
