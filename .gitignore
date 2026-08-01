@@ -58,3 +58,7 @@ graphify-out/
 
 # ── Docker ──
 .docker/
+
+# 运行时文件
+.dev-pids/
+backend/backups/
