@@ -7,6 +7,7 @@
 """
 import json
 import logging
+import os
 
 from app.core.config import settings
 
@@ -21,7 +22,22 @@ class SmsClient:
         self._init_client()
 
     def _init_client(self) -> None:
-        """与示例 create_client() 一致：凭据链 + 固定 endpoint。"""
+        """与示例 create_client() 一致：凭据链 + 固定 endpoint。
+
+        先显式检测 AK/SK：CredentialClient 的凭据链是惰性的，无凭证时构造
+        不会失败，但真实调用会抛 SDK 鉴权错误。因此任一凭证环境变量为空即
+        判定为开发模式，降级为日志模拟（凭据链的其他方式如 OIDC / ECS RAM
+        Role 也可用，但显式 AK/SK 环境变量是必须支持的最小判定）。
+        """
+        access_key_id = os.environ.get("ALIBABA_CLOUD_ACCESS_KEY_ID", "").strip()
+        access_key_secret = os.environ.get("ALIBABA_CLOUD_ACCESS_KEY_SECRET", "").strip()
+        if not access_key_id or not access_key_secret:
+            logger.warning(
+                "未检测到阿里云凭证（ALIBABA_CLOUD_ACCESS_KEY_ID / "
+                "ALIBABA_CLOUD_ACCESS_KEY_SECRET 为空），降级为开发模式日志模拟"
+            )
+            self._client = None
+            return
         try:
             from alibabacloud_credentials.client import Client as CredentialClient
             from alibabacloud_dypnsapi20170525.client import Client as Dypnsapi20170525Client

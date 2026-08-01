@@ -82,3 +82,19 @@ class TestVerifyCode:
             raising=False,
         )
         assert await sms_client.verify_code("13800000000", "654321") is False
+
+
+class TestDevMode:
+    @pytest.mark.asyncio
+    async def test_dev_mode_no_credentials(self, monkeypatch):
+        """无阿里云凭证时降级为开发模式：available=False，send_code 返回 dev-mock。"""
+        monkeypatch.delenv("ALIBABA_CLOUD_ACCESS_KEY_ID", raising=False)
+        monkeypatch.delenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET", raising=False)
+
+        from app.services.sms_client import SmsClient
+
+        client = SmsClient()
+        assert client.available is False
+
+        result = await client.send_code("13800000000", "100001")
+        assert result == {"success": True, "biz_id": "dev-mock", "message": "开发模式模拟发送"}
