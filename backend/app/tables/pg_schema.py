@@ -663,23 +663,25 @@ def init_provider_health(db):
 def init_user_model_services(db):
     """user_model_services 表 — per-user 开通 + 故障转移队列。
 
-    failover_order 1-based; UNIQUE(user_id, failover_order) 保证重排是 swap 语义。
+    capability 区分 'chat' / 'reasoning' 等用途;
+    failover_order 1-based; UNIQUE(user_id, capability, failover_order) 保证重排是 swap 语义。
     """
     db.execute("""
         CREATE TABLE IF NOT EXISTS user_model_services (
             user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             provider_id TEXT NOT NULL REFERENCES model_providers(provider_id) ON DELETE CASCADE,
+            capability TEXT NOT NULL DEFAULT 'chat',
             failover_order INTEGER NOT NULL CHECK (failover_order >= 1),
             is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            PRIMARY KEY (user_id, provider_id),
-            UNIQUE (user_id, failover_order)
+            PRIMARY KEY (user_id, provider_id, capability),
+            UNIQUE (user_id, capability, failover_order)
         );
     """)
     db.execute("""
-        CREATE INDEX IF NOT EXISTS ix_ums_user_enabled
-            ON user_model_services (user_id, is_enabled, failover_order);
+        CREATE INDEX IF NOT EXISTS ix_ums_user_cap_enabled
+            ON user_model_services (user_id, capability, is_enabled, failover_order);
     """)
 
 
