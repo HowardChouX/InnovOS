@@ -28,22 +28,24 @@ def test_validate_password_ok():
     asyncio.run(mgr.validate_password("test1234", None))  # 不抛异常即通过
 
 
-def test_on_after_register_issues_otp(monkeypatch):
+def test_on_after_register_sends_sms(monkeypatch):
     from app.auth.users import UserManager
-    from app.services.email_verification_service import email_verification_service
+    from app.services.sms_client import SmsClient
 
-    called = {"n": 0}
+    sent: list[tuple[str, str]] = []
 
-    def _fake(user, request=None):
-        called["n"] += 1
-        return {"expires_in": 600, "next_resend_in": 60}
+    class _FakeSms:
+        async def send_code(self, phone, template_code):
+            sent.append((phone, template_code))
 
-    monkeypatch.setattr(email_verification_service, "issue_for_user", _fake)
+    monkeypatch.setattr(SmsClient, "send_code", _FakeSms.send_code)
     um = UserManager.__new__(UserManager)
     # User 占位
     class _U:
         id = 1
         email = "a@b.com"
+        phone = "13800000000"
     import asyncio
     asyncio.run(um.on_after_register(_U(), None))
-    assert called["n"] == 1
+    assert len(sent) == 1
+    assert sent[0][0] == "13800000000"

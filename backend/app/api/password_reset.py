@@ -5,9 +5,9 @@
   不查询用户 —— 未知手机号同样下发并返回 202（防探测，不暴露注册状态）。
 - POST /verify：核验短信验证码后更新密码（复用 UserManager 的 bcrypt 哈希逻辑）。
 
-限流：复用 phone_verification.py 中的 sms_otp_* 限流器实例（Task 8 将迁入
-app/rate_limit_redis.py 统一管理）。导入期即共享同一实例，短信发送/核验
-配额在 sms-verification 与 password-reset 两条链路上共用。
+限流：复用 app/rate_limit_redis.py 中的 sms_otp_* 限流器实例。
+导入期即共享同一实例，短信发送/核验配额在 sms-verification 与
+password-reset 两条链路上共用。
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.phone_verification import (
+from app.rate_limit_redis import (
     sms_otp_ip_limiter,
     sms_otp_request_limiter,
     sms_otp_verify_limiter,

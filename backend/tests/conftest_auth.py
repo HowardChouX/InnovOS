@@ -106,15 +106,7 @@ def auth_app(auth_session):
     from app.api.password_reset import router as password_reset_router
 
     app.include_router(password_reset_router)
-    # Register EmailVerificationError handler so route exceptions become
-    # proper JSON responses (401 InvalidResetSession, 429 rate-limited, etc.)
-    from app.exceptions.email_verification import (
-        EmailVerificationError,
-        email_verification_exception_handler,
-    )
-
-    app.add_exception_handler(EmailVerificationError, email_verification_exception_handler)
-    # SMS 限流/校验异常 → 429/400 JSON（password-reset 与 phone-verification 共用）
+    # SMS 限流/校验异常 → 429/400 JSON（password-reset、phone-verification、login/code 共用）
     from app.exceptions.sms_verification import (
         SmsVerificationError,
         sms_verification_exception_handler,
@@ -149,11 +141,11 @@ def reset_sms_otp_limiters():
     注意：名称不带下划线 —— 测试模块通过 `from tests.conftest_auth import *`
     引入 fixture，star import 会跳过下划线开头的名字（若跳过，autouse 不生效）。
 
-    sms_otp_* 限流器实例在 app.api.phone_verification 模块导入时创建，
+    sms_otp_* 限流器实例在 app.rate_limit_redis 模块导入时创建，
     无 REDIS_URL 时走本地内存滑动窗口 —— 不清理的话，一个测试的请求会
     消耗后续测试的配额（如 send 限流 max=1/60s、ip 限流 max=30/60s）。
     """
-    from app.api.phone_verification import (
+    from app.rate_limit_redis import (
         sms_otp_ip_limiter,
         sms_otp_request_limiter,
         sms_otp_verify_limiter,

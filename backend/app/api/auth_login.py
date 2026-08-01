@@ -18,6 +18,8 @@ from app.auth.backend import auth_backend, get_jwt_strategy
 from app.auth.users import get_user_manager
 from app.db.models import User
 from app.db.session import get_session
+from app.exceptions.sms_verification import SmsRateLimited
+from app.rate_limit_redis import sms_otp_verify_limiter
 from app.services.sms_client import sms_client
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -37,6 +39,13 @@ async def login_with_code(
     user_manager: BaseUserManager = Depends(get_user_manager),
 ):
     """验证码登录：核验短信验证码，成功后签发 JWT 并 Set-Cookie。"""
+    # 验证码登录专属限流：每个手机号 60s 最多 10 次核验。
+    # 复用 sms_otp_verify_limiter —— 与 sms-verifications/verify、password-reset/verify
+    # 共用同一按手机号的验证预算，避免攻击者借多条链路分别爆破。
+    # IP 维度已由全局 api_limiter 中间件覆盖（120/min）。
+    if not sms_otp_verify_limiter.check(payload.phone)[0]:
+        raise SmsRateLimited(60)
+
     passed = await sms_client.verify_code(payload.phone, payload.code)
     if not passed:
         raise HTTPException(

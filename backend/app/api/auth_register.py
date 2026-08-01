@@ -14,10 +14,8 @@ from sqlalchemy.orm import Session
 
 from app.auth.schemas import UserCreate, UserRead
 from app.auth.users import get_user_manager
-from app.core.config import settings
 from app.db.models import User
 from app.db.session import get_session
-from app.services.sms_client import sms_client
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -58,7 +56,6 @@ async def register(
             detail={"code": "REGISTER_PHONE_DUPLICATE", "reason": "该手机号已注册"},
         ) from None
 
-    # 3. 自动下发短信验证码（模板 100001；发送失败不阻塞注册响应）
-    await sms_client.send_code(payload.phone, settings.SMS_REGISTER_TEMPLATE_CODE)
-
+    # 3. 短信自动下发由 UserManager.on_after_register 负责（模板 100001；
+    #    发送失败不阻塞注册响应）。此处不再重复发送，避免同一手机号收到两条短信。
     return created_user

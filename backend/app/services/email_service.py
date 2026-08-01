@@ -8,7 +8,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from app.core.config import settings
-from app.exceptions.email_verification import EmailUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -53,32 +52,6 @@ def _brand_logo() -> str:
                   letter-spacing:-0.5px;">
         InnovOS
       </div>
-'''
-
-
-def _code_pill(code: str) -> str:
-    """居中胶囊状验证码 — 等宽风格、字间距大。"""
-    return f'''\
-      <div style="margin:32px 0;padding:24px 16px;background:{_CARD_BG};border-radius:12px;
-                  text-align:center;">
-        <div style="font-family:'SF Mono','Menlo','Consolas','Courier New',monospace;
-                    font-size:36px;font-weight:600;letter-spacing:8px;color:#111827;
-                    line-height:1.2;">
-          {code}
-        </div>
-      </div>
-'''
-
-
-def _footer_note(ttl_minutes: int = 10) -> str:
-    """底部辅助 + 免责文字。"""
-    return f'''\
-      <p style="margin:0 0 8px;color:#6b7280;font-size:13px;line-height:1.6;">
-        验证码 {ttl_minutes} 分钟内有效。请勿将验证码转发给任何人。
-      </p>
-      <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
-        如果不是您本人操作，请忽略这封邮件。
-      </p>
 '''
 
 
@@ -192,58 +165,5 @@ class EmailService:
             logger.warning("SMTP_HOST 未配置，跳过密码重置邮件发送 to=%s", user.email)
             return
         self._send(user.email, "InnovOS 密码重置", body)
-
-    def send_verification_otp_sync(self, user, code: str, request=None) -> None:
-        """发送 6 位邮件 OTP。仅 dev 在未配 SMTP 时记录明文日志。"""
-        ttl_min = settings.OTP_TTL_SECONDS // 60
-        inner = (
-            _brand_logo()
-            + '<h1 style="margin:0 0 12px;font-size:20px;font-weight:600;color:#111827;">注册验证</h1>\n'
-            + '<p style="margin:0 0 8px;color:#4b5563;font-size:14px;line-height:1.6;">'
-              '您正在进行注册验证,请使用以下验证码完成操作。</p>\n'
-            + _code_pill(code)
-            + _footer_note(ttl_min)
-        )
-        body = _wrap_card(inner)
-        if not self.host:
-            if settings.ENVIRONMENT == "production" and not settings.EMAIL_OTP_SOFT_FAIL:
-                raise EmailUnavailable()
-            if settings.ENVIRONMENT == "development":
-                logger.info(
-                    "[DEV OTP] email=%s code=%s ttl=%ss",
-                    user.email, code, settings.OTP_TTL_SECONDS,
-                )
-                return
-            logger.warning("SMTP_HOST 未配置，跳过邮件发送 to=%s", user.email)
-            return
-        self._send(user.email, "InnovOS 邮箱验证码", body)
-
-    def send_password_reset_otp_sync(self, user, code: str, request=None) -> None:
-        """发送密码重置邮件 — 仅含 6 位验证码,无 URL。
-        dev 模式 SMTP 未配置时,把验证码明文写日志。
-        """
-        ttl_min = settings.OTP_TTL_SECONDS // 60
-        inner = (
-            _brand_logo()
-            + '<h1 style="margin:0 0 12px;font-size:20px;font-weight:600;color:#111827;">密码重置</h1>\n'
-            + '<p style="margin:0 0 8px;color:#4b5563;font-size:14px;line-height:1.6;">'
-              '您正在申请重置 InnovOS 账号密码,请使用以下验证码完成操作。</p>\n'
-            + _code_pill(code)
-            + _footer_note(ttl_min)
-        )
-        body = _wrap_card(inner)
-        if not self.host:
-            if settings.ENVIRONMENT == "production" and not settings.EMAIL_OTP_SOFT_FAIL:
-                raise EmailUnavailable()
-            if settings.ENVIRONMENT == "development":
-                logger.info(
-                    "[DEV RESET OTP] email=%s code=%s ttl=%ss",
-                    user.email, code, settings.OTP_TTL_SECONDS,
-                )
-                return
-            logger.warning("SMTP_HOST 未配置,跳过密码重置邮件发送 to=%s", user.email)
-            return
-        self._send(user.email, "InnovOS 密码重置验证码", body)
-
 
 email_service = EmailService()

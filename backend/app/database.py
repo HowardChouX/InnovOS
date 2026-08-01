@@ -251,13 +251,3 @@ def init_db():
     with db_session() as db:
         init_all_tables(db)
         logger.info("Database schema initialized")
-
-    # 清理过期 email_verifications（best-effort，失败不阻塞启动）
-    try:
-        from app.services.email_verification_service import email_verification_service
-
-        email_verification_service.purge_expired()
-    except Exception as e:  # noqa: BLE001
-        import logging
-
-        logging.getLogger(__name__).warning("purge_expired 失败: %s", e)
