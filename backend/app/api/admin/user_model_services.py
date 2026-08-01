@@ -13,6 +13,14 @@ from app.database import get_db
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/users/{user_id}/model-services", tags=["admin-user-model-services"])
 
+VALID_CAPABILITIES = {"chat", "embedding", "rerank", "image", "video"}
+
+
+def _check_capability(capability: str) -> None:
+    """校验 capability 取值，非法值返回 400。"""
+    if capability not in VALID_CAPABILITIES:
+        raise HTTPException(status_code=400, detail=f"invalid capability: {capability}")
+
 
 class AddBody(BaseModel):
     provider_id: str
@@ -114,6 +122,7 @@ def list_user_services(
     capability: str = Query("chat", description="能力类型: chat/embedding/rerank"),
     _: dict = Depends(require_admin),
 ) -> dict:
+    _check_capability(capability)
     return {"data": _load(user_id, capability), "message": "success"}
 
 
@@ -123,6 +132,7 @@ def list_available_services(
     capability: str = Query("chat", description="能力类型: chat/embedding/rerank"),
     _: dict = Depends(require_admin),
 ) -> dict:
+    _check_capability(capability)
     return {"data": _load_available(user_id, capability), "message": "success"}
 
 
@@ -130,6 +140,7 @@ def list_available_services(
 def add_user_service(
     user_id: int, body: AddBody, _: dict = Depends(require_admin)
 ) -> dict:
+    _check_capability(body.capability)
     db = get_db()
     try:
         existing = db.execute(
@@ -158,6 +169,7 @@ def remove_user_service(
     capability: str = Query("chat"),
     _: dict = Depends(require_admin),
 ):
+    _check_capability(capability)
     db = get_db()
     try:
         db.execute(
@@ -174,6 +186,7 @@ def remove_user_service(
 def toggle_user_service(
     user_id: int, provider_id: str, body: ToggleBody, _: dict = Depends(require_admin)
 ) -> dict:
+    _check_capability(body.capability)
     db = get_db()
     try:
         cur = db.execute(
@@ -193,6 +206,7 @@ def toggle_user_service(
 def reorder_user_services(
     user_id: int, body: OrderBody, _: dict = Depends(require_admin)
 ) -> dict:
+    _check_capability(body.capability)
     new_ids = list(body.provider_ids)
     seen: set[str] = set()
     for pid in new_ids:
@@ -207,7 +221,7 @@ def reorder_user_services(
             db.execute(
                 f"DELETE FROM user_model_services "
                 f"WHERE user_id=%s AND capability=%s AND provider_id NOT IN ({placeholders})",
-                tuple([user_id, body.capability, *new_ids]),
+                (user_id, body.capability, *new_ids),
             )
         else:
             db.execute(

@@ -324,25 +324,33 @@ async def upload_patent_pdf(
     if len(full_text) > 200:
         try:
             from app.algorithm.ai_client import chat_completion
+            from app.algorithm.base import parse_ai_json
             from app.algorithm.model_resolver import model_resolver
 
             s = model_resolver.get_assigned_settings()
             extract_id = s.get("extract_model") or ""
             if extract_id and ":" in extract_id:
                 result = await chat_completion(
-                    system_prompt='你是一个专利分析助手。分析以下专利文本，输出JSON：{"title": "简洁的专利名称", "abstract": "完整的专利摘要（100-300字，描述技术方案和效果）"}',
-                    user_prompt=full_text[:3000],
-                    response_format=dict,
+                    user_id=user["id"],
+                    purpose="extract",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": '你是一个专利分析助手。分析以下专利文本，输出JSON：{"title": "简洁的专利名称", "abstract": "完整的专利摘要（100-300字，描述技术方案和效果）"}',
+                        },
+                        {"role": "user", "content": full_text[:3000]},
+                    ],
                     temperature=0.1,
-                    max_retries=1,
-                    model_id=extract_id,
+                    response_format={"type": "json_object"},
+                    model_override=extract_id,
                 )
-                if isinstance(result, dict):
-                    if result.get("title") and len(result["title"]) > 5:
-                        ai_title = result["title"].strip()
+                parsed = parse_ai_json((result.get("content") or "").strip())
+                if isinstance(parsed, dict):
+                    if parsed.get("title") and len(parsed["title"]) > 5:
+                        ai_title = parsed["title"].strip()
                     # 只在正则摘要太短时用 AI 摘要兜底
-                    if result.get("abstract") and len(abstract) < 50:
-                        abstract = result["abstract"].strip()
+                    if parsed.get("abstract") and len(abstract) < 50:
+                        abstract = parsed["abstract"].strip()
         except Exception as e:
             logger.warning(f"专利DB操作异常: {e}")
 

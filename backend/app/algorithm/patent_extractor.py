@@ -9,6 +9,8 @@
 import logging
 import re
 
+from app.algorithm.base import parse_ai_json
+
 EXTRACT_SYSTEM_PROMPT = """你是一个专利文档结构化提取器。从专利文本中提取以下字段，只输出JSON：
 
 {{
@@ -31,7 +33,10 @@ EXTRACT_SYSTEM_PROMPT = """你是一个专利文档结构化提取器。从专�
 不要输出任何其他文字。"""
 
 
-async def extract_patent_fields_ai(text: str) -> dict | None:
+logger = logging.getLogger(__name__)
+
+
+async def extract_patent_fields_ai(text: str, *, user_id: int) -> dict | None:
     """使用 extract_model 提取专利结构化字段"""
     try:
         from app.algorithm.model_resolver import model_resolver
@@ -49,28 +54,29 @@ async def extract_patent_fields_ai(text: str) -> dict | None:
         from app.algorithm.ai_client import chat_completion
 
         result = await chat_completion(
-            system_prompt=EXTRACT_SYSTEM_PROMPT,
-            user_prompt=f"请从以下专利文本中提取结构化字段：\n\n{text[:8000]}",
-            response_format=dict,
+            user_id=user_id,
+            purpose="extract",
+            messages=[
+                {"role": "system", "content": EXTRACT_SYSTEM_PROMPT},
+                {"role": "user", "content": f"请从以下专利文本中提取结构化字段：\n\n{text[:8000]}"},
+            ],
             temperature=0.05,
-            max_retries=2,
-            model_id=extract_model_id,
+            response_format={"type": "json_object"},
+            model_override=extract_model_id,
         )
 
-        if isinstance(result, dict):
+        parsed = parse_ai_json((result.get("content") or "").strip())
+        if isinstance(parsed, dict):
             for arr_field in ["ipc_codes", "applicants", "inventors"]:
-                if not isinstance(result.get(arr_field), list):
-                    result[arr_field] = [result[arr_field]] if result.get(arr_field) else []
+                if not isinstance(parsed.get(arr_field), list):
+                    parsed[arr_field] = [parsed[arr_field]] if parsed.get(arr_field) else []
             for str_field in ["title", "patent_number", "abstract", "claims"]:
-                if not isinstance(result.get(str_field), str):
-                    result[str_field] = str(result.get(str_field, ""))
-            return result
+                if not isinstance(parsed.get(str_field), str):
+                    parsed[str_field] = str(parsed.get(str_field, ""))
+            return parsed
     except Exception as e:
         logger.warning(f"AI 提取失败: {e}")
     return None
-
-
-logger = logging.getLogger(__name__)
 
 # ── 通用正则（兼容全角/半角括号） ──
 

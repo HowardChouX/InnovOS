@@ -12,11 +12,10 @@ written per attempt (so the full failover chain is auditable).
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 import re
 import time
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -149,6 +148,9 @@ async def _call_one(
     api_host: str,
     api_key_plaintext: str,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    temperature: float = 0.3,
+    max_tokens: int | None = None,
+    response_format: dict | None = None,
 ) -> dict[str, Any]:
     """Make a single upstream non-streaming chat call. Returns parsed content + usage."""
     if not api_host or not api_key_plaintext:
@@ -157,11 +159,16 @@ async def _call_one(
     base = api_host.rstrip("/")
     url = base if base.endswith("/chat/completions") else f"{base}/chat/completions"
 
-    body = {
+    body: dict[str, Any] = {
         "model": model_id,
         "messages": messages,
         "stream": False,
+        "temperature": temperature,
     }
+    if max_tokens is not None:
+        body["max_tokens"] = max_tokens
+    if response_format is not None:
+        body["response_format"] = response_format
 
     async with httpx.AsyncClient(timeout=timeout) as client:
         r = await client.post(
@@ -208,7 +215,10 @@ class FailoverRouter:
         user_id: int,
         purpose: str,
         messages: list[dict],
-        model_override: Optional[str] = None,
+        model_override: str | None = None,
+        temperature: float = 0.3,
+        max_tokens: int | None = None,
+        response_format: dict | None = None,
     ) -> dict[str, Any]:
         # purpose → capability 映射,让 embedding / rerank 走各自队列
         capability = _purpose_to_capability(purpose)
@@ -219,8 +229,8 @@ class FailoverRouter:
             )
 
         attempts = 0
-        previous_provider_id: Optional[str] = None
-        last_error: Optional[Exception] = None
+        previous_provider_id: str | None = None
+        last_error: Exception | None = None
 
         cipher = load_api_key_cipher()
 
@@ -233,9 +243,9 @@ class FailoverRouter:
             started = time.perf_counter()
             status_code = 0
             is_success = False
-            error_category: Optional[str] = None
-            error_message: Optional[str] = None
-            result: Optional[dict[str, Any]] = None
+            error_category: str | None = None
+            error_message: str | None = None
+            result: dict[str, Any] | None = None
 
             try:
                 # Decrypt the API key (sync, fast; do it inline).
@@ -252,6 +262,9 @@ class FailoverRouter:
                     messages,
                     api_host=entry["api_host"],
                     api_key_plaintext=key_plain,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    response_format=response_format,
                 )
                 is_success = True
                 status_code = 200

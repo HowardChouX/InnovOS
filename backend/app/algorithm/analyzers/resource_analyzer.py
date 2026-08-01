@@ -32,7 +32,7 @@ RESOURCE_SYSTEM_PROMPT = """你是一个TRIZ资源分析专家。你的任务是
 class ResourceAnalyzer(AIAnalyzer):
     """资源分析器 — 七类资源系统化扫描"""
 
-    def __init__(self, ai):
+    def __init__(self, ai: Any):
         super().__init__(ai)
 
     async def analyze(self, problem: str, **kwargs) -> dict[str, Any] | None:

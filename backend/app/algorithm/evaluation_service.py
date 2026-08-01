@@ -6,6 +6,7 @@ import json
 import logging
 
 from app.algorithm.ai_client import chat_completion
+from app.algorithm.base import parse_ai_json
 
 logger = logging.getLogger(__name__)
 
@@ -71,12 +72,17 @@ async def evaluate_solution(solution_id: int, user_id: int) -> dict:
 
     try:
         result = await chat_completion(
-            system_prompt=EVALUATION_SYSTEM_PROMPT,
-            user_prompt=user_prompt,
-            temperature=0.3,
-            response_format=dict,
+            user_id=user_id,
             purpose="evaluation",
+            messages=[
+                {"role": "system", "content": EVALUATION_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.3,
+            response_format={"type": "json_object"},
         )
+        parsed = parse_ai_json((result.get("content") or "").strip())
+        result = parsed if isinstance(parsed, dict) else {}
 
         scores = result.get("innovation", {}).get("score", 0)
         feasibility = result.get("feasibility", {}).get("score", 0)

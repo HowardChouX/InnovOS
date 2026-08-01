@@ -32,7 +32,7 @@ SUFIELD_SYSTEM_PROMPT = """你是一个TRIZ物质-场分析专家。从问题中
 class SuFieldAnalyzer(AIAnalyzer):
     """物-场分析器"""
 
-    def __init__(self, ai):
+    def __init__(self, ai: Any):
         super().__init__(ai)
 
     async def analyze(self, problem: str, s1: str = "", s2: str = "", **kwargs) -> dict[str, Any] | None:

@@ -12,7 +12,6 @@ from app.algorithm.analyzers.resource_analyzer import ResourceAnalyzer
 from app.algorithm.analyzers.thinking_tools.goldfish_analyzer import GoldfishAnalyzer
 from app.algorithm.analyzers.thinking_tools.nine_screens import NineScreensAnalyzer
 from app.algorithm.analyzers.thinking_tools.stc_operator import STCAnalyzer
-from typing import Any
 
 logger = logging.getLogger(__name__)
 

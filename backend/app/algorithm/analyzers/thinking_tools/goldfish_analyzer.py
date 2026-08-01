@@ -28,7 +28,7 @@ GOLDFISH_SYSTEM_PROMPT = """你是一个TRIZ金鱼法分析专家。
 class GoldfishAnalyzer(AIAnalyzer):
     """金鱼法分析器"""
 
-    def __init__(self, ai):
+    def __init__(self, ai: Any):
         super().__init__(ai)
 
     async def analyze(self, problem: str, **kwargs) -> dict[str, Any] | None:

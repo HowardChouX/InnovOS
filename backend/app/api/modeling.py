@@ -54,7 +54,7 @@ async def generate_modeling(task_id: int, user: dict = Depends(get_current_user)
 
     try:
         # AI分析问题
-        analysis_result = await engine.analyze(task["description"])
+        analysis_result = await engine.analyze(task["description"], user_id=user["id"])
 
         # 构建问题建模数据
         problem_elements = {

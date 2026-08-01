@@ -28,7 +28,7 @@ STC_SYSTEM_PROMPT = """你是一个TRIZ STC算子分析专家。通过尺寸(Siz
 class STCAnalyzer(AIAnalyzer):
     """STC算子分析器"""
 
-    def __init__(self, ai):
+    def __init__(self, ai: Any):
         super().__init__(ai)
 
     async def analyze(self, problem: str, **kwargs) -> dict[str, Any] | None:

@@ -6,6 +6,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.algorithm.ai_client import chat_completion
+from app.algorithm.base import parse_ai_json
 from app.auth import get_current_user
 from app.database import get_db
 
@@ -214,17 +215,18 @@ async def check_infringement(solution_id: int, user: dict = Depends(get_current_
 
     try:
         result = await chat_completion(
-            system_prompt=INFRINGEMENT_SYSTEM,
-            user_prompt=user_prompt,
-            response_format=dict,
+            user_id=user["id"],
             purpose="conversion",
+            messages=[
+                {"role": "system", "content": INFRINGEMENT_SYSTEM},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
         )
-        if isinstance(result, str):
-            try:
-                result = json.loads(result)
-            except json.JSONDecodeError:
-                result = {"riskLevel": "分析失败", "riskScore": 0, "analysisSummary": result}
-        return {"data": result, "message": "success", "code": 200}
+        parsed = parse_ai_json((result.get("content") or "").strip())
+        if not isinstance(parsed, dict):
+            parsed = {"riskLevel": "分析失败", "riskScore": 0, "analysisSummary": (result.get("content") or "").strip()}
+        return {"data": parsed, "message": "success", "code": 200}
     except Exception as e:
         logger.warning(f"AI 侵权分析失败（返回友好提示）: {e}")
         return {

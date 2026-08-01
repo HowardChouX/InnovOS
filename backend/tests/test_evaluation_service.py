@@ -43,14 +43,16 @@ def mock_db_solution_not_found(monkeypatch):
 
 @pytest.fixture
 def mock_ai_result():
-    """模拟 AI 评估结果"""
+    """模拟 AI 评估结果（新 chat_completion 返回信封，content 为 JSON 字符串）"""
     return {
-        "innovation": {"score": 85, "strengths": ["技术新颖"], "weaknesses": ["实现复杂"]},
-        "feasibility": {"score": 70, "strengths": ["成本可控"], "weaknesses": []},
-        "completeness": {"score": 90, "strengths": ["逻辑完整"], "weaknesses": ["缺少验证"]},
-        "conversion": {"score": 75, "strengths": ["产业契合"], "weaknesses": []},
-        "overall": 80,
-        "recommendations": ["加强验证", "降低成本"],
+        "content": json.dumps({
+            "innovation": {"score": 85, "strengths": ["技术新颖"], "weaknesses": ["实现复杂"]},
+            "feasibility": {"score": 70, "strengths": ["成本可控"], "weaknesses": []},
+            "completeness": {"score": 90, "strengths": ["逻辑完整"], "weaknesses": ["缺少验证"]},
+            "conversion": {"score": 75, "strengths": ["产业契合"], "weaknesses": []},
+            "overall": 80,
+            "recommendations": ["加强验证", "降低成本"],
+        })
     }
 
 
@@ -141,7 +143,7 @@ class TestEvaluateSolution:
             "overall": 75,
             "recommendations": [],
         }
-        mock_chat = AsyncMock(return_value=partial_result)
+        mock_chat = AsyncMock(return_value={"content": json.dumps(partial_result)})
         monkeypatch.setattr("app.algorithm.evaluation_service.chat_completion", mock_chat)
 
         from app.algorithm.evaluation_service import evaluate_solution
@@ -157,14 +159,16 @@ class TestEvaluateSolution:
 
     @pytest.mark.asyncio
     async def test_correct_prompt_built(self, mock_db_solution_found, monkeypatch):
-        """AI 调用应使用正确的 prompt 内容"""
+        """AI 调用应使用正确的新签名（user_id/purpose/messages）与 prompt 内容"""
         mock_chat = AsyncMock(return_value={
-            "innovation": {"score": 1, "strengths": [], "weaknesses": []},
-            "feasibility": {"score": 1, "strengths": [], "weaknesses": []},
-            "completeness": {"score": 1, "strengths": [], "weaknesses": []},
-            "conversion": {"score": 1, "strengths": [], "weaknesses": []},
-            "overall": 1,
-            "recommendations": [],
+            "content": json.dumps({
+                "innovation": {"score": 1, "strengths": [], "weaknesses": []},
+                "feasibility": {"score": 1, "strengths": [], "weaknesses": []},
+                "completeness": {"score": 1, "strengths": [], "weaknesses": []},
+                "conversion": {"score": 1, "strengths": [], "weaknesses": []},
+                "overall": 1,
+                "recommendations": [],
+            })
         })
         monkeypatch.setattr("app.algorithm.evaluation_service.chat_completion", mock_chat)
 
@@ -174,11 +178,16 @@ class TestEvaluateSolution:
 
         # Verify chat_completion was called with expected args
         call_args = mock_chat.call_args[1]
-        assert "专业" in call_args["system_prompt"]
+        assert call_args["user_id"] == 1
+        assert call_args["purpose"] == "evaluation"
         assert call_args["temperature"] == 0.3
-        assert call_args["response_format"] is dict
-        assert "测试方案" in call_args["user_prompt"]
-        assert "任务描述内容" in call_args["user_prompt"]
+        assert call_args["response_format"] == {"type": "json_object"}
+        messages = call_args["messages"]
+        assert messages[0]["role"] == "system"
+        assert "专业" in messages[0]["content"]
+        assert messages[1]["role"] == "user"
+        assert "测试方案" in messages[1]["content"]
+        assert "任务描述内容" in messages[1]["content"]
 
     @pytest.mark.asyncio
     async def test_db_closed_after_query(self, mock_db_solution_found, monkeypatch):

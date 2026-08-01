@@ -10,7 +10,6 @@ from typing import Any
 from app.algorithm.analyzers.evolution_analyzer import EvolutionAnalyzer
 from app.algorithm.analyzers.resource_analyzer import ResourceAnalyzer
 from app.algorithm.analyzers.sufield_analyzer import SuFieldAnalyzer
-from typing import Any
 
 logger = logging.getLogger(__name__)
 

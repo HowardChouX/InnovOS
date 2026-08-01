@@ -819,20 +819,25 @@ class TestCheckInfringement:
 
         # Mock AI chat completion to avoid real API calls
         async def mock_chat_completion(**kwargs):
+            # 新签名返回信封：content 为 JSON 字符串
             return {
-                "riskLevel": "中",
-                "riskScore": 65,
-                "analysisSummary": "存在中等侵权风险",
-                "claimOverlaps": [
-                    {
-                        "feature": "智能算法",
-                        "patentClaim": "权利要求1",
-                        "risk": "部分覆盖",
-                        "suggestion": "修改算法细节",
-                    },
-                ],
-                "designArounds": ["采用替代技术路线"],
-                "keyRecommendations": ["进行详细FTO分析"],
+                "content": json.dumps({
+                    "riskLevel": "中",
+                    "riskScore": 65,
+                    "analysisSummary": "存在中等侵权风险",
+                    "claimOverlaps": [
+                        {
+                            "feature": "智能算法",
+                            "patentClaim": "权利要求1",
+                            "risk": "部分覆盖",
+                            "suggestion": "修改算法细节",
+                        },
+                    ],
+                    "designArounds": ["采用替代技术路线"],
+                    "keyRecommendations": ["进行详细FTO分析"],
+                }),
+                "provider_id": "openai",
+                "model_id": "gpt-4",
             }
 
         monkeypatch.setattr(

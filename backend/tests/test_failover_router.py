@@ -1,6 +1,8 @@
 """Tests for the per-user failover queue walker."""
 from __future__ import annotations
 
+import inspect
+
 import pytest
 from app.services import failover_router as mod
 
@@ -121,6 +123,12 @@ async def test_max_attempts_caps_retries(monkeypatch, auto_mock_db):
 
 def test_load_queue_filters_by_capability(monkeypatch):
     """_load_queue must return only rows matching the requested capability."""
+    # SQL 层面必须真正按 ums.capability 过滤（不能只靠 Python 侧过滤）
+    src = inspect.getsource(mod._load_queue)
+    assert "ums.capability = %s" in src, (
+        "_load_queue 的 SQL WHERE 子句必须包含 ums.capability = %s"
+    )
+
     all_rows = [
         _row(
             provider_id="deepseek",

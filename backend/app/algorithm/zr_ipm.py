@@ -12,7 +12,7 @@ import json
 import logging
 
 from .ai_client import chat_completion
-from .model_resolver import model_resolver
+from .base import parse_ai_json
 
 logger = logging.getLogger(__name__)
 
@@ -65,28 +65,23 @@ EVALUATE_SYSTEM = "你是一个创新评估专家。返回JSON: scores(innovatio
 
 
 class ZRIPMEngine:
-    @staticmethod
-    def _get_model_id() -> str:
-        """从全局设置中获取分配的对话模型 ID"""
-        s = model_resolver.get_assigned_settings()
-        return s.get("chat_model") or ""
-
-    async def analyze(self, task_description: str) -> dict:
+    async def analyze(self, task_description: str, *, user_id: int) -> dict:
         """分析问题，返回冲突图谱"""
         result = await chat_completion(
-            system_prompt=SYSTEM_PROMPT,
-            user_prompt=task_description,
-            response_format=dict,
-            model_id=self._get_model_id(),
+            user_id=user_id,
+            purpose="chat",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": task_description},
+            ],
+            response_format={"type": "json_object"},
         )
+        parsed = parse_ai_json((result.get("content") or "").strip())
         # 防御：AI 可能返回字符串而非 dict（JSON 解析异常等）
-        if isinstance(result, str):
-            try:
-                result = json.loads(result)
-            except (json.JSONDecodeError, TypeError):
-                logger.warning(f"AI returned string, not dict: {result[:200]}")
-                result = {}
-        return self._build_conflict_graph(result)
+        if not isinstance(parsed, dict):
+            logger.warning(f"AI returned non-dict content: {str(parsed)[:200]}")
+            parsed = {}
+        return self._build_conflict_graph(parsed)
 
     async def generate_solutions(
         self,
@@ -95,6 +90,8 @@ class ZRIPMEngine:
         innovations: list[dict] | None = None,
         direction_patents: dict | None = None,
         patent_ratings: dict | None = None,
+        *,
+        user_id: int,
     ) -> list[dict]:
         """生成解决方案，按创新方向生成，每个方向至少一个方案
 
@@ -168,28 +165,51 @@ class ZRIPMEngine:
         user_prompt = f"{SOLUTION_PROMPT}：\n" + "\n".join(context_parts)
 
         result = await chat_completion(
-            system_prompt=SOLUTION_SYSTEM,
-            user_prompt=user_prompt,
-            response_format=dict,
-            model_id=self._get_model_id(),
+            user_id=user_id,
+            purpose="chat",
+            messages=[
+                {"role": "system", "content": SOLUTION_SYSTEM},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
         )
-        if isinstance(result, dict) and "solutions" in result:
-            return result["solutions"]
-        if isinstance(result, list):
-            return result
+        content = (result.get("content") or "").strip()
+        parsed: object = None
+        if content:
+            try:
+                parsed = json.loads(content)
+            except (json.JSONDecodeError, TypeError):
+                # 兜底：清理 think 标签等噪声后重试
+                parsed = parse_ai_json(content)
+        if isinstance(parsed, dict) and "solutions" in parsed:
+            return parsed["solutions"]
+        if isinstance(parsed, list):
+            return parsed
         return []
 
-    async def evaluate(self, solution_description: str) -> dict:
+    async def evaluate(self, solution_description: str, *, user_id: int) -> dict:
         """评估方案"""
-        return await chat_completion(
-            system_prompt=EVALUATE_SYSTEM,
-            user_prompt=f"{EVALUATE_PROMPT}：\n{solution_description}",
-            response_format=dict,
-            model_id=self._get_model_id(),
+        result = await chat_completion(
+            user_id=user_id,
+            purpose="evaluation",
+            messages=[
+                {"role": "system", "content": EVALUATE_SYSTEM},
+                {"role": "user", "content": f"{EVALUATE_PROMPT}：\n{solution_description}"},
+            ],
+            response_format={"type": "json_object"},
         )
+        parsed = parse_ai_json((result.get("content") or "").strip())
+        return parsed if isinstance(parsed, dict) else {}
 
     async def generate_report(
-        self, task_description: str, innovations: list, patents: list, solutions: list, evaluations: list
+        self,
+        task_description: str,
+        innovations: list,
+        patents: list,
+        solutions: list,
+        evaluations: list,
+        *,
+        user_id: int,
     ) -> dict:
         """生成完整分析报告"""
         context_parts = [f"用户问题：{task_description}"]
@@ -216,27 +236,31 @@ class ZRIPMEngine:
         user_prompt = "\n".join(context_parts)
 
         result = await chat_completion(
-            system_prompt=REPORT_SYSTEM,
-            user_prompt=user_prompt,
-            response_format=dict,
-            model_id=self._get_model_id(),
+            user_id=user_id,
+            purpose="chat",
+            messages=[
+                {"role": "system", "content": REPORT_SYSTEM},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
         )
-        if isinstance(result, str):
-            try:
-                result = json.loads(result)
-            except (json.JSONDecodeError, TypeError):
-                result = {
-                    "title": "创新分析报告",
-                    "summary": result,
-                    "sections": [],
-                    "recommendations": [],
-                    "topSolutions": [],
-                }
-        return (
-            result
-            if isinstance(result, dict)
-            else {"title": "创新分析报告", "summary": "", "sections": [], "recommendations": [], "topSolutions": []}
-        )
+        content = (result.get("content") or "").strip()
+        try:
+            parsed = json.loads(content) if content else None
+        except (json.JSONDecodeError, TypeError):
+            parsed = None
+        if not isinstance(parsed, dict):
+            # 防御：AI 返回无法解析的内容时生成默认报告
+            result = {
+                "title": "创新分析报告",
+                "summary": content or "报告生成异常",
+                "sections": [],
+                "recommendations": [],
+                "topSolutions": [],
+            }
+        else:
+            result = parsed
+        return result
 
     @staticmethod
     def _build_conflict_graph(ai_result: dict) -> dict:

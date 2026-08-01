@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.algorithm.analyzers.demand_portrait import DemandPortraitAnalyzer
-from app.algorithm.base import parse_ai_json, strip_think_tags
 from app.algorithm.zr_ipm import ZRIPMEngine
 from app.auth import get_current_user
 from app.database import get_db
@@ -403,88 +402,12 @@ def _create_ai_base(user_id: int):
       每次调用通过 chat_completion_sync() → FailoverRouter → user_model_services 队列
       → 逐个尝试供应商 → 失败自动降级 → 记录 model_call_log
 
-    不再读取 system_settings / model_resolver（旧路径，现已废弃）。
+    FailoverAIWrapper 定义在 app.algorithm.ai_client（与 chat_completion 同模块），
+    这里只是薄工厂。
     """
-    from app.algorithm.ai_client import chat_completion_sync
+    from app.algorithm.ai_client import FailoverAIWrapper
 
-    class FailoverAIWrapper:
-        """与 AIBase 接口兼容的包装器，内部使用 FailoverRouter。"""
-
-        def __init__(self, uid: int, purpose: str = "chat"):
-            self.user_id = uid
-            self.purpose = purpose
-            self.enabled = True
-
-        def call_ai(
-            self,
-            system_prompt: str,
-            user_prompt: str,
-            temperature: float = 0.3,
-            max_tokens: int | None = None,
-            logger_prefix: str = "",
-            raw: bool = False,
-            json_mode: bool = False,
-        ) -> str | dict | None:
-            messages: list[dict[str, str]] = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": user_prompt})
-
-            try:
-                result = chat_completion_sync(
-                    user_id=self.user_id,
-                    purpose=self.purpose,
-                    messages=messages,
-                )
-            except Exception as e:
-                logger.error("[%s] FailoverRouter 调用失败: %s", logger_prefix or "AI", e)
-                return None
-
-            content = (result.get("content") or "").strip()
-            content = strip_think_tags(content)
-
-            if not content:
-                logger.warning("[%s] 空响应", logger_prefix or "AI")
-                return None
-
-            if raw:
-                return content
-
-            parsed = parse_ai_json(content)
-            if json_mode and not isinstance(parsed, dict):
-                logger.warning(
-                    "[%s] 返回非 JSON 格式（%s）",
-                    logger_prefix or "AI",
-                    type(parsed).__name__,
-                )
-                return None
-
-            return parsed
-
-        async def call_ai_async(
-            self,
-            system_prompt: str,
-            user_prompt: str,
-            temperature: float = 0.3,
-            max_tokens: int | None = None,
-            logger_prefix: str = "",
-            raw: bool = False,
-            json_mode: bool = False,
-        ) -> str | dict | None:
-            import asyncio
-
-            return await asyncio.to_thread(
-                self.call_ai,
-                system_prompt,
-                user_prompt,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                logger_prefix=logger_prefix,
-                raw=raw,
-                json_mode=json_mode,
-            )
-
-    return FailoverAIWrapper(uid=user_id)
+    return FailoverAIWrapper(user_id=user_id)
 
 
 async def run_demand_portrait(
@@ -618,7 +541,7 @@ async def run_analysis_background(
             update_workflow_step(db, task_id, "agent1", "running")
             logger.debug("Agent1 set to running successfully")
 
-            analysis_result = await engine.analyze(enriched_description)
+            analysis_result = await engine.analyze(enriched_description, user_id=user_id)
 
             # 增量更新：问题要素
             await _update_problem_modeling(db, task_id, task_description, analysis_result, "agent1")
@@ -819,6 +742,7 @@ async def run_analysis_background(
                 innovations=innovations,
                 direction_patents=direction_patents,
                 patent_ratings=patent_ratings,
+                user_id=user_id,
             )
 
             for sol in solutions:
@@ -877,7 +801,9 @@ async def run_analysis_background(
 
             evaluations = []
             for sol in solutions_data:
-                eval_result = await engine.evaluate(sol.get("description", "") or sol.get("title", ""))
+                eval_result = await engine.evaluate(
+                    sol.get("description", "") or sol.get("title", ""), user_id=user_id
+                )
                 evaluations.append(
                     {
                         "solution_title": sol.get("title", ""),
@@ -1005,7 +931,7 @@ async def run_analysis_background(
                 # 生成报告
                 engine = ZRIPMEngine()
                 report = await engine.generate_report(
-                    task_description, innovations, patent_info, solutions_data, evaluations
+                    task_description, innovations, patent_info, solutions_data, evaluations, user_id=user_id
                 )
 
                 update_workflow_step(

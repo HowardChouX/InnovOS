@@ -29,7 +29,7 @@ IFR_SYSTEM_PROMPT = """你是一个TRIZ理想最终解（IFR）专家。IFR描�
 class IFRGenerator(AIAnalyzer):
     """最终理想解生成器"""
 
-    def __init__(self, ai):
+    def __init__(self, ai: Any):
         super().__init__(ai)
 
     async def analyze(self, problem: str, **kwargs) -> dict[str, Any] | None:

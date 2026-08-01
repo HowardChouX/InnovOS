@@ -1,12 +1,13 @@
 """
 测试 zr_ipm.py — ZR-IPM 算法引擎
 
-Mock chat_completion 和 model_resolver，测试分析、方案生成、评估、报告生成流程。
+Mock chat_completion（新签名：user_id/purpose/messages），测试分析、方案生成、
+评估、报告生成流程。
 """
 
 import json
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock
 
 
 # ── Helper ──
@@ -16,13 +17,9 @@ def asyncio_run(coro):
     return asyncio.run(coro)
 
 
-@pytest.fixture(autouse=True)
-def mock_model_resolver_settings(monkeypatch):
-    """Mock model_resolver.get_assigned_settings to return a known chat model"""
-    monkeypatch.setattr(
-        "app.algorithm.zr_ipm.model_resolver.get_assigned_settings",
-        lambda: {"chat_model": "silicon:deepseek-v3"},
-    )
+def _env(obj) -> dict:
+    """把已解析的 AI 结果包装成新 chat_completion 的返回信封。"""
+    return {"content": json.dumps(obj, ensure_ascii=False)}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -40,12 +37,12 @@ class TestAnalyze:
             "principles": ["分割原理"],
             "patentKeywords": ["散热"],
         }
-        mock_chat = AsyncMock(return_value=ai_result)
+        mock_chat = AsyncMock(return_value=_env(ai_result))
         monkeypatch.setattr("app.algorithm.zr_ipm.chat_completion", mock_chat)
 
         from app.algorithm.zr_ipm import ZRIPMEngine
 
-        result = asyncio_run(ZRIPMEngine().analyze("手机发热问题"))
+        result = asyncio_run(ZRIPMEngine().analyze("手机发热问题", user_id=1))
 
         assert "centerNode" in result
         assert result["centerNode"]["description"] == "性能与成本的矛盾"
@@ -57,57 +54,61 @@ class TestAnalyze:
         assert result["principles"] == ["分割原理"]
 
     def test_analyze_string_result_parsed_as_json(self, monkeypatch):
-        """AI 返回字符串时，应尝试 JSON 解析"""
+        """AI 返回 JSON 字符串时，应解析为冲突图谱"""
         ai_result_str = json.dumps({
             "centerConflict": "冲突",
             "satellites": [],
             "principles": [],
             "patentKeywords": [],
         })
-        mock_chat = AsyncMock(return_value=ai_result_str)
+        mock_chat = AsyncMock(return_value={"content": ai_result_str})
         monkeypatch.setattr("app.algorithm.zr_ipm.chat_completion", mock_chat)
 
         from app.algorithm.zr_ipm import ZRIPMEngine
 
-        result = asyncio_run(ZRIPMEngine().analyze("test"))
+        result = asyncio_run(ZRIPMEngine().analyze("test", user_id=1))
         assert result["centerNode"]["description"] == "冲突"
 
     def test_analyze_invalid_string_falls_back(self, monkeypatch):
-        """AI 返回无法解析的字符串时，应生成空图谱"""
-        mock_chat = AsyncMock(return_value="this is not json at all")
+        """AI 返回无法解析的内容时，应生成空图谱"""
+        mock_chat = AsyncMock(return_value={"content": "this is not json at all"})
         monkeypatch.setattr("app.algorithm.zr_ipm.chat_completion", mock_chat)
 
         from app.algorithm.zr_ipm import ZRIPMEngine
 
-        result = asyncio_run(ZRIPMEngine().analyze("test"))
+        result = asyncio_run(ZRIPMEngine().analyze("test", user_id=1))
         assert result["centerNode"]["description"] == ""
 
     def test_analyze_empty_result(self, monkeypatch):
-        """AI 返回空 dict 时，图谱仍应生成但为空"""
-        mock_chat = AsyncMock(return_value={})
+        """AI 返回空内容时，图谱仍应生成但为空"""
+        mock_chat = AsyncMock(return_value={"content": ""})
         monkeypatch.setattr("app.algorithm.zr_ipm.chat_completion", mock_chat)
 
         from app.algorithm.zr_ipm import ZRIPMEngine
 
-        result = asyncio_run(ZRIPMEngine().analyze("test"))
+        result = asyncio_run(ZRIPMEngine().analyze("test", user_id=1))
         assert result["centerNode"]["description"] == ""
         assert result["satelliteNodes"] == []
         assert result["edges"] == []
 
-    def test_analyze_model_id_resolved(self, monkeypatch):
-        """analyze 应通过 model_id 调用"""
+    def test_analyze_passes_user_and_messages(self, monkeypatch):
+        """analyze 应以新签名（user_id/purpose/messages）调用"""
         mock_chat = AsyncMock(return_value={
-            "centerConflict": "x", "satellites": [], "principles": [], "patentKeywords": [],
+            "content": json.dumps({"centerConflict": "x", "satellites": [], "principles": [], "patentKeywords": []}),
         })
         monkeypatch.setattr("app.algorithm.zr_ipm.chat_completion", mock_chat)
 
         from app.algorithm.zr_ipm import ZRIPMEngine
 
-        asyncio_run(ZRIPMEngine().analyze("test"))
+        asyncio_run(ZRIPMEngine().analyze("test", user_id=7))
 
         call_kwargs = mock_chat.call_args[1]
-        assert call_kwargs["model_id"] == "silicon:deepseek-v3"
-        assert call_kwargs["response_format"] is dict
+        assert call_kwargs["user_id"] == 7
+        assert call_kwargs["purpose"] == "chat"
+        assert call_kwargs["response_format"] == {"type": "json_object"}
+        assert call_kwargs["messages"][0]["role"] == "system"
+        assert "你是一个创新问题分析专家" in call_kwargs["messages"][0]["content"]
+        assert call_kwargs["messages"][1] == {"role": "user", "content": "test"}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -117,12 +118,12 @@ class TestAnalyze:
 class TestGenerateSolutions:
     def test_generates_with_innovations_and_patents(self, monkeypatch):
         """有创新方向和专利时应构建完整上下文"""
-        mock_chat = AsyncMock(return_value={
+        mock_chat = AsyncMock(return_value=_env({
             "solutions": [
                 {"title": "方案A", "description": "描述A", "direction": "方向1",
                  "principles": ["分割"], "referencedPatents": ["CN123"]},
             ]
-        })
+        }))
         monkeypatch.setattr("app.algorithm.zr_ipm.chat_completion", mock_chat)
 
         from app.algorithm.zr_ipm import ZRIPMEngine
@@ -131,35 +132,36 @@ class TestGenerateSolutions:
             task_description="手机发热",
             innovations=[{"description": "热传导优化"}],
             patents=[{"title": "散热专利", "relevance": 0.8}],
+            user_id=1,
         ))
         assert len(result) == 1
         assert result[0]["title"] == "方案A"
 
     def test_returns_list_when_result_is_list(self, monkeypatch):
         """AI 返回列表时，直接返回"""
-        mock_chat = AsyncMock(return_value=[
+        mock_chat = AsyncMock(return_value=_env([
             {"title": "方案X", "description": "desc"},
-        ])
+        ]))
         monkeypatch.setattr("app.algorithm.zr_ipm.chat_completion", mock_chat)
 
         from app.algorithm.zr_ipm import ZRIPMEngine
 
-        result = asyncio_run(ZRIPMEngine().generate_solutions(task_description="test"))
+        result = asyncio_run(ZRIPMEngine().generate_solutions(task_description="test", user_id=1))
         assert len(result) == 1
 
     def test_returns_empty_when_result_invalid(self, monkeypatch):
-        """AI 返回非 dict/list 时，返回空列表"""
-        mock_chat = AsyncMock(return_value="invalid")
+        """AI 返回非 dict/list 内容时，返回空列表"""
+        mock_chat = AsyncMock(return_value={"content": "invalid"})
         monkeypatch.setattr("app.algorithm.zr_ipm.chat_completion", mock_chat)
 
         from app.algorithm.zr_ipm import ZRIPMEngine
 
-        result = asyncio_run(ZRIPMEngine().generate_solutions(task_description="test"))
+        result = asyncio_run(ZRIPMEngine().generate_solutions(task_description="test", user_id=1))
         assert result == []
 
     def test_patent_rating_scoring(self, monkeypatch):
         """测试专利评分算法的正确性"""
-        mock_chat = AsyncMock(return_value=[])
+        mock_chat = AsyncMock(return_value=_env({"solutions": []}))
         monkeypatch.setattr("app.algorithm.zr_ipm.chat_completion", mock_chat)
 
         from app.algorithm.zr_ipm import ZRIPMEngine
@@ -174,10 +176,11 @@ class TestGenerateSolutions:
             task_description="test",
             patents=patents,
             patent_ratings=ratings,
+            user_id=1,
         ))
 
         call_kwargs = mock_chat.call_args[1]
-        user_prompt = call_kwargs["user_prompt"]
+        user_prompt = call_kwargs["messages"][1]["content"]
 
         # High-rated patent should be in "重点参考" section
         assert "★" in user_prompt
@@ -185,7 +188,7 @@ class TestGenerateSolutions:
 
     def test_direction_patents_used(self, monkeypatch):
         """当 direction_patents 存在时，优先使用它而非 patents"""
-        mock_chat = AsyncMock(return_value=[])
+        mock_chat = AsyncMock(return_value=_env({"solutions": []}))
         monkeypatch.setattr("app.algorithm.zr_ipm.chat_completion", mock_chat)
 
         from app.algorithm.zr_ipm import ZRIPMEngine
@@ -194,10 +197,11 @@ class TestGenerateSolutions:
             task_description="test",
             patents=[{"title": "P1", "relevance": 1.0}],
             direction_patents={"方向1": ["专利X"]},
+            user_id=1,
         ))
 
         call_kwargs = mock_chat.call_args[1]
-        user_prompt = call_kwargs["user_prompt"]
+        user_prompt = call_kwargs["messages"][1]["content"]
 
         # "方向-专利对应关系" should be in prompt
         assert "方向-专利对应关系" in user_prompt
@@ -211,19 +215,20 @@ class TestGenerateSolutions:
 
 class TestEvaluate:
     def test_evaluate_calls_chat_completion(self, monkeypatch):
-        mock_chat = AsyncMock(return_value={"overall": 85})
+        mock_chat = AsyncMock(return_value=_env({"overall": 85}))
         monkeypatch.setattr("app.algorithm.zr_ipm.chat_completion", mock_chat)
 
         from app.algorithm.zr_ipm import ZRIPMEngine
 
-        result = asyncio_run(ZRIPMEngine().evaluate("某方案描述"))
+        result = asyncio_run(ZRIPMEngine().evaluate("某方案描述", user_id=1))
         assert result["overall"] == 85
 
-        # Verify prompt construction
+        # Verify prompt construction with the new signature
         call_kwargs = mock_chat.call_args[1]
-        assert "评估" in call_kwargs["user_prompt"]
-        assert call_kwargs["response_format"] is dict
-        assert call_kwargs["model_id"] == "silicon:deepseek-v3"
+        assert call_kwargs["user_id"] == 1
+        assert call_kwargs["purpose"] == "evaluation"
+        assert "评估" in call_kwargs["messages"][1]["content"]
+        assert call_kwargs["response_format"] == {"type": "json_object"}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -232,13 +237,13 @@ class TestEvaluate:
 
 class TestGenerateReport:
     def test_generates_report_with_all_sections(self, monkeypatch):
-        mock_chat = AsyncMock(return_value={
+        mock_chat = AsyncMock(return_value=_env({
             "title": "分析报告",
             "summary": "摘要",
             "sections": [{"heading": "分析", "content": "内容"}],
             "recommendations": ["建议1"],
             "topSolutions": ["方案A"],
-        })
+        }))
         monkeypatch.setattr("app.algorithm.zr_ipm.chat_completion", mock_chat)
 
         from app.algorithm.zr_ipm import ZRIPMEngine
@@ -251,29 +256,31 @@ class TestGenerateReport:
         result = asyncio_run(ZRIPMEngine().generate_report(
             task_description="问题描述", innovations=innovations,
             patents=patents, solutions=solutions, evaluations=evaluations,
+            user_id=1,
         ))
         assert result["title"] == "分析报告"
         assert result["summary"] == "摘要"
         assert len(result["sections"]) == 1
 
     def test_report_fallback_on_string_result(self, monkeypatch):
-        """AI 返回字符串时，应尝试解析 JSON，失败时生成默认报告"""
-        mock_chat = AsyncMock(return_value="this is not json")
+        """AI 返回无法解析的内容时，应生成默认报告"""
+        mock_chat = AsyncMock(return_value={"content": "this is not json"})
         monkeypatch.setattr("app.algorithm.zr_ipm.chat_completion", mock_chat)
 
         from app.algorithm.zr_ipm import ZRIPMEngine
 
         result = asyncio_run(ZRIPMEngine().generate_report(
             task_description="test", innovations=[], patents=[], solutions=[], evaluations=[],
+            user_id=1,
         ))
         assert result["title"] == "创新分析报告"
         assert isinstance(result["sections"], list)
         assert isinstance(result["recommendations"], list)
 
     def test_report_context_built_correctly(self, monkeypatch):
-        mock_chat = AsyncMock(return_value={
+        mock_chat = AsyncMock(return_value=_env({
             "title": "R", "summary": "S", "sections": [], "recommendations": [], "topSolutions": [],
-        })
+        }))
         monkeypatch.setattr("app.algorithm.zr_ipm.chat_completion", mock_chat)
 
         from app.algorithm.zr_ipm import ZRIPMEngine
@@ -284,10 +291,11 @@ class TestGenerateReport:
             patents=[{"title": "散热专利"}],
             solutions=[{"title": "方案A", "description": "使用均热板"}],
             evaluations=[{"solution_title": "方案A", "evaluation": {"overall": 90}}],
+            user_id=1,
         ))
 
         call_kwargs = mock_chat.call_args[1]
-        user_prompt = call_kwargs["user_prompt"]
+        user_prompt = call_kwargs["messages"][1]["content"]
         assert "手机发热" in user_prompt
         assert "散热优化" in user_prompt
         assert "散热专利" in user_prompt
@@ -338,25 +346,3 @@ class TestBuildConflictGraph:
         result = ZRIPMEngine._build_conflict_graph({"centerConflict": "test"})
         assert result["satelliteNodes"] == []
         assert result["edges"] == []
-
-
-# ═══════════════════════════════════════════════════════════════════
-# ZRIPMEngine._get_model_id — 模型 ID 解析
-# ═══════════════════════════════════════════════════════════════════
-
-class TestGetModelId:
-    def test_returns_chat_model(self, monkeypatch):
-        monkeypatch.setattr(
-            "app.algorithm.zr_ipm.model_resolver.get_assigned_settings",
-            lambda: {"chat_model": "openai:gpt-4"},
-        )
-        from app.algorithm.zr_ipm import ZRIPMEngine
-        assert ZRIPMEngine._get_model_id() == "openai:gpt-4"
-
-    def test_returns_empty_when_not_set(self, monkeypatch):
-        monkeypatch.setattr(
-            "app.algorithm.zr_ipm.model_resolver.get_assigned_settings",
-            lambda: {"chat_model": None},
-        )
-        from app.algorithm.zr_ipm import ZRIPMEngine
-        assert ZRIPMEngine._get_model_id() == ""

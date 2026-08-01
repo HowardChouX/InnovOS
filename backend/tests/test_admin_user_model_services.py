@@ -266,6 +266,64 @@ def client(app_with_mock_db):
 
 
 # ====================================================================
+# Capability validation — invalid capability values rejected with 400
+# ====================================================================
+
+
+class TestCapabilityValidation:
+    """非法 capability 值必须返回 400。"""
+
+    def test_list_rejects_invalid_capability(self, client):
+        response = client.get(
+            "/api/admin/users/1/model-services", params={"capability": "bogus"}
+        )
+        assert response.status_code == 400
+        assert "invalid capability" in response.json()["detail"]
+
+    def test_list_available_rejects_invalid_capability(self, client):
+        response = client.get(
+            "/api/admin/users/1/model-services/available",
+            params={"capability": "bogus"},
+        )
+        assert response.status_code == 400
+
+    def test_add_rejects_invalid_capability(self, client):
+        response = client.post(
+            "/api/admin/users/1/model-services",
+            json={"provider_id": "openai", "capability": "bogus"},
+        )
+        assert response.status_code == 400
+
+    def test_remove_rejects_invalid_capability(self, client):
+        response = client.delete(
+            "/api/admin/users/1/model-services/openai", params={"capability": "bogus"}
+        )
+        assert response.status_code == 400
+
+    def test_toggle_rejects_invalid_capability(self, client):
+        response = client.post(
+            "/api/admin/users/1/model-services/openai/toggle",
+            json={"is_enabled": True, "capability": "bogus"},
+        )
+        assert response.status_code == 400
+
+    def test_reorder_rejects_invalid_capability(self, client):
+        response = client.put(
+            "/api/admin/users/1/model-services/order",
+            json={"provider_ids": ["openai"], "capability": "bogus"},
+        )
+        assert response.status_code == 400
+
+    def test_valid_capabilities_accepted(self, client):
+        """chat/embedding/rerank/image/video 均合法。"""
+        for cap in ["chat", "embedding", "rerank", "image", "video"]:
+            response = client.get(
+                "/api/admin/users/1/model-services", params={"capability": cap}
+            )
+            assert response.status_code == 200, cap
+
+
+# ====================================================================
 # GET /api/admin/users/{user_id}/model-services  —  list enabled services
 # ====================================================================
 
