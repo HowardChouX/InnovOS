@@ -147,8 +147,42 @@ class TestLoginWithCode:
         assert resp.status_code == 400, resp.text
         assert resp.json()["detail"]["code"] == "LOGIN_USER_NOT_FOUND"
 
+    def test_login_code_disabled_user_rejected(self, auth_client, auth_session, monkeypatch):
+        """管理员禁用用户（is_active=false, is_verified=true）验证码正确也拒绝登录，且不重新激活。"""
+        _patch_sms_client(monkeypatch)
+        from pwdlib import PasswordHash
+
+        from app.db.models import User
+
+        ph = PasswordHash.recommended()
+        disabled = User(
+            email="disabled@example.com",
+            phone="13800000007",
+            hashed_password=ph.hash("test1234"),
+            is_active=False,
+            is_superuser=False,
+            is_verified=True,
+            role="user",
+            token_version=0,
+        )
+        auth_session.add(disabled)
+        auth_session.commit()
+
+        resp = auth_client.post(
+            "/api/auth/login/code",
+            json={"phone": "13800000007", "code": "123456"},
+        )
+        assert resp.status_code == 403, resp.text
+        assert resp.json()["detail"]["code"] == "LOGIN_USER_DISABLED"
+        assert "token" not in resp.cookies
+
+        # 数据库状态未被改写（不得自行重新激活）
+        auth_session.refresh(disabled)
+        assert disabled.is_active is False
+        assert disabled.is_verified is True
+
     def test_login_code_auto_activate(self, auth_client, auth_session, monkeypatch):
-        """注册用户（is_verified=false）验证码登录 → 自动激活并返回 is_verified=true。"""
+        """注册用户（is_verified=false, is_active=true）验证码登录 → 自动激活 is_verified 并返回 true。"""
         _patch_sms_client(monkeypatch)
         reg = auth_client.post("/api/auth/register", json=_register_payload())
         assert reg.status_code == 201, reg.text

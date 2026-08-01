@@ -1,8 +1,8 @@
 """自定义验证码登录路由 - 手机号 + 短信验证码。
 
 核验通过后签发 JWT（与 FastAPI Users 登录同一条链路：strategy.write_token +
-transport cookie 配置），Set-Cookie 写入浏览器。未激活/未验证的注册用户
-在登录时自动激活。
+transport cookie 配置），Set-Cookie 写入浏览器。未验证的注册用户在登录时
+自动激活 is_verified；管理员禁用的用户（is_active=False）拒绝登录。
 """
 
 from typing import cast
@@ -44,15 +44,21 @@ async def login_with_code(
             detail={"code": "LOGIN_CODE_INVALID", "reason": "验证码错误"},
         )
 
-    # 查找用户（含未激活的注册用户 → 自动激活）
+    # 查找用户
     user = session.execute(select(User).where(User.phone == payload.phone)).scalar_one_or_none()
     if not user:
         raise HTTPException(
             status_code=400,
             detail={"code": "LOGIN_USER_NOT_FOUND", "reason": "该手机号未注册"},
         )
-    if not user.is_active or not user.is_verified:
-        user.is_active = True
+    # 管理员禁用（is_active=False）的用户拒绝登录 —— 不得借验证码自行重新激活
+    if not user.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "LOGIN_USER_DISABLED", "reason": "该账号已被禁用"},
+        )
+    # 未验证的注册用户 → 仅翻转 is_verified（is_active 不动，只有管理员可改）
+    if not user.is_verified:
         user.is_verified = True
         session.commit()
 
