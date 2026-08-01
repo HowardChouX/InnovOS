@@ -296,29 +296,58 @@ def test_invalid_reset_session_status():
 
 
 class TestPasswordResetRoutes:
-    """HTTP 路由集成测试。"""
+    """HTTP 路由集成测试 — 短信 OTP 版（Task 7 起 password-reset 走 SMS）。"""
 
-    def test_request_otp_route_exists(self, auth_client, db):
-        """路由存在且接受 POST。未知邮箱静默返回 202（防探测）。"""
+    @staticmethod
+    def _patch_sms_client(monkeypatch):
+        """按 test_sms_verification_api.py 的模式：patch SmsClient 类属性。"""
+        from app.services.sms_client import SmsClient
+
+        class _FakeSmsClient:
+            async def send_code(self, phone, template_code):
+                return {"success": True, "biz_id": "test-biz", "message": "ok"}
+
+            async def verify_code(self, phone, code):
+                return code == "123456"
+
+        monkeypatch.setattr(SmsClient, "send_code", _FakeSmsClient.send_code)
+        monkeypatch.setattr(SmsClient, "verify_code", _FakeSmsClient.verify_code)
+
+    def test_send_code_route_exists(self, auth_client, monkeypatch):
+        """路由存在且接受 POST。未知手机号静默返回 202（防探测）。"""
+        self._patch_sms_client(monkeypatch)
         r = auth_client.post(
-            "/api/auth/password-reset/request-otp",
-            json={"email": "nobody@example.com"},
+            "/api/auth/password-reset/send-code",
+            json={"phone": "13999999999"},
         )
-        # 防探测:未知邮箱也返回 202
+        # 防探测:未知手机号也返回 202
         assert r.status_code == 202, r.text
 
-    def test_set_password_route_exists(self, auth_client):
-        """路由存在,错误 token 返回 401。"""
+    def test_verify_route_updates_password(
+        self, auth_client, auth_session, seed_user, monkeypatch
+    ):
+        """验证码正确 → 200 reset:true，数据库密码已更新。"""
+        self._patch_sms_client(monkeypatch)
         r = auth_client.post(
-            "/api/auth/password-reset/set-password",
-            json={"reset_token": "garbage.token.here", "new_password": "newpass1234"},
+            "/api/auth/password-reset/verify",
+            json={
+                "phone": "13800000001",
+                "code": "123456",
+                "new_password": "newpass1234",
+            },
         )
-        assert r.status_code == 401, r.text
+        assert r.status_code == 200, r.text
+        assert r.json() == {"reset": True}
 
-    def test_set_password_short_password_rejected(self, auth_client):
+        from pwdlib import PasswordHash
+
+        auth_session.refresh(seed_user)
+        assert PasswordHash.recommended().verify("newpass1234", seed_user.hashed_password)
+
+    def test_verify_short_password_rejected(self, auth_client):
         """短密码被 schema 校验拒绝 (422)。"""
         r = auth_client.post(
-            "/api/auth/password-reset/set-password",
-            json={"reset_token": "any.token.here", "new_password": "short"},
+            "/api/auth/password-reset/verify",
+            json={"phone": "13800000001", "code": "123456", "new_password": "short"},
         )
         assert r.status_code == 422, r.text

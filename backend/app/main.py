@@ -231,6 +231,10 @@ from app.exceptions.email_verification import (
     EmailVerificationError,
     email_verification_exception_handler,
 )
+from app.exceptions.sms_verification import (
+    SmsVerificationError,
+    sms_verification_exception_handler,
+)
 from fastapi_users.exceptions import (
     InvalidPasswordException,
     InvalidResetPasswordToken,
@@ -261,6 +265,7 @@ app_.include_router(
 app_.include_router(email_verification_router)
 app_.include_router(password_reset_router)
 app_.add_exception_handler(EmailVerificationError, email_verification_exception_handler)
+app_.add_exception_handler(SmsVerificationError, sms_verification_exception_handler)
 for exc in (
     UserAlreadyExists, UserNotExists,
     InvalidResetPasswordToken, InvalidPasswordException,

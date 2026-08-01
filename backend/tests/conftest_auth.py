@@ -100,9 +100,9 @@ def auth_app(auth_session):
         tags=["users"],
     )
 
-    # Mount custom password-reset router so HTTP route integration tests
-    # can exercise the 4 new endpoints (request-otp / resend-otp / verify /
-    # set-password) via auth_client without depending on the full app_.
+    # Mount custom password-reset router (SMS OTP 版：send-code / verify) so
+    # HTTP route integration tests can exercise the endpoints via auth_client
+    # without depending on the full app_.
     from app.api.password_reset import router as password_reset_router
 
     app.include_router(password_reset_router)
@@ -114,6 +114,13 @@ def auth_app(auth_session):
     )
 
     app.add_exception_handler(EmailVerificationError, email_verification_exception_handler)
+    # SMS 限流/校验异常 → 429/400 JSON（password-reset 与 phone-verification 共用）
+    from app.exceptions.sms_verification import (
+        SmsVerificationError,
+        sms_verification_exception_handler,
+    )
+
+    app.add_exception_handler(SmsVerificationError, sms_verification_exception_handler)
 
     for exc in (
         UserAlreadyExists,
@@ -133,6 +140,28 @@ def auth_app(auth_session):
 @pytest.fixture
 def auth_client(auth_app):
     return TestClient(auth_app)
+
+
+@pytest.fixture(autouse=True)
+def reset_sms_otp_limiters():
+    """清空 sms_otp_* 限流器本地状态（模块级单例，跨测试共享）。
+
+    注意：名称不带下划线 —— 测试模块通过 `from tests.conftest_auth import *`
+    引入 fixture，star import 会跳过下划线开头的名字（若跳过，autouse 不生效）。
+
+    sms_otp_* 限流器实例在 app.api.phone_verification 模块导入时创建，
+    无 REDIS_URL 时走本地内存滑动窗口 —— 不清理的话，一个测试的请求会
+    消耗后续测试的配额（如 send 限流 max=1/60s、ip 限流 max=30/60s）。
+    """
+    from app.api.phone_verification import (
+        sms_otp_ip_limiter,
+        sms_otp_request_limiter,
+        sms_otp_verify_limiter,
+    )
+
+    for limiter in (sms_otp_ip_limiter, sms_otp_request_limiter, sms_otp_verify_limiter):
+        if not limiter._use_redis:
+            limiter._local_requests.clear()
 
 
 @pytest.fixture
