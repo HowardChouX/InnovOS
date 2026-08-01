@@ -71,6 +71,7 @@ def seed_first_superuser_if_configured() -> None:
         hashed = password_helper.hash(password)
         user = User(
             email=email,
+            phone=settings.FIRST_SUPERUSER_PHONE or "13800000000",
             hashed_password=hashed,
             is_active=True,
             is_superuser=True,

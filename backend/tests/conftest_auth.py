@@ -119,6 +119,7 @@ def seed_user(auth_session):
     ph = PasswordHash.recommended()
     user = User(
         email="test@example.com",
+        phone="13800000001",
         hashed_password=ph.hash("test1234"),
         is_active=True,
         is_superuser=False,
@@ -140,6 +141,7 @@ def seed_admin(auth_session):
     ph = PasswordHash.recommended()
     admin = User(
         email="admin@example.com",
+        phone="13800000002",
         hashed_password=ph.hash("admin1234"),
         is_active=True,
         is_superuser=True,

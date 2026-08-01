@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER_PASSWORD: str = Field(
         default="", validation_alias=AliasChoices("INNOVOS_ADMIN_PASSWORD", "FIRST_SUPERUSER_PASSWORD")
     )
+    FIRST_SUPERUSER_PHONE: str = Field(
+        default="", validation_alias=AliasChoices("INNOVOS_ADMIN_PHONE", "FIRST_SUPERUSER_PHONE")
+    )
 
     # ── S3 / MinIO ──
     S3_ENDPOINT: str = ""
