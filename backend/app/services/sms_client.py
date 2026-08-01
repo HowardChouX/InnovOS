@@ -1,8 +1,9 @@
-"""阿里云 DYPNS 客户端封装 — 直接使用 alibabacloud_dypnsapi20170525 SDK。
+"""阿里云 DYPNS 短信验证码客户端。
 
-参考 zip 示例代码：
-- backend/app/services/sms_send_sample/alibabacloud_sample/sample.py
-- backend/app/services/sms_verify_sample/alibabacloud_sample/sample.py
+基于官方 SDK 示例（alibabacloud_sample/sample.py）改写：
+- create_client() 与示例一致：CredentialClient 凭据链 + endpoint
+- 发送/核验均使用异步方法（示例 main_async 的调用方式）
+- 开发环境无凭证时降级为日志打印
 """
 import json
 import logging
@@ -13,34 +14,38 @@ logger = logging.getLogger(__name__)
 
 
 class SmsClient:
-    """短信验证码客户端。开发环境无凭证时降级为日志打印。"""
+    """短信验证码客户端。"""
 
     def __init__(self):
         self._client = None
         self._init_client()
 
     def _init_client(self) -> None:
-        """使用凭据初始化阿里云 Client（与 zip 示例的 create_client() 一致）。"""
+        """与示例 create_client() 一致：凭据链 + 固定 endpoint。"""
         try:
-            from alibabacloud_dypnsapi20170525.client import Client as Dypnsapi20170525Client
             from alibabacloud_credentials.client import Client as CredentialClient
+            from alibabacloud_dypnsapi20170525.client import Client as Dypnsapi20170525Client
             from alibabacloud_tea_openapi import models as open_api_models
 
             credential = CredentialClient()
             config = open_api_models.Config(credential=credential)
-            config.endpoint = "dypnsapi.aliyuncs.com"
+            config.endpoint = settings.SMS_ENDPOINT
             self._client = Dypnsapi20170525Client(config)
             logger.info("阿里云 DYPNS 客户端初始化成功")
         except Exception as e:
-            logger.warning("阿里云客户端初始化失败（开发模式降级）: %s", e)
+            logger.warning("阿里云客户端初始化失败（开发模式降级为日志模拟）: %s", e)
             self._client = None
 
     @property
     def available(self) -> bool:
         return self._client is not None
 
-    def send_code(self, phone: str, template_code: str) -> dict:
-        """发送短信验证码（参考 sms_send_sample/sample.py）。
+    def _dev_code(self, phone: str) -> str:
+        """开发模式伪验证码（确定性，便于调试）。"""
+        return f"{abs(hash(phone)) % 1_000_000:06d}"
+
+    async def send_code(self, phone: str, template_code: str) -> dict:
+        """发送短信验证码（异步，与示例 main_async 调用方式一致）。
 
         Args:
             phone: 手机号
@@ -50,38 +55,39 @@ class SmsClient:
             {"success": bool, "biz_id": str | None, "message": str}
         """
         if not self._client:
-            fake_code = f"{hash(phone) % 1_000_000:06d}"
+            code = self._dev_code(phone)
             logger.info(
                 "[DEV SMS] phone=%s template=%s code=%s valid=%ss",
-                phone, template_code, fake_code, settings.SMS_CODE_VALID_TIME,
+                phone, template_code, code, settings.SMS_CODE_VALID_TIME,
             )
             return {"success": True, "biz_id": "dev-mock", "message": "开发模式模拟发送"}
 
         from alibabacloud_dypnsapi20170525 import models as dypnsapi_models
         from alibabacloud_tea_util import models as util_models
 
-        # ── 参数与 sms_send_sample/sample.py 完全一致 ──
+        # 参数与官方示例完全一致（template_param 的 min 为分钟）
         request = dypnsapi_models.SendSmsVerifyCodeRequest(
             scheme_name=settings.SMS_SCHEME_NAME,
-            country_code="86",
+            country_code=settings.SMS_COUNTRY_CODE,
             phone_number=phone,
             sign_name=settings.SMS_SIGN_NAME,
             template_code=template_code,
             template_param=json.dumps({
                 "code": "##code##",
-                "min": str(settings.SMS_CODE_VALID_TIME // 60),
+                "min": str(settings.SMS_CODE_VALID_MIN),
             }),
             code_length=settings.SMS_CODE_LENGTH,
             valid_time=settings.SMS_CODE_VALID_TIME,
-            duplicate_policy=1,
+            duplicate_policy=settings.SMS_DUPLICATE_POLICY,
             interval=settings.SMS_RESEND_INTERVAL,
-            code_type=1,
-            return_verify_code=True,  # 与 sample.py 一致
-            auto_retry=1,
+            code_type=settings.SMS_CODE_TYPE,
+            return_verify_code=True,
+            auto_retry=settings.SMS_AUTO_RETRY,
         )
         runtime = util_models.RuntimeOptions()
         try:
-            resp = self._client.send_sms_verify_code_with_options(request, runtime)
+            # 与示例 main_async 相同的异步调用
+            resp = await self._client.send_sms_verify_code_with_options_async(request, runtime)
             body = resp.body
             if body.code == "OK":
                 biz_id = body.model.biz_id if body.model else None
@@ -90,58 +96,59 @@ class SmsClient:
             logger.error("短信发送失败 phone=%s code=%s message=%s", phone, body.code, body.message)
             return {"success": False, "biz_id": None, "message": body.message or "发送失败"}
         except Exception as error:
-            # 与 sample.py 一致的错误处理模式：error.message + error.data.get("Recommend")
-            error_msg = error.message if hasattr(error, "message") else str(error)
-            logger.error("短信发送异常 phone=%s error=%s", phone, error_msg)
-            if hasattr(error, "data") and error.data:
-                logger.error("诊断地址: %s", error.data.get("Recommend"))
+            # 与示例相同的错误处理：error.message + error.data["Recommend"]
+            error_msg = getattr(error, "message", None) or str(error)
+            recommend = ""
+            data = getattr(error, "data", None)
+            if data:
+                recommend = data.get("Recommend", "")
+            logger.error("短信发送异常 phone=%s error=%s recommend=%s", phone, error_msg, recommend)
             return {"success": False, "biz_id": None, "message": error_msg}
 
-    def verify_code(self, phone: str, code: str) -> bool:
-        """核验短信验证码（参考 sms_verify_sample/sample.py）。
+    async def verify_code(self, phone: str, code: str) -> bool:
+        """核验短信验证码（异步）。
 
         Args:
             phone: 手机号
             code: 用户输入的验证码
 
         Returns:
-            True 表示核验通过（PASS），False 表示核验失败
+            True 表示核验通过（VerifyResult == "PASS"）
         """
         if not self._client:
-            fake_code = f"{hash(phone) % 1_000_000:06d}"
-            result = code == fake_code
+            # 开发模式：对比伪验证码
+            dev_code = self._dev_code(phone)
+            result = code == dev_code
             logger.info(
                 "[DEV SMS VERIFY] phone=%s input=%s expected=%s result=%s",
-                phone, code, fake_code, result,
+                phone, code, dev_code, result,
             )
             return result
 
         from alibabacloud_dypnsapi20170525 import models as dypnsapi_models
         from alibabacloud_tea_util import models as util_models
 
-        # ── 参数与 sms_verify_sample/sample.py 完全一致 ──
+        # 参数与官方示例完全一致
         request = dypnsapi_models.CheckSmsVerifyCodeRequest(
             scheme_name=settings.SMS_SCHEME_NAME,
-            country_code="86",
+            country_code=settings.SMS_COUNTRY_CODE,
             phone_number=phone,
             verify_code=code,
-            case_auth_policy=1,
+            case_auth_policy=settings.SMS_CASE_AUTH_POLICY,
         )
         runtime = util_models.RuntimeOptions()
         try:
-            resp = self._client.check_sms_verify_code_with_options(request, runtime)
+            resp = await self._client.check_sms_verify_code_with_options_async(request, runtime)
             body = resp.body
             if body.code == "OK" and body.model:
                 passed = body.model.verify_result == "PASS"
-                logger.info("验证码核验 phone=%s result=%s", phone, "PASS" if passed else "FAIL")
+                logger.info("验证码核验 phone=%s result=%s", phone, "PASS" if passed else "UNKNOWN")
                 return passed
-            logger.error("验证码核验异常 phone=%s code=%s", phone, body.code)
+            logger.error("验证码核验接口异常 phone=%s code=%s", phone, body.code)
             return False
         except Exception as error:
-            error_msg = error.message if hasattr(error, "message") else str(error)
+            error_msg = getattr(error, "message", None) or str(error)
             logger.error("验证码核验异常 phone=%s error=%s", phone, error_msg)
-            if hasattr(error, "data") and error.data:
-                logger.error("诊断地址: %s", error.data.get("Recommend"))
             return False
 
 
