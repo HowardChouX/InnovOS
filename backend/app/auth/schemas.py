@@ -6,7 +6,7 @@ from pydantic import Field
 class UserRead(schemas.BaseUser[int]):
     """用户读取 schema。"""
     username: str | None = None
-    phone: str  # 必填
+    phone: str | None = None  # 历史用户可能无手机号，读取时允许 None
     role: str = "user"
 
 
