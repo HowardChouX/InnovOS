@@ -6,7 +6,7 @@ from pydantic import Field
 class UserRead(schemas.BaseUser[int]):
     """用户读取 schema。"""
     username: str | None = None
-    phone: str | None = None  # 历史用户可能无手机号，读取时允许 None
+    phone: str
     role: str = "user"
 
 
@@ -20,5 +20,5 @@ class UserCreate(schemas.BaseUserCreate):
 class UserUpdate(schemas.BaseUserUpdate):
     """用户更新 schema。"""
     username: str | None = None
-    phone: str | None = None
+    phone: str | None = Field(min_length=11, max_length=11, pattern=r"^1\d{10}$")
     email: str | None = None
