@@ -43,6 +43,7 @@ class TestLogin:
         ph = PasswordHash.recommended()
         inactive = User(
             email="inactive@example.com",
+            phone="13800000003",
             hashed_password=ph.hash("test1234"),
             is_active=False,
             is_superuser=False,

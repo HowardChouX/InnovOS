@@ -21,6 +21,7 @@ class TestRegister:
         resp = auth_client.post("/api/auth/register", json={
             "email": "test@example.com",
             "password": "test1234",
+            "phone": "13800000005",
         })
         assert resp.status_code == 400
 
@@ -29,6 +30,7 @@ class TestRegister:
         resp = auth_client.post("/api/auth/register", json={
             "email": "short@example.com",
             "password": "123",
+            "phone": "13800000006",
         })
         assert resp.status_code == 400
         data = resp.json()
@@ -37,13 +39,18 @@ class TestRegister:
         if isinstance(detail, dict):
             assert "密码至少 8 位" in detail.get("reason", "")
 
-    def test_register_phone_optional(self, auth_client):
-        """phone 可选。"""
+    def test_register_phone_required(self, auth_client):
+        """phone 必填（主登录标识）：缺失返回 422。"""
         resp = auth_client.post("/api/auth/register", json={
             "email": "nophone@example.com",
             "password": "test1234",
         })
-        assert resp.status_code == 201, resp.text
+        assert resp.status_code == 422, resp.text
+        detail = resp.json().get("detail", [])
+        assert any(
+            isinstance(d, dict) and d.get("loc") == ["body", "phone"]
+            for d in detail
+        )
 
     def test_register_invalid_email(self, auth_client):
         """非法 email 返回 422。"""

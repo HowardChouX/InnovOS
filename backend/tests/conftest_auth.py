@@ -12,8 +12,13 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# 确保 settings 有值
-os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+# 确保 settings 有值。注意：app.database 的 _build_pg_dsn 拒绝 sqlite scheme，
+# 而本套 fixture 的 engine 是硬编码 SQLite 内存库（见 auth_engine），
+# DATABASE_URL 仅供 settings 通过 scheme 校验，不会被真实连接。
+os.environ.setdefault(
+    "DATABASE_URL",
+    "postgresql://innovos:@localhost:5432/innovos",
+)
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-auth-tests")
 
 from app.db.base import Base  # noqa: E402

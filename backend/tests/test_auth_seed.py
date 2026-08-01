@@ -70,6 +70,7 @@ class TestSeed:
         with Session() as s:
             existing = User(
                 email="seed-admin@example.com",
+                phone="13800000004",
                 hashed_password="$argon2id$dummy",
                 is_active=True,
                 is_superuser=False,
