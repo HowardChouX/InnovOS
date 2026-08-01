@@ -5,7 +5,7 @@
 import logging
 from typing import Any
 
-from app.algorithm.base import AIAnalyzer, AIBase
+from app.algorithm.base import AIAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ SUFIELD_SYSTEM_PROMPT = """你是一个TRIZ物质-场分析专家。从问题中
 class SuFieldAnalyzer(AIAnalyzer):
     """物-场分析器"""
 
-    def __init__(self, ai: AIBase):
+    def __init__(self, ai):
         super().__init__(ai)
 
     async def analyze(self, problem: str, s1: str = "", s2: str = "", **kwargs) -> dict[str, Any] | None:

@@ -51,24 +51,6 @@ DEFAULT_MAX_ATTEMPTS = 4
 DEFAULT_TIMEOUT_SECONDS = 30.0
 
 
-# ── Purpose → Capability mapping ──
-
-
-PURPOSE_TO_CAPABILITY: dict[str, str] = {
-    "chat": "chat",
-    "evaluation": "chat",
-    "conversion": "chat",
-    "extract": "chat",
-    "ocr": "chat",
-    "embedding": "embedding",
-    "rerank": "rerank",
-}
-
-
-def _purpose_to_capability(purpose: str) -> str:
-    return PURPOSE_TO_CAPABILITY.get(purpose, "chat")
-
-
 # ── Internal helpers ──
 
 
@@ -99,15 +81,14 @@ def _status_code_for(category: str) -> int:
     }.get(category, 500)
 
 
-def _load_queue(user_id: int, capability: str = "chat") -> list[dict[str, Any]]:
-    """Return the user's enabled queue for a given capability, joined with provider + key + health."""
+def _load_queue(user_id: int) -> list[dict[str, Any]]:
+    """Return the user's enabled queue, joined with provider + key + health."""
     db = get_db()
     try:
         rows = db.execute(
             """
             SELECT
                 ums.provider_id,
-                ums.capability,
                 mp.api_host,
                 mp.api_model,
                 ak.id              AS key_id,
@@ -123,13 +104,12 @@ def _load_queue(user_id: int, capability: str = "chat") -> list[dict[str, Any]]:
                 AND ak.is_active = TRUE
             LEFT JOIN provider_health ph ON ph.provider_id = ums.provider_id
             WHERE ums.user_id = %s
-              AND ums.capability = %s
               AND ums.is_enabled = TRUE
               AND mp.is_enabled = 1
               AND ak.priority = 0
             ORDER BY ums.failover_order ASC
             """,
-            (user_id, capability),
+            (user_id,),
         ).fetchall()
     finally:
         db.close()
@@ -212,8 +192,7 @@ class FailoverRouter:
         messages: list[dict],
         model_override: Optional[str] = None,
     ) -> dict[str, Any]:
-        capability = _purpose_to_capability(purpose)
-        queue = _load_queue(user_id, capability=capability)
+        queue = _load_queue(user_id)
         if not queue:
             raise NoProvidersConfiguredError(
                 f"user {user_id} has no enabled model services for purpose {purpose!r}"

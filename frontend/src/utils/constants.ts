@@ -26,6 +26,7 @@ export const NAV_ITEMS = [
   { label: '方案评估', path: ROUTES.EVALUATION },
   { label: '视频展示', path: ROUTES.VIDEO },
   { label: '项目管理', path: ROUTES.PROJECT },
+  { label: '知识库', path: ROUTES.KNOWLEDGE },
 ] as const;
 
 export const TASK_STATUS_MAP: Record<string, { label: string; color: string }> = {

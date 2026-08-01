@@ -6,7 +6,7 @@ IFR（理想最终解）生成器 — 从 RootSeek 迁移
 import logging
 from typing import Any
 
-from app.algorithm.base import AIAnalyzer, AIBase
+from app.algorithm.base import AIAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ IFR_SYSTEM_PROMPT = """你是一个TRIZ理想最终解（IFR）专家。IFR描�
 class IFRGenerator(AIAnalyzer):
     """最终理想解生成器"""
 
-    def __init__(self, ai: AIBase):
+    def __init__(self, ai):
         super().__init__(ai)
 
     async def analyze(self, problem: str, **kwargs) -> dict[str, Any] | None:

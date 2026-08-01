@@ -5,7 +5,7 @@
 import logging
 from typing import Any
 
-from app.algorithm.base import AIAnalyzer, AIBase
+from app.algorithm.base import AIAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ EVOLUTION_SYSTEM_PROMPT = """你是一个TRIZ技术进化趋势分析专家。�
 class EvolutionAnalyzer(AIAnalyzer):
     """进化趋势分析器"""
 
-    def __init__(self, ai: AIBase):
+    def __init__(self, ai):
         super().__init__(ai)
 
     async def analyze(self, problem: str, **kwargs) -> dict[str, Any] | None:

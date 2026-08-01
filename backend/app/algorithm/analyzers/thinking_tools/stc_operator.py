@@ -5,7 +5,7 @@ STC算子分析器 — 尺寸-时间-成本极限思维（从 RootSeek 迁移）
 import logging
 from typing import Any
 
-from app.algorithm.base import AIAnalyzer, AIBase
+from app.algorithm.base import AIAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ STC_SYSTEM_PROMPT = """你是一个TRIZ STC算子分析专家。通过尺寸(Siz
 class STCAnalyzer(AIAnalyzer):
     """STC算子分析器"""
 
-    def __init__(self, ai: AIBase):
+    def __init__(self, ai):
         super().__init__(ai)
 
     async def analyze(self, problem: str, **kwargs) -> dict[str, Any] | None:

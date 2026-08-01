@@ -5,7 +5,7 @@
 import logging
 from typing import Any
 
-from app.algorithm.base import AIAnalyzer, AIBase
+from app.algorithm.base import AIAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ GOLDFISH_SYSTEM_PROMPT = """你是一个TRIZ金鱼法分析专家。
 class GoldfishAnalyzer(AIAnalyzer):
     """金鱼法分析器"""
 
-    def __init__(self, ai: AIBase):
+    def __init__(self, ai):
         super().__init__(ai)
 
     async def analyze(self, problem: str, **kwargs) -> dict[str, Any] | None:

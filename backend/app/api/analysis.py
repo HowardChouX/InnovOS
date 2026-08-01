@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.algorithm.analyzers.demand_portrait import DemandPortraitAnalyzer
-from app.algorithm.base import AIBase
+from app.algorithm.base import parse_ai_json, strip_think_tags
 from app.algorithm.zr_ipm import ZRIPMEngine
 from app.auth import get_current_user
 from app.database import get_db
@@ -396,49 +396,95 @@ async def _search_knowledge_bases(user_id: int, base_ids: list[str], query: str,
     return "\n".join(lines)
 
 
-def _create_ai_base() -> AIBase | None:
-    """从全局设置创建 AIBase 实例给分析器用。
+def _create_ai_base(user_id: int):
+    """创建使用 FailoverRouter 的 AI 包装器（替代旧 AIBase + key_provider 路径）。
 
-    AIBase 通过 key_provider() callback 取 Key(Key 来自数据库加密存储)。
-    不再持有长期 api_key。
+    New (per-user) 路径:
+      每次调用通过 chat_completion_sync() → FailoverRouter → user_model_services 队列
+      → 逐个尝试供应商 → 失败自动降级 → 记录 model_call_log
+
+    不再读取 system_settings / model_resolver（旧路径，现已废弃）。
     """
-    try:
-        from app.algorithm.model_resolver import model_resolver
+    from app.algorithm.ai_client import chat_completion_sync
 
-        s = model_resolver.get_assigned_settings()
-        chat_model = s.get("chat_model") or ""
-        if not chat_model or ":" not in chat_model:
-            return None
-        provider_id, model_id = model_resolver.parse_composite_id(chat_model)
-        if not provider_id or not model_id:
-            return None
+    class FailoverAIWrapper:
+        """与 AIBase 接口兼容的包装器，内部使用 FailoverRouter。"""
 
-        # 构造 key_provider:每次从 ApiKeyService 借一把 Key
-        from app.core.key_crypto import load_api_key_cipher
-        from app.database import get_db
-        from app.services.api_key_service import ApiKeyService
+        def __init__(self, uid: int, purpose: str = "chat"):
+            self.user_id = uid
+            self.purpose = purpose
+            self.enabled = True
 
-        db = get_db()
-        cipher = load_api_key_cipher()
-        svc = ApiKeyService(db=db, cipher=cipher)
-        exclude_ids: set[int] = set()
+        def call_ai(
+            self,
+            system_prompt: str,
+            user_prompt: str,
+            temperature: float = 0.3,
+            max_tokens: int | None = None,
+            logger_prefix: str = "",
+            raw: bool = False,
+            json_mode: bool = False,
+        ) -> str | dict | None:
+            messages: list[dict[str, str]] = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": user_prompt})
 
-        def key_provider() -> str | None:
-            nonlocal exclude_ids
-            lease = svc.lease_key(provider_id=provider_id, exclude_key_ids=exclude_ids)
-            if lease:
-                exclude_ids.add(lease.key_id)
-                return lease.plaintext
-            return None
+            try:
+                result = chat_completion_sync(
+                    user_id=self.user_id,
+                    purpose=self.purpose,
+                    messages=messages,
+                )
+            except Exception as e:
+                logger.error("[%s] FailoverRouter 调用失败: %s", logger_prefix or "AI", e)
+                return None
 
-        return AIBase(
-            model_id=model_id,
-            api_host=None,  # 由 model_runtime 解析
-            key_provider=key_provider,
-        )
-    except Exception as e:
-        logger.warning(f"Failed to create AIBase: {e}")
-        return None
+            content = (result.get("content") or "").strip()
+            content = strip_think_tags(content)
+
+            if not content:
+                logger.warning("[%s] 空响应", logger_prefix or "AI")
+                return None
+
+            if raw:
+                return content
+
+            parsed = parse_ai_json(content)
+            if json_mode and not isinstance(parsed, dict):
+                logger.warning(
+                    "[%s] 返回非 JSON 格式（%s）",
+                    logger_prefix or "AI",
+                    type(parsed).__name__,
+                )
+                return None
+
+            return parsed
+
+        async def call_ai_async(
+            self,
+            system_prompt: str,
+            user_prompt: str,
+            temperature: float = 0.3,
+            max_tokens: int | None = None,
+            logger_prefix: str = "",
+            raw: bool = False,
+            json_mode: bool = False,
+        ) -> str | dict | None:
+            import asyncio
+
+            return await asyncio.to_thread(
+                self.call_ai,
+                system_prompt,
+                user_prompt,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                logger_prefix=logger_prefix,
+                raw=raw,
+                json_mode=json_mode,
+            )
+
+    return FailoverAIWrapper(uid=user_id)
 
 
 async def run_demand_portrait(
@@ -462,9 +508,9 @@ async def run_demand_portrait(
     try:
         update_workflow_step(db, task_id, "agent1", "running", description="正在进行需求分析...")
 
-        ai_base = _create_ai_base()
+        ai_base = _create_ai_base(user_id)
         if not ai_base:
-            raise RuntimeError("AI 模型未配置，请在模型服务中配置 API Key")
+            raise RuntimeError("AI 模型未配置，请联系管理员开通 AI 功能")
 
         analyzer = DemandPortraitAnalyzer(ai_base)
         result = await analyzer.analyze(enriched)
@@ -603,7 +649,7 @@ async def run_analysis_background(
             try:
                 from app.algorithm.analyzers.problem_modeling import ProblemModelingAnalyzer
 
-                ai_base = _create_ai_base()
+                ai_base = _create_ai_base(user_id)
                 if ai_base:
                     pm_analyzer = ProblemModelingAnalyzer(ai_base)
                     # 读取 Step 1 的用户评分，传入作为分析参考
@@ -633,7 +679,7 @@ async def run_analysis_background(
                         output=json.dumps(pm_result, ensure_ascii=False),
                     )
                 else:
-                    raise RuntimeError("AI 模型未配置")
+                    raise RuntimeError("AI 模型未配置，请联系管理员开通 AI 功能")
             except Exception as e:
                 logger.error(f"问题建模分析失败: {e}")
                 update_workflow_step(db, task_id, "agent2", "failed", description=f"执行失败: {str(e)}")

@@ -12,7 +12,7 @@ from app.algorithm.analyzers.resource_analyzer import ResourceAnalyzer
 from app.algorithm.analyzers.thinking_tools.goldfish_analyzer import GoldfishAnalyzer
 from app.algorithm.analyzers.thinking_tools.nine_screens import NineScreensAnalyzer
 from app.algorithm.analyzers.thinking_tools.stc_operator import STCAnalyzer
-from app.algorithm.base import AIBase
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ DEMAND_SYSTEM_PROMPT = """你是一个TRIZ需求分析专家。你的任务是�
 class DemandPortraitAnalyzer:
     """需求画像编排器 — 并行运行所有分析工具，汇总需求列表"""
 
-    def __init__(self, ai: AIBase):
+    def __init__(self, ai: Any):
         self.ai = ai
         self.resource_analyzer = ResourceAnalyzer(ai)
         self.ifr_generator = IFRGenerator(ai)

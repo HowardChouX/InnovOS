@@ -4,7 +4,7 @@
 
 from typing import Any
 
-from app.algorithm.base import AIAnalyzer, AIBase
+from app.algorithm.base import AIAnalyzer
 
 NINE_SCREENS_SYSTEM_PROMPT = """你是一个TRIZ九屏幕法分析专家。
 
@@ -22,7 +22,7 @@ NINE_SCREENS_SYSTEM_PROMPT = """你是一个TRIZ九屏幕法分析专家。
 class NineScreensAnalyzer(AIAnalyzer):
     """九屏幕法分析器"""
 
-    def __init__(self, ai: AIBase):
+    def __init__(self, ai):
         super().__init__(ai)
 
     async def analyze(self, problem: str, **kwargs) -> dict[str, Any] | None:

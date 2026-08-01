@@ -10,7 +10,7 @@ from typing import Any
 from app.algorithm.analyzers.evolution_analyzer import EvolutionAnalyzer
 from app.algorithm.analyzers.resource_analyzer import ResourceAnalyzer
 from app.algorithm.analyzers.sufield_analyzer import SuFieldAnalyzer
-from app.algorithm.base import AIBase
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ INNOVATION_SYSTEM_PROMPT = """你是一个TRIZ创新方向生成专家。基于�
 class ProblemModelingAnalyzer:
     """问题建模编排器 — 6 路并行分析，生成创新方向"""
 
-    def __init__(self, ai: AIBase):
+    def __init__(self, ai: Any):
         self.ai = ai
         self.resource_analyzer = ResourceAnalyzer(ai)
         self.evolution_analyzer = EvolutionAnalyzer(ai)

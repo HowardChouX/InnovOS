@@ -5,7 +5,7 @@
 import logging
 from typing import Any
 
-from app.algorithm.base import AIAnalyzer, AIBase
+from app.algorithm.base import AIAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ RESOURCE_SYSTEM_PROMPT = """你是一个TRIZ资源分析专家。你的任务是
 class ResourceAnalyzer(AIAnalyzer):
     """资源分析器 — 七类资源系统化扫描"""
 
-    def __init__(self, ai: AIBase):
+    def __init__(self, ai):
         super().__init__(ai)
 
     async def analyze(self, problem: str, **kwargs) -> dict[str, Any] | None:

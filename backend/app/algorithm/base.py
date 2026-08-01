@@ -1,10 +1,8 @@
 """
-AI 分析器基类 — 从 RootSeek 移植，适配 InnovOS 的 key_manager。
+AI 分析器基类 — 提供 JSON 解析工具 + AIAnalyzer 基类。
 
-提供：
-- AIBase: AI 通信基类，封装 API 调用管道
-- AIAnalyzer: 分析器基类，所有领域分析器的父类
-- JSON 解析工具函数
+AIBase 已移除（2026-08-01），所有 AI 调用走 FailoverRouter 路径。
+分析器现在接收任意实现了 call_ai() / call_ai_async() 接口的对象（duck typing）。
 """
 
 from __future__ import annotations
@@ -14,13 +12,11 @@ import logging
 import re
 from typing import Any
 
-from openai import APIConnectionError, APIError, APITimeoutError, OpenAI
-
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# JSON 解析工具函数（从 RootSeek 移植）
+# JSON 解析工具函数
 # ---------------------------------------------------------------------------
 
 _THINK_TAG_RE = re.compile(r"<(think|thinking)>.*?</\1>", re.IGNORECASE | re.DOTALL)
@@ -207,341 +203,19 @@ def parse_ai_json(content: str) -> dict | str | None:
 
 
 # ---------------------------------------------------------------------------
-# AIBase — AI 通信基类
-# ---------------------------------------------------------------------------
-
-
-class AIBase:
-    """AI 通信基类 — 适配 InnovOS ProviderKeyPool + Runtime。
-
-    两种构造方式:
-    1. 新(推荐):AIBase(runtime=..., model_id=...) — 不持有 api_key,
-       每次调用通过 key_provider callback 取 Key
-    2. 旧(legacy / 测试):AIBase(api_key=..., base_url=..., model=...) — 标 deprecated
-    """
-
-    def __init__(
-        self,
-        api_key: str | None = None,
-        base_url: str | None = None,
-        model: str = "deepseek-chat",
-        model_id: str | None = None,
-        api_host: str | None = None,
-        key_provider: Any | None = None,
-    ):
-        # 两种构造形式:
-        # 1. 新形式(推荐):key_provider + api_host + model_id
-        # 2. 旧形式(标 deprecated):api_key + base_url + model
-        if key_provider is not None:
-            self.key_provider = key_provider
-            self.model = model_id or model
-            self.base_url = api_host or base_url
-            self.api_key = None
-            self.enabled = True
-            self.client = None
-        else:
-            import warnings
-
-            warnings.warn(
-                "AIBase(api_key=..., base_url=..., model=...) is deprecated; "
-                "use AIBase(key_provider=..., api_host=..., model_id=...) instead",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            self.key_provider = None
-            self.api_key = api_key
-            self.model = model
-            self.base_url = base_url or "https://api.deepseek.com"
-            self.enabled = bool(api_key)
-            self.client: OpenAI | None = None
-            if self.enabled:
-                self._init_client()
-
-    def _init_client(self) -> None:
-        try:
-            from app.algorithm.model_runtime import ModelRuntime
-
-            self.client = OpenAI(
-                api_key=self.api_key,
-                base_url=ModelRuntime.ensure_v1_url(self.base_url),
-                timeout=600.0,
-            )
-            logger.info(f"AI客户端初始化成功: base_url={self.base_url}, model={self.model}")
-        except Exception as e:
-            logger.error(f"AI客户端初始化失败: {e}")
-            self.enabled = False
-
-    def is_available(self) -> bool:
-        if self.key_provider is not None:
-            return True
-        return self.enabled and self.client is not None
-
-    def _legacy_call(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        temperature: float,
-        max_tokens: int | None,
-        logger_prefix: str,
-        raw: bool,
-        json_mode: bool,
-    ):
-        """旧同步调用路径 — 仅供旧构造形式使用。"""
-        if not self.is_available() or self.client is None:
-            return None
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
-        kwargs: dict[str, Any] = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": temperature,
-        }
-        if max_tokens is not None:
-            kwargs["max_tokens"] = max_tokens
-        if json_mode:
-            kwargs["response_format"] = {"type": "json_object"}
-
-        max_attempts = 3
-        for attempt in range(max_attempts):
-            try:
-                resp = self.client.chat.completions.create(**kwargs)
-                content = (resp.choices[0].message.content or "").strip()
-                content = strip_think_tags(content)
-
-                if not content:
-                    logger.warning(f"[{logger_prefix}] 空响应，重试 {attempt + 1}/{max_attempts}")
-                    if json_mode:
-                        kwargs.pop("response_format", None)
-                        json_mode = False
-                    continue
-
-                if raw:
-                    return content
-
-                parsed = parse_ai_json(content)
-                if json_mode and not isinstance(parsed, dict):
-                    logger.warning(
-                        f"[{logger_prefix}] 返回非 JSON 格式（{type(parsed).__name__}），重试 {attempt + 1}/{max_attempts}"
-                    )
-                    kwargs.pop("response_format", None)
-                    json_mode = False
-                    for i, msg in enumerate(kwargs.get("messages", [])):
-                        if msg["role"] == "user":
-                            kwargs["messages"][i]["content"] = (
-                                str(msg["content"]) + "\n\n【重要】请只输出合法的JSON对象，不要包含其他文字。"
-                            )
-                    continue
-
-                return parsed
-
-            except APIError as e:
-                if getattr(e, "status_code", None) == 429:
-                    if attempt < max_attempts - 1:
-                        import time
-
-                        wait = (attempt + 1) * 2.0
-                        logger.warning(f"[{logger_prefix}] 429 限流，{wait}s 后重试")
-                        time.sleep(wait)
-                        continue
-                    logger.error(f"[{logger_prefix}] 429 限流，已达最大重试")
-                    return None
-                logger.error(f"[{logger_prefix}] API 错误: {e}")
-                return None
-            except (APITimeoutError, APIConnectionError):
-                if attempt < max_attempts - 1:
-                    import time
-
-                    time.sleep((attempt + 1) * 1.5)
-                    continue
-                logger.error(f"[{logger_prefix}] 超时/连接失败")
-                return None
-            except Exception as e:
-                logger.error(f"[{logger_prefix}] 未知错误: {e}")
-                return None
-
-        return None
-
-    def call_ai_with_key_provider(
-        self,
-        *,
-        key_provider,
-        api_host: str,
-        system_prompt: str,
-        user_prompt: str,
-        temperature: float = 0.3,
-        max_tokens: int | None = None,
-        logger_prefix: str = "",
-        raw: bool = False,
-        json_mode: bool = False,
-    ) -> str | dict | None:
-        """新调用形式:每次通过 key_provider 临时取 Key,失败可换 Key 重试。
-
-        key_provider: () -> str | None  (无参数 callable,返明文 api_key)
-        api_host: 该 model 解析出的 host
-        """
-        from app.algorithm.clients.openai_compatible import OpenAICompatibleAdapter
-        from app.algorithm.client_registry import AIClientRegistry
-
-        api_key = key_provider()
-        if not api_key:
-            logger.warning(f"[{logger_prefix}] key_provider returned None; cannot call AI")
-            return None
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
-        kwargs: dict[str, Any] = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": temperature,
-        }
-        if max_tokens is not None:
-            kwargs["max_tokens"] = max_tokens
-        response_format: dict | None = None
-        if json_mode:
-            response_format = {"type": "json_object"}
-
-        adapter = AIClientRegistry.get("openai")
-        max_attempts = 3
-        for attempt in range(max_attempts):
-            try:
-                content = adapter.chat(
-                    api_key=api_key,
-                    api_host=api_host,
-                    model_id=self.model,
-                    messages=messages,
-                    temperature=temperature,
-                    response_format=response_format,
-                    timeout=30.0,
-                )
-                content = (content or "").strip()
-                content = strip_think_tags(content)
-
-                if not content:
-                    logger.warning(f"[{logger_prefix}] 空响应，重试 {attempt + 1}/{max_attempts}")
-                    if json_mode:
-                        response_format = None
-                        json_mode = False
-                    continue
-
-                if raw:
-                    return content
-
-                parsed = parse_ai_json(content)
-                if json_mode and not isinstance(parsed, dict):
-                    logger.warning(
-                        f"[{logger_prefix}] 返回非 JSON 格式（{type(parsed).__name__}），重试 {attempt + 1}/{max_attempts}"
-                    )
-                    response_format = None
-                    json_mode = False
-                    for i, msg in enumerate(kwargs.get("messages", [])):
-                        if msg["role"] == "user":
-                            kwargs["messages"][i]["content"] = (
-                                str(msg["content"]) + "\n\n【重要】请只输出合法的JSON对象，不要包含其他文字。"
-                            )
-                    continue
-
-                return parsed
-
-            except Exception as e:
-                from app.algorithm.ai_client import classify_error
-                from datetime import datetime, timedelta, timezone
-
-                outcome = classify_error(e)
-                if outcome.should_failover:
-                    logger.warning(
-                        f"[{logger_prefix}] {outcome.category} error, "
-                        f"cooldown={outcome.cooldown_seconds}s; retry with new key: {e}"
-                    )
-                    api_key = key_provider()
-                    if not api_key:
-                        logger.warning(f"[{logger_prefix}] key_provider exhausted")
-                        return None
-                    if outcome.cooldown_seconds > 0:
-                        # 静默 cooldown_until 已在 ApiKeyService.mark_failure 内部处理
-                        # 这里只留日志;实际 cooldown 由 service 写入 DB
-                        pass
-                    continue
-                logger.error(f"[{logger_prefix}] 未知错误: {e}")
-                return None
-
-        return None
-
-    def call_ai(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        temperature: float = 0.3,
-        max_tokens: int | None = None,
-        logger_prefix: str = "",
-        raw: bool = False,
-        json_mode: bool = False,
-    ) -> str | dict | None:
-        """同步调用 AI。
-
-        - 若 AIBase 用新形式构造(有 key_provider),走 call_ai_with_key_provider
-        - 若用旧形式(api_key + base_url),走 _legacy_call(标 deprecated)
-        """
-        if self.key_provider is not None:
-            return self.call_ai_with_key_provider(
-                key_provider=self.key_provider,
-                api_host=self.base_url or "https://api.deepseek.com",
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                logger_prefix=logger_prefix,
-                raw=raw,
-                json_mode=json_mode,
-            )
-        return self._legacy_call(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            logger_prefix=logger_prefix,
-            raw=raw,
-            json_mode=json_mode,
-        )
-
-    async def call_ai_async(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        temperature: float = 0.3,
-        max_tokens: int | None = None,
-        logger_prefix: str = "",
-        raw: bool = False,
-        json_mode: bool = False,
-    ) -> str | dict | None:
-        """异步调用 AI(通过 asyncio.to_thread 包装同步调用)。"""
-        import asyncio
-
-        return await asyncio.to_thread(
-            self.call_ai,
-            system_prompt,
-            user_prompt,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            logger_prefix=logger_prefix,
-            raw=raw,
-            json_mode=json_mode,
-        )
-
-
-# ---------------------------------------------------------------------------
 # AIAnalyzer — 分析器基类
 # ---------------------------------------------------------------------------
 
 
 class AIAnalyzer:
-    """AI 分析器基类 — 所有领域分析器的父类。"""
+    """AI 分析器基类 — 所有领域分析器的父类。
 
-    def __init__(self, ai: AIBase):
+    接收任意实现了以下接口的对象（duck typing）：
+        call_ai(system_prompt, user_prompt, ...) -> str | dict | None
+        call_ai_async(system_prompt, user_prompt, ...) -> str | dict | None
+    """
+
+    def __init__(self, ai):
         self.ai = ai
 
     def call_ai(
