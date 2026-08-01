@@ -100,6 +100,15 @@ class Settings(BaseSettings):
     OTP_PEPPER: str = Field(default="", validation_alias=AliasChoices("INNOVOS_OTP_PEPPER", "OTP_PEPPER"))
     EMAIL_OTP_SOFT_FAIL: bool = False
 
+    # ── 阿里云号码认证服务 ──
+    SMS_SCHEME_NAME: str = "一竖光年"
+    SMS_SIGN_NAME: str = "速通互联验证码"
+    SMS_REGISTER_TEMPLATE_CODE: str = "100001"
+    SMS_RESET_PASSWORD_TEMPLATE_CODE: str = "100003"
+    SMS_CODE_LENGTH: int = 6
+    SMS_CODE_VALID_TIME: int = 300
+    SMS_RESEND_INTERVAL: int = 60
+
     # ── Password reset session token ──
     # 独立 secret,避免和业务 JWT 共用导致 reset_token 泄露时影响会话安全。
     # 不配则回退到 SECRET_KEY。

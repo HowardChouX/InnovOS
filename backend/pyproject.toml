@@ -30,6 +30,8 @@ dependencies = [
     "alembic>=1.13",
     "pwdlib[argon2,bcrypt]>=0.3",
     "pyjwt[crypto]>=2.12.0",
+    "alibabacloud_dypnsapi20170525>=2.0.0,<3.0.0",
+    "alibabacloud_credentials>=1.0.0",
 ]
 
 [project.optional-dependencies]
