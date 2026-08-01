@@ -2,6 +2,7 @@ import { apiRequest } from '../client';
 
 export interface UserModelService {
   provider_id: string;
+  capability: string;
   name: string;
   api_host: string;
   api_model: string;
@@ -22,23 +23,25 @@ export interface AvailableModelService {
 }
 
 export const userModelServicesApi = {
-  list: (userId: number): Promise<{ data: UserModelService[] }> =>
-    apiRequest<{ data: UserModelService[] }>(`/api/admin/users/${userId}/model-services`),
-
-  listAvailable: (userId: number): Promise<{ data: AvailableModelService[] }> =>
-    apiRequest<{ data: AvailableModelService[] }>(
-      `/api/admin/users/${userId}/model-services/available`,
+  list: (userId: number, capability: string = 'chat'): Promise<{ data: UserModelService[] }> =>
+    apiRequest<{ data: UserModelService[] }>(
+      `/api/admin/users/${userId}/model-services?capability=${encodeURIComponent(capability)}`,
     ),
 
-  add: (userId: number, providerId: string): Promise<{ data: UserModelService[] }> =>
+  listAvailable: (userId: number, capability: string = 'chat'): Promise<{ data: AvailableModelService[] }> =>
+    apiRequest<{ data: AvailableModelService[] }>(
+      `/api/admin/users/${userId}/model-services/available?capability=${encodeURIComponent(capability)}`,
+    ),
+
+  add: (userId: number, providerId: string, capability: string = 'chat'): Promise<{ data: UserModelService[] }> =>
     apiRequest(`/api/admin/users/${userId}/model-services`, {
       method: 'POST',
-      body: JSON.stringify({ provider_id: providerId }),
+      body: JSON.stringify({ provider_id: providerId, capability }),
     }),
 
-  remove: (userId: number, providerId: string): Promise<void> =>
+  remove: (userId: number, providerId: string, capability: string = 'chat'): Promise<void> =>
     apiRequest<void>(
-      `/api/admin/users/${userId}/model-services/${encodeURIComponent(providerId)}`,
+      `/api/admin/users/${userId}/model-services/${encodeURIComponent(providerId)}?capability=${encodeURIComponent(capability)}`,
       { method: 'DELETE' },
     ),
 
@@ -46,18 +49,19 @@ export const userModelServicesApi = {
     userId: number,
     providerId: string,
     isEnabled: boolean,
+    capability: string = 'chat',
   ): Promise<{ data: { is_enabled: boolean } }> =>
     apiRequest(
       `/api/admin/users/${userId}/model-services/${encodeURIComponent(providerId)}/toggle`,
       {
         method: 'POST',
-        body: JSON.stringify({ is_enabled: isEnabled }),
+        body: JSON.stringify({ is_enabled: isEnabled, capability }),
       },
     ),
 
-  reorder: (userId: number, providerIds: string[]): Promise<{ data: UserModelService[] }> =>
+  reorder: (userId: number, providerIds: string[], capability: string = 'chat'): Promise<{ data: UserModelService[] }> =>
     apiRequest(`/api/admin/users/${userId}/model-services/order`, {
       method: 'PUT',
-      body: JSON.stringify({ provider_ids: providerIds }),
+      body: JSON.stringify({ provider_ids: providerIds, capability }),
     }),
 };
