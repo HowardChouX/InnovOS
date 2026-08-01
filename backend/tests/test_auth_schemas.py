@@ -43,6 +43,14 @@ def test_user_read_phone_required():
         )
 
 
+def test_user_update_all_fields_optional():
+    """UserUpdate 无参调用必须成功（username/phone/email 均可选）。"""
+    u = UserUpdate()
+    assert u.username is None
+    assert u.phone is None
+    assert u.email is None
+
+
 def test_user_update_phone_validation():
     """UserUpdate.phone 有格式校验，且允许 None。"""
     u = UserUpdate(phone="13800000000")

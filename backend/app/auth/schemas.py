@@ -20,5 +20,5 @@ class UserCreate(schemas.BaseUserCreate):
 class UserUpdate(schemas.BaseUserUpdate):
     """用户更新 schema。"""
     username: str | None = None
-    phone: str | None = Field(min_length=11, max_length=11, pattern=r"^1\d{10}$")
+    phone: str | None = Field(default=None, min_length=11, max_length=11, pattern=r"^1\d{10}$")
     email: str | None = None
