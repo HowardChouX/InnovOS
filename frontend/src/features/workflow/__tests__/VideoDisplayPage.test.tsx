@@ -71,4 +71,37 @@ describe('VideoDisplayPage', () => {
     render(<VideoDisplayPage />);
     await waitFor(() => expect(mockListTasks).toHaveBeenCalled());
   });
+
+  it('shows fallback message when succeeded but videoUrl missing', async () => {
+    mockListTasks.mockResolvedValue({
+      data: [
+        {
+          id: 't1',
+          userId: 1,
+          providerId: 'minimax',
+          model: 'MiniMax-H3',
+          prompt: '缺地址的视频',
+          resolution: '768P',
+          duration: 5,
+          ratio: '16:9',
+          remoteTaskId: 'r1',
+          status: 'succeeded',
+          videoUrl: null,
+          error: null,
+          createdAt: '2026-08-02T10:00:00Z',
+          updatedAt: '2026-08-02T10:00:00Z',
+        },
+      ],
+      code: 200,
+    });
+
+    render(<VideoDisplayPage />);
+
+    // 选中该任务
+    await waitFor(() => expect(screen.getByText('缺地址的视频')).toBeTruthy());
+    fireEvent.click(screen.getByText('缺地址的视频'));
+
+    // 主播放区不应空白，显示缺失提示
+    await waitFor(() => expect(screen.getByText('视频地址缺失')).toBeTruthy());
+  });
 });

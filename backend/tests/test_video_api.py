@@ -76,6 +76,34 @@ def test_generate_no_key_returns_error(client):
     assert "MiniMax" in resp.json()["detail"]
 
 
+def test_generate_unexpected_error_marks_failed(client):
+    """远端创建后发生非 MinimaxVideoError 异常 → 标记 failed 并返回 500，不留孤儿。"""
+    created = {"id": "task-1", "status": "pending"}
+    with patch.object(
+        video_api.video_task_service, "create", return_value=created
+    ), patch.object(
+        video_api, "_lease_minimax_key", return_value=("sk-test", "https://api.minimaxi.com")
+    ), patch.object(
+        video_api.minimax_video_adapter,
+        "create_task",
+        new=AsyncMock(return_value="remote-123"),
+    ), patch.object(
+        video_api.video_task_service,
+        "set_remote_task",
+        side_effect=RuntimeError("db down"),
+    ), patch.object(
+        video_api.video_task_service, "mark_failed"
+    ) as mock_fail:
+        resp = client.post(
+            "/api/video/generate",
+            json={"prompt": "一只猫", "resolution": "768P", "duration": 5, "ratio": "16:9"},
+        )
+
+    assert resp.status_code == 500
+    mock_fail.assert_called_once()
+    assert mock_fail.call_args.args[0] == "task-1"
+
+
 def test_list_tasks_returns_user_tasks(client):
     with patch.object(
         video_api.video_task_service,

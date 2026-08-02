@@ -1,4 +1,5 @@
 """后台视频轮询器测试 — mock 服务 + 适配器，验证单轮状态推进。"""
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 from app.services import video_poller as vp_mod
@@ -66,7 +67,49 @@ def test_poll_once_query_error_does_not_crash():
     mock_apply.assert_not_called()
 
 
+def test_poll_once_marks_stale_pending_failed():
+    """无 remoteTaskId 且 createdAt 过旧的 pending 任务 → 标记 failed（孤儿回收）。"""
+    poller = VideoPoller(interval_seconds=5)
+    old = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+    active = [{"id": "orphan", "remoteTaskId": None, "createdAt": old}]
+
+    with patch.object(
+        vp_mod.video_task_service, "list_active", return_value=active
+    ), patch.object(
+        vp_mod.video_task_service, "mark_failed"
+    ) as mock_fail, patch.object(
+        vp_mod, "_lease_minimax_key", return_value=("sk", "https://api.minimaxi.com")
+    ), patch.object(
+        vp_mod.minimax_video_adapter, "query_task", new=AsyncMock()
+    ) as mock_query:
+        count = _run(poller.poll_once())
+
+    mock_fail.assert_called_once()
+    assert mock_fail.call_args.args[0] == "orphan"
+    mock_query.assert_not_called()  # 无 remote id，不查询远端
+    assert count == 1
+
+
+def test_poll_once_keeps_fresh_pending():
+    """无 remoteTaskId 但 createdAt 很新的 pending 任务 → 保留，不标记失败。"""
+    poller = VideoPoller(interval_seconds=5)
+    fresh = datetime.now(timezone.utc).isoformat()
+    active = [{"id": "fresh", "remoteTaskId": None, "createdAt": fresh}]
+
+    with patch.object(
+        vp_mod.video_task_service, "list_active", return_value=active
+    ), patch.object(
+        vp_mod.video_task_service, "mark_failed"
+    ) as mock_fail, patch.object(
+        vp_mod, "_lease_minimax_key", return_value=("sk", "https://api.minimaxi.com")
+    ):
+        count = _run(poller.poll_once())
+
+    mock_fail.assert_not_called()
+    assert count == 0
+
+
 def _run(coro):
     import asyncio
 
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)

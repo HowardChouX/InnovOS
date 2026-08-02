@@ -10,6 +10,7 @@ MiniMax 非 OpenAI 兼容协议，用 httpx 直打 REST。异步任务模型：
 """
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -39,6 +40,15 @@ class MinimaxVideoAdapter:
                 return str(err["message"])
         return f"MiniMax API error (HTTP {status_code})"
 
+    @staticmethod
+    def _safe_json(resp: httpx.Response) -> Any:
+        """防御性解析响应体：网关 HTML 错误页（502/504）使 resp.json()
+        抛 JSONDecodeError，此处吞掉并返回 None，交由调用方兜底。"""
+        try:
+            return resp.json()
+        except Exception:  # noqa: BLE001
+            return None
+
     async def create_task(
         self,
         *,
@@ -61,11 +71,12 @@ class MinimaxVideoAdapter:
         headers = {"Authorization": f"Bearer {api_key}"}
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.post(url, json=body, headers=headers)
+        data = self._safe_json(resp)
         if resp.status_code >= 400:
             raise MinimaxVideoError(
-                self._extract_error_message(resp.json(), resp.status_code)
+                self._extract_error_message(data, resp.status_code)
             )
-        task_id = resp.json().get("task_id")
+        task_id = (data or {}).get("task_id") if isinstance(data, dict) else None
         if not task_id:
             raise MinimaxVideoError("MiniMax 未返回 task_id")
         return str(task_id)
@@ -82,16 +93,24 @@ class MinimaxVideoAdapter:
         headers = {"Authorization": f"Bearer {api_key}"}
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.get(url, headers=headers)
+        data = self._safe_json(resp)
         if resp.status_code >= 400:
             raise MinimaxVideoError(
-                self._extract_error_message(resp.json(), resp.status_code)
+                self._extract_error_message(data, resp.status_code)
             )
-        task = resp.json().get("task", {})
+        task = (data or {}).get("task", {}) if isinstance(data, dict) else {}
         status = task.get("status", "")
         video_url = None
         if status == "succeeded":
             video_url = (task.get("content") or {}).get("url")
         error = task.get("error") if status in ("failed", "expired") else None
+        # error 可能是 dict/其他类型，而 video_tasks.error 为 TEXT 列：
+        # 统一转为字符串，避免 psycopg2 AdaptationError
+        if error is not None and not isinstance(error, str):
+            try:
+                error = json.dumps(error, ensure_ascii=False)
+            except (TypeError, ValueError):
+                error = str(error)
         return {"status": status, "video_url": video_url, "error": error}
 
 

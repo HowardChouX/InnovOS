@@ -215,6 +215,28 @@ export default function VideoDisplayPage() {
             style={{ width: '100%', display: 'block', maxHeight: 420, background: '#000' }}
           />
         )}
+        {selected && selected.status === 'succeeded' && !selected.videoUrl && (
+          <div
+            style={{
+              height: 280,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              color: 'var(--text-secondary)',
+            }}
+          >
+            <i
+              className="fa-solid fa-circle-exclamation"
+              style={{ fontSize: 32, color: '#f97316' }}
+            />
+            <div style={{ fontSize: 13 }}>视频地址缺失</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+              任务已成功但未返回视频地址，请重试或联系管理员
+            </div>
+          </div>
+        )}
         {selected && NON_TERMINAL.has(selected.status) && (
           <div
             style={{

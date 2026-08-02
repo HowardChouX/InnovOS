@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, timedelta, timezone
 
 from app.algorithm.clients.minimax_video import (
     MinimaxVideoError,
@@ -18,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 MINIMAX_PROVIDER_ID = "minimax"
 TERMINAL_STATUSES = {"succeeded", "failed", "expired"}
+# 无 remote_task_id 的 pending 任务超过该时长视为孤儿，标记 failed 避免永久滞留
+STALE_PENDING_THRESHOLD = timedelta(minutes=10)
 
 
 def _lease_minimax_key() -> tuple[str | None, str | None]:
@@ -35,6 +38,20 @@ def _lease_minimax_key() -> tuple[str | None, str | None]:
         ).fetchone()
     api_host = row["api_host"] if row else "https://api.minimaxi.com"
     return lease.plaintext, api_host
+
+
+def _is_stale_pending(task: dict) -> bool:
+    """无 remote_task_id 的 pending 任务且创建时间超过阈值 → 孤儿任务。"""
+    created_at = task.get("createdAt")
+    if not created_at:
+        return True
+    try:
+        created = datetime.fromisoformat(created_at)
+    except (TypeError, ValueError):
+        return True
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - created > STALE_PENDING_THRESHOLD
 
 
 class VideoPoller:
@@ -78,16 +95,31 @@ class VideoPoller:
         if not active:
             return 0
 
+        # 孤儿回收：无 remote_task_id 且滞留过久的 pending 任务标记 failed，
+        # 无需密钥即可执行
+        to_query = []
+        count = 0
+        for task in active:
+            if not task.get("remoteTaskId"):
+                if _is_stale_pending(task):
+                    video_task_service.mark_failed(
+                        task["id"],
+                        "任务创建超时：未关联远端任务，已自动标记失败",
+                    )
+                    count += 1
+                continue
+            to_query.append(task)
+
+        if not to_query:
+            return count
+
         api_key, api_host = _lease_minimax_key()
         if not api_key:
             logger.debug("无 MiniMax 密钥，跳过本轮轮询")
-            return 0
+            return count
 
-        count = 0
-        for task in active:
-            remote_id = task.get("remoteTaskId")
-            if not remote_id:
-                continue
+        for task in to_query:
+            remote_id = task["remoteTaskId"]
             try:
                 result = await minimax_video_adapter.query_task(
                     api_key=api_key, api_host=api_host, remote_task_id=remote_id

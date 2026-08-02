@@ -81,11 +81,15 @@ async def generate(body: GenerateInput, user: dict = Depends(get_current_user)):
             duration=body.duration,
             ratio=body.ratio,
         )
+        video_task_service.set_remote_task(task["id"], remote_task_id)
     except MinimaxVideoError as exc:
         video_task_service.mark_failed(task["id"], str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:  # noqa: BLE001
+        # 远端任务已创建但本地回写失败等意外：标记失败，避免遗留 pending 孤儿任务
+        video_task_service.mark_failed(task["id"], f"创建视频任务失败: {exc}")
+        raise HTTPException(status_code=500, detail="创建视频任务失败")
 
-    video_task_service.set_remote_task(task["id"], remote_task_id)
     return {"data": {"taskId": task["id"]}, "message": "success", "code": 200}
 
 

@@ -146,3 +146,88 @@ async def test_query_task_running_has_no_url(adapter):
 
     assert result["status"] == "running"
     assert result["video_url"] is None
+
+
+def _mock_bad_json_response(status_code: int):
+    """网关 HTML 错误页：.json() 抛 JSONDecodeError。"""
+    import json as _json
+
+    resp = MagicMock()
+    resp.status_code = status_code
+    resp.json = MagicMock(side_effect=_json.JSONDecodeError("Expecting value", "", 0))
+    return resp
+
+
+async def test_create_task_html_502_raises_minimax_error(adapter):
+    mock_client = MagicMock()
+    mock_client.post = AsyncMock(return_value=_mock_bad_json_response(502))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with patch(
+        "app.algorithm.clients.minimax_video.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
+        with pytest.raises(MinimaxVideoError) as exc:
+            await adapter.create_task(
+                api_key="sk-test",
+                api_host="https://api.minimaxi.com",
+                prompt="x",
+                resolution="2K",
+                duration=5,
+                ratio="16:9",
+            )
+    # 必须是 MinimaxVideoError（而非 JSONDecodeError），且携带 HTTP 码兜底信息
+    assert "502" in str(exc.value)
+
+
+async def test_query_task_html_504_raises_minimax_error(adapter):
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(return_value=_mock_bad_json_response(504))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with patch(
+        "app.algorithm.clients.minimax_video.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
+        with pytest.raises(MinimaxVideoError) as exc:
+            await adapter.query_task(
+                api_key="sk-test",
+                api_host="https://api.minimaxi.com",
+                remote_task_id="x",
+            )
+    assert "504" in str(exc.value)
+
+
+async def test_query_task_dict_error_coerced_to_string(adapter):
+    """MiniMax failed 任务的 error 可能是 dict，而 error 列为 TEXT：必须转字符串。"""
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(
+        return_value=_mock_response(
+            200,
+            {
+                "task": {
+                    "id": "x",
+                    "status": "failed",
+                    "error": {"code": 1026, "message": "sensitive content"},
+                }
+            },
+        )
+    )
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with patch(
+        "app.algorithm.clients.minimax_video.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
+        result = await adapter.query_task(
+            api_key="sk-test",
+            api_host="https://api.minimaxi.com",
+            remote_task_id="x",
+        )
+
+    assert result["status"] == "failed"
+    assert isinstance(result["error"], str)
+    assert "sensitive content" in result["error"]
