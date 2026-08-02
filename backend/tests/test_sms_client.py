@@ -91,6 +91,10 @@ class TestDevMode:
         monkeypatch.delenv("ALIBABA_CLOUD_ACCESS_KEY_ID", raising=False)
         monkeypatch.delenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET", raising=False)
 
+        from app.core.config import settings
+        monkeypatch.setattr(settings, "ALIBABA_CLOUD_ACCESS_KEY_ID", "")
+        monkeypatch.setattr(settings, "ALIBABA_CLOUD_ACCESS_KEY_SECRET", "")
+
         from app.services.sms_client import SmsClient
 
         client = SmsClient()

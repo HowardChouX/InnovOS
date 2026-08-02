@@ -1,8 +1,7 @@
 """
 User models — Pydantic BaseModel schemas (SQLModel removed).
 
-Admin users are validated against .env vars (no DB record).
-Regular users are stored in the `users` table.
+Legacy schemas kept for backward compatibility; new code uses app.auth.schemas.
 """
 
 from pydantic import BaseModel, Field, field_validator
@@ -18,7 +17,6 @@ class User(BaseModel):
     id: int | None = None
     username: str
     password_hash: str
-    role: str = "user"
     email: str = ""
     is_active: int = 1
     token_version: int = 0
@@ -55,7 +53,6 @@ class UserPublic(BaseModel):
     id: int
     username: str
     email: str = ""
-    role: str
     created_at: str | None = None
 
 
@@ -77,5 +74,4 @@ class TokenPayload(BaseModel):
     """Contents of the JWT token (sub = user_id)."""
 
     sub: str | None = None
-    role: str = "user"
     token_version: int = 0

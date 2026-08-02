@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Request
 
 from app.core.config import settings
-from app.exceptions.sms_verification import SmsRateLimited
+from app.exceptions.sms_verification import SmsRateLimited, SmsSendFailed
 from app.rate_limit_redis import (
     sms_otp_ip_limiter,
     sms_otp_request_limiter,
@@ -32,7 +32,10 @@ async def send_sms(payload: SmsSendIn, request: Request) -> SmsSendOut:
         if payload.purpose == "password_reset"
         else settings.SMS_REGISTER_TEMPLATE_CODE
     )
-    await sms_client.send_code(payload.phone, template_code)
+    result = await sms_client.send_code(payload.phone, template_code)
+    if not result["success"]:
+        raise SmsSendFailed()
+
     return SmsSendOut(
         expires_in=settings.SMS_CODE_VALID_TIME,
         next_resend_in=settings.SMS_RESEND_INTERVAL,

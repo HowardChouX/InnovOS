@@ -1,4 +1,4 @@
-.PHONY: dev stop stop-apps test lint quality format clean install build security docker-up docker-down db-backup setup-hooks
+.PHONY: dev stop stop-apps test lint quality format clean install build security docker-up docker-down db-backup setup-hooks add-admin delete-admin user-ls docker-add-admin docker-delete-admin docker-user-ls db-reset docker-reset
 
 # PostgreSQL local cluster (sudo pg_ctl) — overridable from env
 PG_DATA_DIR    ?= /var/lib/postgres/data
@@ -175,6 +175,35 @@ db-restore:
 	@if [ -z "$(file)" ]; then echo "Usage: make db-restore file=backup.sql.gz"; exit 1; fi
 	@gunzip -c $(file) | psql "$$DATABASE_URL"
 	@echo "Restored from $(file)"
+
+# 将已注册用户提升为管理员（交互式输入手机号）
+add-admin:
+	@PG_SOCKET_DIR=$(PG_SOCKET_DIR) PG_PORT=$(PG_PORT) bash scripts/add_admin.sh
+
+# 将管理员降级为普通用户（交互式输入手机号）
+delete-admin:
+	@PG_SOCKET_DIR=$(PG_SOCKET_DIR) PG_PORT=$(PG_PORT) bash scripts/delete_admin.sh
+
+# 列出所有已注册用户
+user-ls:
+	@PG_SOCKET_DIR=$(PG_SOCKET_DIR) PG_PORT=$(PG_PORT) bash scripts/user_ls.sh
+
+# ── Docker 部署版本（通过 TCP 连接容器内数据库）──
+docker-add-admin:
+	@PG_HOST=localhost PG_PORT=$(PG_PORT) bash scripts/add_admin.sh
+
+docker-delete-admin:
+	@PG_HOST=localhost PG_PORT=$(PG_PORT) bash scripts/delete_admin.sh
+
+docker-user-ls:
+	@PG_HOST=localhost PG_PORT=$(PG_PORT) bash scripts/user_ls.sh
+
+# 重置数据库（清空 schema，后端重启时自动重建；带二次确认）
+db-reset:
+	@PG_SOCKET_DIR=$(PG_SOCKET_DIR) PG_PORT=$(PG_PORT) bash scripts/db_reset.sh
+
+docker-reset:
+	@PG_HOST=localhost PG_PORT=$(PG_PORT) bash scripts/db_reset.sh
 
 # ══════════════════════════════════════════════
 #  钩子安装

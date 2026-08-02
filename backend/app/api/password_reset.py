@@ -25,7 +25,7 @@ from app.auth.users import get_user_manager
 from app.core.config import settings
 from app.db.models import User
 from app.db.session import get_session
-from app.exceptions.sms_verification import SmsRateLimited
+from app.exceptions.sms_verification import SmsRateLimited, SmsSendFailed
 from app.schemas.sms_verification import SmsSendOut
 from app.services.sms_client import sms_client
 
@@ -51,7 +51,9 @@ async def send_reset_code(payload: PasswordResetSendIn, request: Request) -> Sms
         raise SmsRateLimited(60)
 
     # 防探测：不查询用户，未知手机号同样下发验证码并返回 202
-    await sms_client.send_code(payload.phone, settings.SMS_RESET_PASSWORD_TEMPLATE_CODE)
+    result = await sms_client.send_code(payload.phone, settings.SMS_RESET_PASSWORD_TEMPLATE_CODE)
+    if not result["success"]:
+        raise SmsSendFailed()
     return SmsSendOut(
         expires_in=settings.SMS_CODE_VALID_TIME,
         next_resend_in=settings.SMS_RESEND_INTERVAL,

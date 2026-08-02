@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.backend import auth_backend, get_jwt_strategy
 from app.auth.users import get_user_manager
+from app.auth.schemas import UserRead
 from app.db.models import User
 from app.db.session import get_session
 from app.exceptions.sms_verification import SmsRateLimited
@@ -30,7 +31,7 @@ class PhoneCodeLoginIn(BaseModel):
     code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
 
 
-@router.post("/login/code")
+@router.post("/login/code", response_model=UserRead)
 async def login_with_code(
     payload: PhoneCodeLoginIn,
     request: Request,
@@ -87,11 +88,4 @@ async def login_with_code(
         httponly=transport.cookie_httponly,
         samesite=transport.cookie_samesite,
     )
-    return {
-        "id": user.id,
-        "phone": user.phone,
-        "email": user.email,
-        "is_active": user.is_active,
-        "is_superuser": user.is_superuser,
-        "is_verified": user.is_verified,
-    }
+    return UserRead.model_validate(user)

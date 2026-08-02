@@ -162,7 +162,6 @@ class TestLoginWithCode:
             is_active=False,
             is_superuser=False,
             is_verified=True,
-            role="user",
             token_version=0,
         )
         auth_session.add(disabled)

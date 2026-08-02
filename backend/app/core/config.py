@@ -61,14 +61,9 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "innovos"
     DATABASE_URL: str | None = None
 
-    # ── 管理员（从环境变量实时验证，不存数据库）──
-    FIRST_SUPERUSER: str = Field(default="", validation_alias=AliasChoices("INNOVOS_ADMIN_USER", "FIRST_SUPERUSER"))
-    FIRST_SUPERUSER_PASSWORD: str = Field(
-        default="", validation_alias=AliasChoices("INNOVOS_ADMIN_PASSWORD", "FIRST_SUPERUSER_PASSWORD")
-    )
-    FIRST_SUPERUSER_PHONE: str = Field(
-        default="", validation_alias=AliasChoices("INNOVOS_ADMIN_PHONE", "FIRST_SUPERUSER_PHONE")
-    )
+    # ── 管理员 ──
+    # 超级用户由开发者手动在数据库中设置（UPDATE users SET is_superuser=true ...），
+    # 不再通过环境变量种子化。
 
     # ── S3 / MinIO ──
     S3_ENDPOINT: str = ""
@@ -118,6 +113,8 @@ class Settings(BaseSettings):
     SMS_AUTO_RETRY: int = 1               # 1=开启自动重试
     SMS_CASE_AUTH_POLICY: int = 1         # 1=不区分大小写
     SMS_ENDPOINT: str = "dypnsapi.aliyuncs.com"
+    ALIBABA_CLOUD_ACCESS_KEY_ID: str = ""
+    ALIBABA_CLOUD_ACCESS_KEY_SECRET: str = ""
 
     # ── Password reset session token ──
     # 独立 secret,避免和业务 JWT 共用导致 reset_token 泄露时影响会话安全。
@@ -147,7 +144,6 @@ class Settings(BaseSettings):
     def _enforce_non_default_secrets(self) -> Settings:
         self._check_default_secret("SECRET_KEY", self.SECRET_KEY)
         self._check_default_secret("POSTGRES_PASSWORD", self.POSTGRES_PASSWORD)
-        self._check_default_secret("FIRST_SUPERUSER_PASSWORD", self.FIRST_SUPERUSER_PASSWORD)
         return self
 
     @model_validator(mode="after")

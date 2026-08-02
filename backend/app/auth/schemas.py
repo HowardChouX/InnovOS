@@ -9,7 +9,6 @@ class UserRead(schemas.BaseUser[int]):
 
     username: str | None = None
     phone: str
-    role: str = "user"
 
 
 class UserCreate(schemas.BaseUserCreate):

@@ -24,7 +24,9 @@ export function ProfilePage() {
   const [email, setEmail] = useState(user?.email ?? '');
   const [editingEmail, setEditingEmail] = useState(false);
   const [emailSaving, setEmailSaving] = useState(false);
-  const [emailMsg, setEmailMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [emailMsg, setEmailMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
+    null,
+  );
 
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -75,9 +77,13 @@ export function ProfilePage() {
 
   if (!user) return null;
 
-  const roleLabel = user.role === 'admin' ? '管理员' : '普通用户';
-  const createdAt = (user as any).created_at
-    ? new Date((user as any).created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
+  const roleLabel = user.is_superuser ? '管理员' : '普通用户';
+  const createdAt = user.created_at
+    ? new Date(user.created_at).toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
     : '-';
 
   const inputClass =
@@ -105,7 +111,7 @@ export function ProfilePage() {
             <div className="flex items-center gap-3 mt-1">
               <span
                 className={`text-xs px-2 py-0.5 rounded-full ${
-                  user.role === 'admin'
+                  user.is_superuser
                     ? 'bg-blue-500/10 border border-blue-500/30 text-blue-400'
                     : 'bg-[var(--bg-root)] border border-[var(--border)] text-[var(--text-secondary)]'
                 }`}
@@ -130,22 +136,42 @@ export function ProfilePage() {
             <span className="text-[var(--text-tertiary)] text-sm w-16 flex-shrink-0">邮箱</span>
             {editingEmail ? (
               <div className="flex items-center gap-2 flex-1">
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  className={inputClass} placeholder="输入邮箱地址" />
-                <button onClick={handleSaveEmail} disabled={emailSaving}
-                  className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-50">
-                  {emailSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={inputClass}
+                  placeholder="输入邮箱地址"
+                />
+                <button
+                  onClick={handleSaveEmail}
+                  disabled={emailSaving}
+                  className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                >
+                  {emailSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
                 </button>
-                <button onClick={() => { setEditingEmail(false); setEmail(user.email ?? ''); setEmailMsg(null); }}
-                  className="p-1.5 rounded-lg bg-[var(--bg-root)] border border-[var(--border)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
+                <button
+                  onClick={() => {
+                    setEditingEmail(false);
+                    setEmail(user.email ?? '');
+                    setEmailMsg(null);
+                  }}
+                  className="p-1.5 rounded-lg bg-[var(--bg-root)] border border-[var(--border)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             ) : (
               <div className="flex items-center justify-between flex-1">
                 <span className="text-sm text-[var(--text-primary)]">{user.email || '未设置'}</span>
-                <button onClick={() => setEditingEmail(true)}
-                  className="text-[var(--text-tertiary)] hover:text-[var(--accent)] transition-colors p-1">
+                <button
+                  onClick={() => setEditingEmail(true)}
+                  className="text-[var(--text-tertiary)] hover:text-[var(--accent)] transition-colors p-1"
+                >
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -153,11 +179,15 @@ export function ProfilePage() {
           </div>
 
           {emailMsg && (
-            <div className={`text-xs rounded-lg px-3 py-2 mt-2 mb-1 ${
-              emailMsg.type === 'success'
-                ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
-                : 'bg-red-500/10 border border-red-500/30 text-red-400'
-            }`}>{emailMsg.text}</div>
+            <div
+              className={`text-xs rounded-lg px-3 py-2 mt-2 mb-1 ${
+                emailMsg.type === 'success'
+                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                  : 'bg-red-500/10 border border-red-500/30 text-red-400'
+              }`}
+            >
+              {emailMsg.text}
+            </div>
           )}
 
           {/* Username (read-only) */}
@@ -188,11 +218,18 @@ export function ProfilePage() {
             <div>
               <label className="text-xs text-[var(--text-tertiary)] mb-1.5 block">当前密码</label>
               <div className="relative">
-                <input type={showCurrentPw ? 'text' : 'password'} value={currentPw}
+                <input
+                  type={showCurrentPw ? 'text' : 'password'}
+                  value={currentPw}
                   onChange={(e) => setCurrentPw(e.target.value)}
-                  className={`${inputClass} pr-10`} placeholder="输入当前密码" />
-                <button type="button" onClick={() => setShowCurrentPw(!showCurrentPw)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]">
+                  className={`${inputClass} pr-10`}
+                  placeholder="输入当前密码"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPw(!showCurrentPw)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                >
                   {showCurrentPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
@@ -200,33 +237,53 @@ export function ProfilePage() {
             <div>
               <label className="text-xs text-[var(--text-tertiary)] mb-1.5 block">新密码</label>
               <div className="relative">
-                <input type={showNewPw ? 'text' : 'password'} value={newPw}
-                  onChange={(e) => setNewPw(e.target.value)} minLength={8}
-                  className={`${inputClass} pr-10`} placeholder="至少8个字符" />
-                <button type="button" onClick={() => setShowNewPw(!showNewPw)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]">
+                <input
+                  type={showNewPw ? 'text' : 'password'}
+                  value={newPw}
+                  onChange={(e) => setNewPw(e.target.value)}
+                  minLength={8}
+                  className={`${inputClass} pr-10`}
+                  placeholder="至少8个字符"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPw(!showNewPw)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                >
                   {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
             <div>
               <label className="text-xs text-[var(--text-tertiary)] mb-1.5 block">确认新密码</label>
-              <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)}
-                minLength={8} className={inputClass} placeholder="再次输入新密码" />
+              <input
+                type="password"
+                value={confirmPw}
+                onChange={(e) => setConfirmPw(e.target.value)}
+                minLength={8}
+                className={inputClass}
+                placeholder="再次输入新密码"
+              />
             </div>
           </div>
 
           {pwMsg && (
-            <div className={`text-xs rounded-lg px-3 py-2 ${
-              pwMsg.type === 'success'
-                ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
-                : 'bg-red-500/10 border border-red-500/30 text-red-400'
-            }`}>{pwMsg.text}</div>
+            <div
+              className={`text-xs rounded-lg px-3 py-2 ${
+                pwMsg.type === 'success'
+                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                  : 'bg-red-500/10 border border-red-500/30 text-red-400'
+              }`}
+            >
+              {pwMsg.text}
+            </div>
           )}
 
-          <button type="submit"
+          <button
+            type="submit"
             disabled={pwSaving || !currentPw || !newPw || !confirmPw}
-            className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-4 py-2 rounded-lg font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
+            className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-4 py-2 rounded-lg font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             {pwSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             保存密码
           </button>
@@ -234,8 +291,10 @@ export function ProfilePage() {
       </section>
 
       {/* Logout — subtle, not a full card */}
-      <button onClick={handleLogout}
-        className="flex items-center gap-2 text-[var(--text-tertiary)] hover:text-red-400 px-2 py-2 rounded-lg transition-colors text-sm">
+      <button
+        onClick={handleLogout}
+        className="flex items-center gap-2 text-[var(--text-tertiary)] hover:text-red-400 px-2 py-2 rounded-lg transition-colors text-sm"
+      >
         <LogOut className="w-3.5 h-3.5" />
         退出登录
       </button>

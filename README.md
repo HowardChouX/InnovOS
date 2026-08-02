@@ -26,16 +26,27 @@ docker compose up -d --build
 http://localhost
 ```
 
-首次启动自动初始化数据库、创建管理员账号、加载模型注册表。
+首次启动自动初始化数据库、应用迁移、加载模型注册表。管理员账号需手动设置（见下方说明）。
 
 ### 环境变量
 
-| 变量                  | 必填 | 说明                                        |
-| --------------------- | ---- | ------------------------------------------- |
-| `INNOVOS_JWT_SECRET`  | ✅   | JWT 签名密钥（生产必须设置强随机值）        |
+| 变量                  | 必填 | 说明                                                      |
+| --------------------- | ---- | --------------------------------------------------------- |
+| `INNOVOS_JWT_SECRET`  | ✅   | JWT 签名密钥（生产必须设置强随机值）                      |
 | `INNOVOS_ENCRYPT_KEY` | ✅   | 主加密密钥:加密数据库中存储的供应商 API Key (AES-256-GCM) |
-| `POSTGRES_PASSWORD`   | ✅   | 数据库密码                                  |
-| `MINIO_ROOT_PASSWORD` | ✅   | MinIO 管理员密码                            |
+| `POSTGRES_PASSWORD`   | ✅   | 数据库密码                                                |
+| `MINIO_ROOT_PASSWORD` | ✅   | MinIO 管理员密码                                          |
+
+### 管理员账号
+
+系统**不会**自动创建管理员。需先注册一个普通用户，然后手动提升为超级用户：
+
+```sql
+-- 连接数据库后执行（以手机号定位用户）
+UPDATE users SET is_superuser = TRUE WHERE phone = '<手机号>';
+```
+
+之后该用户即可访问所有 `/admin/*` 管理页面，并可在「用户管理」中提升其他用户。
 
 ### AI 密钥配置
 
@@ -44,8 +55,9 @@ API Key **不再通过环境变量配置**。所有 Provider / Key 由管理员�
 (主密钥由 `INNOVOS_ENCRYPT_KEY` 派生)。支持多 Key 轮询、failover、cooldown。
 
 首次启动步骤:
+
 1. 配置 `INNOVOS_ENCRYPT_KEY`(见 `.env.example`)
-2. 启动后端,以首位管理员账号登录
+2. 启动后端,按上方说明设置管理员账号并登录
 3. 进入"模型服务"页面,新建 Provider(SiliconFlow / DeepSeek / OpenAI / 阿里百炼等)
 4. 为 Provider 添加 API Key(掩码显示,保存后永不回显明文)
 5. 在系统设置中分配 chat / embedding / rerank / ocr / extract 默认模型

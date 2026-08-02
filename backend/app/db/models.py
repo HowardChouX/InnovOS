@@ -29,7 +29,6 @@ class User(SQLAlchemyBaseUserTable[int], Base):
 
     # InnovOS 扩展字段
     username = Column(String(100), nullable=True)   # 显示名，可空
-    role = Column(String(20), default="user")        # 业务角色
     token_version = Column(Integer, default=0)       # 撤销机制
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())

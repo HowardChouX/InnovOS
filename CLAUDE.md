@@ -77,7 +77,6 @@ backend/app/
 ├── logging_config.py # JSON 结构化日志（ENV=production）
 ├── auth.py          # JWT 认证 + bcrypt（生产环境强制 INNOVOS_JWT_SECRET）
 ├── database.py      # PostgreSQL 连接池 + db_session() 上下文管理器 + QueryBuilder
-├── seed.py          # idempotent 种子数据 seed_if_empty()
 ├── api/             # 路由层（20+ Router）
 │   ├── auth.py, tasks.py, analysis.py, patents.py
 │   ├── knowledge.py, knowledge_bases.py, kb_tools.py
@@ -161,8 +160,8 @@ Backend: `.env` (see `.env.example`)
 INNOVOS_JWT_SECRET=        # 必须：JWT 签名密钥（生产环境必填）
 DATABASE_URL=              # PostgreSQL 连接串
 ENV=production             # production 启用 JSON 日志
-INNOVOS_ADMIN_USER=admin   # 可选：管理员用户名
-INNOVOS_ADMIN_PASSWORD=    # 可选：管理员密码（未设置则自动生成随机密码）
+# 超级用户由开发者手动在数据库中设置：
+#   UPDATE users SET is_superuser=true, role='admin' WHERE phone='<手机号>';
 ```
 
 ## Development Notes
@@ -173,9 +172,9 @@ INNOVOS_ADMIN_PASSWORD=    # 可选：管理员密码（未设置则自动生成
 - **Branch Strategy:** main → develop → feature/fix/refactor branches
 - **CORS:** Allows `localhost:5173` and `localhost:5174` (Vite dev servers)
 - **JWT Tokens:** 24-hour expiry, sent via `Authorization: Bearer <token>` header
-- **Database Init:** Automatic on backend startup (`init_db()` + `seed_if_empty()` in startup event)
+- **Database Init:** Automatic on backend startup (`init_db()` in startup event)
 - **Dev Servers:** Backend on `:8000`, Frontend on `:5173`
-- **Seed:** First-run only — creates admin user if none exists. Does NOT overwrite existing admin password.
+- **Superuser:** No automatic seeding. Set manually via SQL: `UPDATE users SET is_superuser=true, role='admin' WHERE phone='<手机号>';`
 - **Key Management:** API keys from environment variables (`AI_{PROVIDER_ID}_API_KEY`), no database encryption. Per-provider round-robin pool with in-memory rate limiting.
 - **Rate Limiting:** per-IP sliding window (auth 10/min, register 3/5min, API 120/min, in-memory, single-worker)
 - **Security Headers:** CSP, HSTS, XFO, X-XSS-Protection, Referrer-Policy, Permissions-Policy

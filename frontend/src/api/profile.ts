@@ -4,7 +4,7 @@ export interface ProfileUser {
   id: number;
   username: string;
   email: string;
-  role: string;
+  is_superuser: boolean;
   created_at: string | null;
 }
 

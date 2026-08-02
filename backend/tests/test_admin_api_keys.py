@@ -103,7 +103,7 @@ def app_with_mock_db(master_key, monkeypatch):
 
 @pytest.fixture
 def admin_user():
-    return {"user_id": 7, "username": "admin", "role": "admin"}
+    return {"user_id": 7, "username": "admin", "is_superuser": True}
 
 
 @pytest.fixture

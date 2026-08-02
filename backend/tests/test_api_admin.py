@@ -660,11 +660,11 @@ def client(mock_db, monkeypatch):
     orm_admin = OrmUser(
         id=1, email="admin@example.com",
         hashed_password="!", is_active=True, is_superuser=True, is_verified=True,
-        username="admin", role="admin", token_version=0,
+        username="admin", token_version=0,
     )
     # 旧 require_admin 垫片路径 — 返回 dict
     admin_dict = {
-        "id": 1, "username": "admin", "role": "admin",
+        "id": 1, "username": "admin", "is_superuser": True,
         "email": "admin@example.com", "is_active": True, "created_at": "",
     }
 
@@ -750,7 +750,7 @@ class TestMonitor:
         assert len(data["keyUsage"]) == 3
 
     def test_system_status(self, client, mock_db):
-        mock_db.add_row("users", username="admin", role="admin")
+        mock_db.add_row("users", username="admin", is_superuser=True)
         mock_db.add_row("tasks", user_id=1, status="completed")
         mock_db.add_row("patents", title="test patent")
 
@@ -793,7 +793,7 @@ class TestUsers:
             username="alice",
             email="alice@x.com",
             password_hash="hashed",
-            role="user",
+            is_superuser=False,
             is_active=1,
             created_at="2024-01-01",
         )
@@ -802,7 +802,7 @@ class TestUsers:
             username="bob",
             email="bob@x.com",
             password_hash="hashed",
-            role="admin",
+            is_superuser=True,
             is_active=1,
             created_at="2024-01-02",
         )
@@ -821,28 +821,23 @@ class TestUsers:
             username="alice",
             email="alice@x.com",
             password_hash="hashed",
-            role="user",
+            is_superuser=False,
             is_active=1,
             created_at="2024-01-01",
         )
 
-        resp = client.put("/api/admin/users/1", json={"is_active": False, "role": "admin"})
+        resp = client.put("/api/admin/users/1", json={"is_active": False, "is_superuser": True})
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert body["data"]["isActive"] is False
-        assert body["data"]["role"] == "admin"
+        assert body["data"]["isSuperuser"] is True
 
     def test_update_user_not_found(self, client):
         resp = client.put("/api/admin/users/999", json={"is_active": False})
         assert resp.status_code == 404
 
-    def test_update_user_invalid_role(self, client, mock_db):
-        mock_db.add_row("users", username="alice", password_hash="hashed", role="user")
-        resp = client.put("/api/admin/users/1", json={"role": "superadmin"})
-        assert resp.status_code == 400
-
     def test_delete_user_success(self, client, mock_db):
-        mock_db.add_row("users", username="alice", password_hash="hashed", role="user", is_active=1)
+        mock_db.add_row("users", username="alice", password_hash="hashed", is_superuser=False, is_active=1)
         resp = client.delete("/api/admin/users/1")
         assert resp.status_code == 200, resp.text
         assert resp.json()["message"] == "已删除"
@@ -856,7 +851,7 @@ class TestUsers:
         assert resp.status_code == 400
 
     def test_revoke_tokens_success(self, client, mock_db):
-        mock_db.add_row("users", username="alice", password_hash="hashed", role="user", token_version=0)
+        mock_db.add_row("users", username="alice", password_hash="hashed", is_superuser=False, token_version=0)
         resp = client.post("/api/admin/users/1/revoke-tokens")
         assert resp.status_code == 200, resp.text
         assert resp.json()["ok"] is True

@@ -49,7 +49,7 @@ export function UserManagementPage() {
 
   // Edit user state
   const [editEmail, setEditEmail] = useState('');
-  const [editRole, setEditRole] = useState('');
+  const [editSuperuser, setEditSuperuser] = useState(false);
   const [editIsActive, setEditIsActive] = useState(true);
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -203,7 +203,7 @@ export function UserManagementPage() {
   const openEditModal = (user: User) => {
     setModalUser(user);
     setEditEmail(user.email || '');
-    setEditRole(user.role);
+    setEditSuperuser(user.isSuperuser);
     setEditIsActive(user.isActive);
     setModalType('edit');
   };
@@ -214,7 +214,7 @@ export function UserManagementPage() {
     try {
       await usersApi.update(modalUser.id, {
         email: editEmail.trim(),
-        role: editRole,
+        is_superuser: editSuperuser,
         is_active: editIsActive,
       });
       setToast({ msg: '用户信息已更新', type: 'success' });
@@ -414,12 +414,12 @@ export function UserManagementPage() {
                 {/* Role badge */}
                 <span
                   className={`w-[80px] text-[10px] text-center px-1.5 py-0.5 rounded ${
-                    u.role === 'admin'
+                    u.isSuperuser
                       ? 'bg-yellow-500/15 text-yellow-400'
                       : 'bg-slate-500/10 text-slate-500'
                   }`}
                 >
-                  {u.role === 'admin' ? '管理员' : '普通用户'}
+                  {u.isSuperuser ? '管理员' : '普通用户'}
                 </span>
 
                 {/* Status badge */}
@@ -500,12 +500,12 @@ export function UserManagementPage() {
             />
           </div>
 
-          {/* Role */}
+          {/* Superuser */}
           <div>
             <label className="block text-xs text-slate-400 mb-1">角色</label>
             <select
-              value={editRole}
-              onChange={(e) => setEditRole(e.target.value)}
+              value={editSuperuser ? 'admin' : 'user'}
+              onChange={(e) => setEditSuperuser(e.target.value === 'admin')}
               className="w-full px-2.5 py-2 rounded-md bg-black/20 border border-[var(--border)] text-[13px] text-slate-200 outline-none cursor-pointer font-[inherit]"
             >
               <option value="user">普通用户</option>

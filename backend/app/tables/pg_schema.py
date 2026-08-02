@@ -677,7 +677,7 @@ def init_all_tables(db):
     """按依赖顺序初始化所有表。
 
     注意：users 表的 DDL 改由 Alembic 迁移管理（见 alembic/versions/0001_users_fastapi_users_schema.py），
-    此处不再创建。admin 用户的种子数据由 seed_first_superuser_if_configured() 单独处理。
+    此处不再创建。超级用户由开发者手动在数据库中设置（UPDATE users SET is_superuser=true ...）。
     """
     logger.info("Initializing PostgreSQL schema...")
     # pgvector 扩展必须最先创建

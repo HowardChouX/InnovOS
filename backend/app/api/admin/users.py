@@ -17,7 +17,7 @@ router = APIRouter(prefix="/users", tags=["admin-users"])
 
 class UpdateUserInput(BaseModel):
     is_active: bool | None = None
-    role: str | None = None
+    is_superuser: bool | None = None
     email: str | None = None
     phone: str | None = None
 
@@ -30,7 +30,7 @@ def list_users(_admin=SuperUserDep):
     db = get_db()
     try:
         rows = db.execute(
-            "SELECT id, email, username, phone, role, is_active, is_superuser, is_verified, token_version "
+            "SELECT id, email, username, phone, is_active, is_superuser, is_verified, token_version "
             "FROM users ORDER BY id"
         ).fetchall()
         return {
@@ -40,7 +40,6 @@ def list_users(_admin=SuperUserDep):
                     "email": r.get("email") or "",
                     "username": r.get("username") or "",
                     "phone": r.get("phone") or "",
-                    "role": r.get("role") or "user",
                     "isActive": bool(r.get("is_active", 0)),
                     "isSuperuser": bool(r.get("is_superuser", 0)),
                     "isVerified": bool(r.get("is_verified", 0)),
@@ -69,18 +68,12 @@ def update_user(
         if not existing:
             raise HTTPException(status_code=404, detail="用户不存在")
 
-        if body.role is not None and body.role not in ("admin", "user"):
-            raise HTTPException(status_code=400, detail="无效角色")
-
         sets: list[str] = []
         params: list = []
         if body.is_active is not None:
             sets.append("is_active=?"); params.append(1 if body.is_active else 0)
-        if body.role is not None:
-            sets.append("role=?"); params.append(body.role)
-            # role 与 is_superuser 必须一致，避免 SuperUserDep（判 is_superuser）锁死管理员
-            sets.append("is_superuser=?")
-            params.append(body.role == "admin")
+        if body.is_superuser is not None:
+            sets.append("is_superuser=?"); params.append(body.is_superuser)
         if body.email is not None:
             sets.append("email=?"); params.append(body.email)
         if body.phone is not None:
@@ -91,7 +84,7 @@ def update_user(
             db.commit()
 
         row = db.execute(
-            "SELECT id, email, username, phone, role, is_active, is_superuser FROM users WHERE id=?",
+            "SELECT id, email, username, phone, is_active, is_superuser FROM users WHERE id=?",
             (user_id,),
         ).fetchone()
         return {
@@ -100,7 +93,6 @@ def update_user(
                 "email": row.get("email") or "",
                 "username": row.get("username") or "",
                 "phone": row.get("phone") or "",
-                "role": row.get("role") or "user",
                 "isActive": bool(row.get("is_active", 0)),
                 "isSuperuser": bool(row.get("is_superuser", False)),
             },

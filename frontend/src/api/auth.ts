@@ -10,7 +10,7 @@
 // - POST /api/auth/password-reset/send-code {phone} → {expires_in, next_resend_in}
 // - POST /api/auth/password-reset/verify    {phone, code, new_password} → {reset}
 //
-// UserRead 形状：{id, email?, phone, username?, role, isActive, isSuperuser, isVerified}
+// UserRead 形状：{id, email?, phone, username?, isActive, isSuperuser, isVerified}
 //
 // 注意：FastAPI Users 的登录字段统一命名为 "username"（任意标识符；InnovOS 用 phone）。
 import { apiRequest } from './client';

@@ -6,7 +6,6 @@
 payload 形如 {sub, aud, token_version}）。本垫片仍需解码这些新 token 供 25+ 旧路由使用，
 因此解码时必须传入与签发端一致的 audience，并从 sub/user_id 两种 claim 中取用户 ID。
 """
-import hmac
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -63,13 +62,6 @@ def clear_token_cookie(response: Response) -> None:
     )
 
 
-def _verify_admin_credentials(username: str, password: str) -> bool:
-    """常量时间比较管理员凭据。"""
-    admin_user = settings.FIRST_SUPERUSER or ""
-    admin_pass = settings.FIRST_SUPERUSER_PASSWORD or ""
-    return hmac.compare_digest(username, admin_user) and hmac.compare_digest(password, admin_pass)
-
-
 def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_security_optional),
@@ -111,7 +103,7 @@ def get_current_user(
         return {
             "id": row["id"] if row.get("id") is not None else 0,
             "username": row.get("username") or "",
-            "role": row.get("role") or "user",
+            "is_superuser": bool(row.get("is_superuser", False)),
             "created_at": str(created_at) if created_at else "",
             "email": row.get("email") or "",
             "is_active": row.get("is_active", 1),
@@ -122,6 +114,6 @@ def get_current_user(
 
 def require_admin(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
     """要求管理员。"""
-    if user.get("role") != "admin":
+    if not user.get("is_superuser"):
         raise HTTPException(status_code=403, detail="需要管理员权限")
     return user

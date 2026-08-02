@@ -14,7 +14,7 @@ def get_sidebar_stats(current_user: CurrentUser):
     db = get_db()
     today = datetime.now().strftime("%Y-%m-%d")
 
-    if current_user.role == "admin":
+    if current_user.is_superuser:
         today_tasks = db.execute("SELECT COUNT(*) FROM tasks WHERE created_at::date=?", (today,)).fetchone()[0]
         completed = db.execute("SELECT COUNT(*) FROM tasks WHERE status='completed'").fetchone()[0]
         analyzing = db.execute("SELECT COUNT(*) FROM tasks WHERE status='analyzing'").fetchone()[0]
@@ -33,7 +33,7 @@ def get_sidebar_stats(current_user: CurrentUser):
             (uid,),
         ).fetchone()[0]
 
-    if current_user.role == "admin":
+    if current_user.is_superuser:
         patents = db.execute("SELECT COUNT(*) FROM patents").fetchone()[0]
     else:
         patents = 0  # non-admin users don't see global patent count

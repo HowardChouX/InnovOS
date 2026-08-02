@@ -12,15 +12,15 @@ export interface User {
   id: number;
   username: string;
   email: string;
-  role: string;
   isActive: boolean;
+  isSuperuser: boolean;
   createdAt: string;
   stats?: UserStats;
 }
 
 export interface UpdateUserInput {
   is_active?: boolean;
-  role?: string;
+  is_superuser?: boolean;
   email?: string;
 }
 

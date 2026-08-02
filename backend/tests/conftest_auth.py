@@ -171,7 +171,6 @@ def seed_user(auth_session):
         is_active=True,
         is_superuser=False,
         is_verified=True,
-        role="user",
         token_version=0,
     )
     auth_session.add(user)
@@ -195,7 +194,6 @@ def seed_admin(auth_session):
         is_active=True,
         is_superuser=True,
         is_verified=True,
-        role="admin",
         token_version=0,
     )
     auth_session.add(admin)

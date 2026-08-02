@@ -24,13 +24,16 @@ class SmsClient:
     def _init_client(self) -> None:
         """与示例 create_client() 一致：凭据链 + 固定 endpoint。
 
-        先显式检测 AK/SK：CredentialClient 的凭据链是惰性的，无凭证时构造
-        不会失败，但真实调用会抛 SDK 鉴权错误。因此任一凭证环境变量为空即
-        判定为开发模式，降级为日志模拟（凭据链的其他方式如 OIDC / ECS RAM
-        Role 也可用，但显式 AK/SK 环境变量是必须支持的最小判定）。
+        优先从 pydantic settings（.env）读取 AK/SK 并注入 os.environ，
+        使 CredentialClient 的默认凭据链能自动拾取。
+        无凭证时降级为开发模式日志模拟。
         """
-        access_key_id = os.environ.get("ALIBABA_CLOUD_ACCESS_KEY_ID", "").strip()
-        access_key_secret = os.environ.get("ALIBABA_CLOUD_ACCESS_KEY_SECRET", "").strip()
+        # 从 settings 读取（pydantic 已加载 .env），注入 os.environ 供 SDK 凭据链使用
+        access_key_id = (settings.ALIBABA_CLOUD_ACCESS_KEY_ID or os.environ.get("ALIBABA_CLOUD_ACCESS_KEY_ID", "")).strip()
+        access_key_secret = (settings.ALIBABA_CLOUD_ACCESS_KEY_SECRET or os.environ.get("ALIBABA_CLOUD_ACCESS_KEY_SECRET", "")).strip()
+        if access_key_id and access_key_secret:
+            os.environ.setdefault("ALIBABA_CLOUD_ACCESS_KEY_ID", access_key_id)
+            os.environ.setdefault("ALIBABA_CLOUD_ACCESS_KEY_SECRET", access_key_secret)
         if not access_key_id or not access_key_secret:
             logger.warning(
                 "未检测到阿里云凭证（ALIBABA_CLOUD_ACCESS_KEY_ID / "

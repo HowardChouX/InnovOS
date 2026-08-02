@@ -108,11 +108,6 @@ class TestSettingsEnvAliases:
                      BACKEND_CORS_ORIGINS=["https://example.com"])
         assert s.ENVIRONMENT == "production"
 
-    def test_admin_user_populated(self):
-        s = Settings()
-        # .env sets INNOVOS_ADMIN_USER=admin@innovos.local
-        assert s.FIRST_SUPERUSER != ""
-
 
 class TestSettingsDatabaseUrlAutoBuild:
     """DATABASE_URL auto-build from component fields."""

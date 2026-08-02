@@ -76,7 +76,10 @@ export function LoginPage() {
     setSubmitting(true);
     setError('');
     try {
-      await authApi.loginWithCode(phone, full);
+      const user = await authApi.loginWithCode(phone, full);
+      // 更新 store（与密码登录一致），确保 isAdmin 状态正确
+      const { useAuthStore } = await import('../../store/useAuthStore');
+      useAuthStore.setState({ user, isAdmin: user.is_superuser ?? false });
       navigate('/');
     } catch (e) {
       setError(e instanceof Error ? e.message : '登录失败');

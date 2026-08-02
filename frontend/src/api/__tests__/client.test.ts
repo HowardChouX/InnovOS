@@ -82,6 +82,6 @@ describe('apiRequest', () => {
 
     const { apiRequest } = await import('../client');
 
-    await expect(apiRequest('/error')).rejects.toThrow('请求失败');
+    await expect(apiRequest('/error')).rejects.toThrow('服务器内部错误，请稍后重试');
   });
 });

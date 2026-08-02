@@ -24,13 +24,12 @@ def test_user_create_email_optional():
     assert u.phone == "13800000000"
 
 
-def test_user_read_has_role():
-    """UserRead 包含 role 和 phone 字段。"""
+def test_user_read_has_phone():
+    """UserRead 包含 phone 字段。"""
     u = UserRead(
         id=1, phone="13800000000", email="test@example.com", is_active=True,
-        is_superuser=False, is_verified=False, role="user",
+        is_superuser=False, is_verified=False,
     )
-    assert u.role == "user"
     assert u.phone == "13800000000"
 
 
@@ -39,7 +38,7 @@ def test_user_read_phone_required():
     with pytest.raises(ValidationError):
         UserRead(
             id=1, email="test@example.com", is_active=True,
-            is_superuser=False, is_verified=False, role="user",
+            is_superuser=False, is_verified=False,
         )
 
 

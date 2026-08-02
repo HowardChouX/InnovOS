@@ -46,7 +46,7 @@ class TestLegacyCompatDecodesNewToken:
             "id": 7,
             "username": "alice",
             "email": "alice@example.com",
-            "role": "user",
+            "is_superuser": False,
             "is_active": 1,
             "created_at": "2026-01-01 00:00:00",
             "hashed_password": "x",  # 新列名，旧 Pydantic 模型无此字段
@@ -60,7 +60,7 @@ class TestLegacyCompatDecodesNewToken:
         assert user["id"] == 7
         assert user["username"] == "alice"
         assert user["email"] == "alice@example.com"
-        assert user["role"] == "user"
+        assert user["is_superuser"] is False
 
     def test_rejects_reset_password_token(self):
         """同 SECRET_KEY 的 reset token（不同 audience）不得被当作登录 token。

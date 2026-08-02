@@ -18,7 +18,7 @@ def get_overview(current_user: CurrentUser):
     """总览数据（数据隔离：普通用户只看自己的）"""
     db = get_db()
 
-    if current_user.role == "admin":
+    if current_user.is_superuser:
         total_tasks = db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
         completed = db.execute("SELECT COUNT(*) FROM tasks WHERE status='completed'").fetchone()[0]
         failed = db.execute("SELECT COUNT(*) FROM tasks WHERE status='failed'").fetchone()[0]
@@ -70,7 +70,7 @@ def get_task_stats(current_user: CurrentUser):
     db = get_db()
     cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
 
-    if current_user.role == "admin":
+    if current_user.is_superuser:
         by_status = db.execute("SELECT status, COUNT(*) as cnt FROM tasks GROUP BY status").fetchall()
         recent = db.execute(
             "SELECT created_at::date as d, COUNT(*) as cnt FROM tasks "

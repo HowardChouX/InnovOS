@@ -483,17 +483,17 @@ def _patch_all_get_db(monkeypatch, mock_db, *mod_names):
         monkeypatch.setattr(f"{name}.get_db", lambda: mock_db)
 
 
-def _user_token(user_id: int = 1, role: str = "user") -> str:
+def _user_token(user_id: int = 1) -> str:
     from app.auth import create_access_token
-    return create_access_token({"user_id": user_id, "role": role})
+    return create_access_token({"user_id": user_id})
 
 
 def _admin_token() -> str:
     from app.auth import create_access_token
-    return create_access_token({"user_id": 0, "role": "admin", "username": "admin"})
+    return create_access_token({"user_id": 0, "username": "admin"})
 
 
-def _seed_user(mock_db, user_id: int = 1, role: str = "user") -> None:
+def _seed_user(mock_db, user_id: int = 1, is_superuser: bool = False) -> None:
     """Seed a user in the mock database for auth lookups."""
     if "users" not in mock_db._tables:
         mock_db._tables["users"] = {}
@@ -501,7 +501,7 @@ def _seed_user(mock_db, user_id: int = 1, role: str = "user") -> None:
         "id": user_id,
         "username": f"user{user_id}",
         "password_hash": "x",
-        "role": role,
+        "is_superuser": is_superuser,
         "email": "",
         "is_active": 1,
         "created_at": "2024-01-01 00:00:00",
@@ -1003,7 +1003,7 @@ class TestSidebarStats:
 
     def test_stats_admin(self, client, mock_db):
         """Admin sees global task stats and patent count."""
-        _seed_user(mock_db, user_id=0, role="admin")
+        _seed_user(mock_db, user_id=0, is_superuser=True)
         mock_db._tables["tasks"] = {
             1: {"id": 1, "user_id": 1, "title": "T1",
                 "status": "completed", "created_at": datetime_today()},

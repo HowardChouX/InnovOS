@@ -253,7 +253,7 @@ def app_with_mock_db(monkeypatch, fake_cursor):
     app.dependency_overrides[require_admin] = lambda: {
         "user_id": 1,
         "username": "admin",
-        "role": "admin",
+        "is_superuser": True,
     }
 
     return app, fake_cursor

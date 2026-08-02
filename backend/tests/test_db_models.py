@@ -18,7 +18,6 @@ def test_user_model_has_required_fields():
     # InnovOS 扩展字段
     assert "username" in columns
     assert "phone" in columns
-    assert "role" in columns
     assert "token_version" in columns
 
 

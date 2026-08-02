@@ -30,9 +30,7 @@ describe('authApi', () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 201,
-      text: () => Promise.resolve(
-        JSON.stringify({ id: 1, email: 'a@b.com', role: 'user' }),
-      ),
+      text: () => Promise.resolve(JSON.stringify({ id: 1, email: 'a@b.com', is_superuser: false })),
     });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -48,7 +46,9 @@ describe('authApi', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
-          email: 'a@b.com', password: 'pass1234', phone: '13800138000',
+          email: 'a@b.com',
+          password: 'pass1234',
+          phone: '13800138000',
         }),
       }),
     );
@@ -108,7 +108,9 @@ describe('authApi', () => {
 
     it('requestPasswordResetOtp posts to /api/auth/password-reset/request-otp', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
-        ok: true, status: 202, text: () => Promise.resolve(''),
+        ok: true,
+        status: 202,
+        text: () => Promise.resolve(''),
       });
       vi.stubGlobal('fetch', mockFetch);
       const { authApi } = await import('../auth');
@@ -121,7 +123,8 @@ describe('authApi', () => {
 
     it('verifyPasswordResetOtp returns reset_token', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
-        ok: true, status: 200,
+        ok: true,
+        status: 200,
         text: () => Promise.resolve(JSON.stringify({ verified: true, reset_token: 'jwt-xxx' })),
       });
       vi.stubGlobal('fetch', mockFetch);
@@ -132,7 +135,9 @@ describe('authApi', () => {
 
     it('setNewPassword posts reset_token + new_password', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
-        ok: true, status: 200, text: () => Promise.resolve('{"reset":true}'),
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('{"reset":true}'),
       });
       vi.stubGlobal('fetch', mockFetch);
       const { authApi } = await import('../auth');

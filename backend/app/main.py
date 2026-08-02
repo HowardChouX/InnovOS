@@ -137,13 +137,8 @@ async def startup():
     await asyncio.to_thread(model_registry.load)
     logger.info("模型注册表已加载")
 
-    # 3. 注入首任超级用户（仅当 .env 提供 FIRST_SUPERUSER 时执行；幂等）
-    try:
-        from app.auth.seed import seed_first_superuser_if_configured
-
-        await asyncio.to_thread(seed_first_superuser_if_configured)
-    except Exception as e:
-        logger.warning(f"首任超级用户种子失败（非致命）: {e}")
+    # 3. 超级用户由开发者手动在数据库中设置（UPDATE users SET is_superuser=true ...），
+    #    不再通过环境变量自动种子化。
 
     # 4. ~~ 自动种子化有环境变量 API Key 的内置供应商 ~~
     # 已废弃:环境变量不再承载 API Key,所有 Provider / Key 由管理员通过

@@ -429,28 +429,28 @@ def db_with_user(mock_db):
     mock_db._tables["users"] = {}
     mock_db._tables["users"][1] = {
         "id": 1, "username": "testuser", "password_hash": "x",
-        "role": "user", "email": "", "is_active": 1,
+        "is_superuser": False, "email": "", "is_active": 1,
         "created_at": "2024-01-01 00:00:00", "token_version": 0,
     }
     mock_db._tables["users"][2] = {
         "id": 2, "username": "admin", "password_hash": "x",
-        "role": "admin", "email": "", "is_active": 1,
+        "is_superuser": True, "email": "", "is_active": 1,
         "created_at": "2024-01-01 00:00:00", "token_version": 0,
     }
     mock_db._next_ids["users"] = 3
     return mock_db
 
 
-def _user_token(user_id: int, role: str = "user") -> str:
+def _user_token(user_id: int) -> str:
     """Create a JWT for the given user."""
     from app.auth import create_access_token
-    return create_access_token({"user_id": user_id, "role": role})
+    return create_access_token({"user_id": user_id})
 
 
 def _admin_token() -> str:
-    """Create a JWT for the admin (env-based, user_id=0)."""
+    """Create a JWT for the admin (user_id=2)."""
     from app.auth import create_access_token
-    return create_access_token({"user_id": 0, "role": "admin", "username": "admin"})
+    return create_access_token({"user_id": 2, "username": "admin"})
 
 
 # Need FastAPI here for the client fixture

@@ -34,7 +34,13 @@ export function VerifyPhonePage() {
     setSubmitting(true);
     setError('');
     try {
-      await authApi.verifySmsCode(phone, full, 'register');
+      const result = await authApi.verifySmsCode(phone, full, 'register');
+      if (!result.verified) {
+        setError('验证码错误，请重新输入');
+        setDigits(['', '', '', '', '', '']);
+        refs.current[0]?.focus();
+        return;
+      }
       navigate(`/login?phone=${encodeURIComponent(phone)}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : '验证失败');
