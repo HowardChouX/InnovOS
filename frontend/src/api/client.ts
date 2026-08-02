@@ -14,37 +14,53 @@ function buildHeaders(options?: RequestInit): HeadersInit {
 }
 
 /**
- * 从后端错误响应中提取人类可读的消息。
+ * 后端统一错误契约：{code, reason}，reason 为用户可见中文（唯一真源在后端）。
+ * 前端只负责提取 reason 显示，不做码表映射；code 供页面做分支判断（如未验证跳转）。
  *
- * 后端有两种错误格式：
- * 1. FastAPI 标准：{"detail": "string"} 或 {"detail": [{loc, msg, type}]}
- * 2. 自定义 SMS 异常：{"code": "SMS_xxx", "message": "中文消息", "detail": {retry_after: N}}
+ * 兼容的历史格式：
+ * - SMS 异常：顶层 {code, message, reason}
+ * - FastAPI 422：detail 为数组 [{loc, msg, type}]（msg 已由后端翻译成中文）
+ * - 旧版 detail 字符串：仅作兜底
  */
-// FastAPI Users 内置错误码 → 中文映射
-const ERROR_CODE_MAP: Record<string, string> = {
-  LOGIN_BAD_CREDENTIALS: '手机号或密码错误',
-  LOGIN_USER_NOT_VERIFIED: '账号未验证，请先完成手机验证',
-};
+export class ApiError extends Error {
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = code;
+  }
+}
 
-function extractErrorMessage(data: unknown, status: number): string {
+function extractError(data: unknown, status: number): { message: string; code?: string } {
   if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>;
+    const code = typeof obj.code === 'string' ? obj.code : undefined;
 
-    // 自定义异常格式：优先取 message 字段（中文用户可见消息）
+    // 统一契约：顶层 reason（中文用户可见消息）
+    if (typeof obj.reason === 'string' && obj.reason) {
+      return { message: obj.reason, code };
+    }
+    // SMS 异常：message 字段
     if (typeof obj.message === 'string' && obj.message) {
-      return obj.message;
+      return { message: obj.message, code };
     }
 
-    // FastAPI 标准格式（detail 可能是错误码字符串，如 LOGIN_BAD_CREDENTIALS）
     const detail = obj.detail;
-    if (typeof detail === 'string' && detail) {
-      return ERROR_CODE_MAP[detail] ?? detail;
+    // 业务错误：detail 为对象 {code, reason}
+    if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+      const d = detail as Record<string, unknown>;
+      if (typeof d.reason === 'string' && d.reason) {
+        return { message: d.reason, code: typeof d.code === 'string' ? d.code : code };
+      }
     }
-
-    // FastAPI 验证错误：detail 是数组 [{loc, msg, type}]
+    // FastAPI 422：detail 为数组 [{loc, msg, type}]（msg 已中文化）
     if (Array.isArray(detail) && detail.length > 0) {
       const first = detail[0] as Record<string, unknown>;
-      if (typeof first?.msg === 'string') return first.msg;
+      if (typeof first?.msg === 'string') return { message: first.msg, code };
+    }
+    // 旧版兜底：detail 字符串
+    if (typeof detail === 'string' && detail) {
+      return { message: detail, code };
     }
   }
 
@@ -58,7 +74,7 @@ function extractErrorMessage(data: unknown, status: number): string {
     502: '服务暂时不可用',
     503: '服务暂时不可用，请稍后重试',
   };
-  return statusMessages[status] ?? `请求失败 (${status})`;
+  return { message: statusMessages[status] ?? `请求失败 (${status})` };
 }
 
 export async function apiRequest<T>(
@@ -100,7 +116,8 @@ export async function apiRequest<T>(
         store.logout?.();
       }
     }
-    throw new Error(extractErrorMessage(data, res.status));
+    const { message, code } = extractError(data, res.status);
+    throw new ApiError(message, code);
   }
   return data;
 }

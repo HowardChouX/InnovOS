@@ -37,6 +37,18 @@ class TestRegister:
         assert "id" in data
         assert data["is_active"] is True
 
+    def test_register_without_email(self, auth_client, auth_session, monkeypatch):
+        """phone-first：email 可选，缺省注册仍返回 201 且 email 为 null（回归 #Bug2）。"""
+        _patch_sms_client(monkeypatch)
+        resp = auth_client.post(
+            "/api/auth/register",
+            json={"phone": "13800000010", "password": "test1234"},
+        )
+        assert resp.status_code == 201, resp.text
+        data = resp.json()
+        assert data["phone"] == "13800000010"
+        assert data["email"] is None
+
     def test_register_duplicate_phone(self, auth_client, auth_session, monkeypatch):
         """同一手机号二次注册返回 400 REGISTER_PHONE_DUPLICATE。"""
         _patch_sms_client(monkeypatch)
@@ -81,14 +93,15 @@ class TestRegister:
         assert any(isinstance(d, dict) and d.get("loc") == ["body", "phone"] for d in detail)
 
     def test_register_invalid_phone(self, auth_client):
-        """非法手机号返回 422。"""
+        """非法手机号返回 422 + 中文 msg。"""
         resp = auth_client.post(
             "/api/auth/register",
             json=_register_payload(phone="23800000000"),
         )
         assert resp.status_code == 422, resp.text
         detail = resp.json().get("detail", [])
-        assert any(isinstance(d, dict) and d.get("loc") == ["body", "phone"] for d in detail)
+        phone_err = next(d for d in detail if d.get("loc") == ["body", "phone"])
+        assert phone_err["msg"] == "手机号格式不正确（11 位数字，1 开头）"
 
     def test_register_invalid_email(self, auth_client):
         """非法 email 返回 422。"""

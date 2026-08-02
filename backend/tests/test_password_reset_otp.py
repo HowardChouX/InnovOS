@@ -26,14 +26,13 @@ class TestPasswordResetRoutes:
         monkeypatch.setattr(SmsClient, "send_code", _FakeSmsClient.send_code)
         monkeypatch.setattr(SmsClient, "verify_code", _FakeSmsClient.verify_code)
 
-    def test_send_code_route_exists(self, auth_client, monkeypatch):
-        """路由存在且接受 POST。未知手机号静默返回 202（防探测）。"""
+    def test_send_code_route_exists(self, auth_client, seed_user, monkeypatch):
+        """路由存在且接受 POST。已注册手机号返回 202。"""
         self._patch_sms_client(monkeypatch)
         r = auth_client.post(
             "/api/auth/password-reset/send-code",
-            json={"phone": "13999999999"},
+            json={"phone": "13800000001"},
         )
-        # 防探测:未知手机号也返回 202
         assert r.status_code == 202, r.text
 
     def test_verify_route_updates_password(

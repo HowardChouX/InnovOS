@@ -70,12 +70,12 @@ export const authApi = {
     });
   },
 
-  /** 核验短信验证码（注册场景：通过后激活账号） */
+  /** 核验短信验证码（注册场景：通过后激活账号并自动登录，返回 user + Set-Cookie） */
   verifySmsCode(
     phone: string,
     code: string,
     purpose: 'register' | 'login' = 'register',
-  ): Promise<{ verified: boolean; already?: boolean }> {
+  ): Promise<{ verified: boolean; already?: boolean; user?: AuthUser }> {
     return apiRequest('/api/auth/sms-verifications/verify', {
       method: 'POST',
       body: JSON.stringify({ phone, code, purpose }),
@@ -99,57 +99,6 @@ export const authApi = {
     return apiRequest('/api/auth/password-reset/verify', {
       method: 'POST',
       body: JSON.stringify({ phone, code, new_password: newPassword }),
-    });
-  },
-
-  /**
-   * @deprecated 旧邮箱 URL token 流程（FastAPI Users 内置端点仍在，但 on_after_forgot_password 已 no-op，实际失效）。保留以备回滚。
-   */
-  forgotPassword(email: string): Promise<void> {
-    return apiRequest<void>('/api/auth/forgot-password', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    });
-  },
-
-  /** @deprecated 旧邮箱 token 重置，已替换为 resetPasswordWithSms。 */
-  resetPassword(token: string, password: string): Promise<void> {
-    return apiRequest<void>('/api/auth/reset-password', {
-      method: 'POST',
-      body: JSON.stringify({ token, password }),
-    });
-  },
-
-  /**
-   * @deprecated 旧邮箱 OTP 密码重置第一步，已替换为 requestPasswordResetSms。保留以备回滚。
-   */
-  requestPasswordResetOtp(email: string): Promise<void> {
-    return apiRequest<void>('/api/auth/password-reset/request-otp', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    });
-  },
-
-  /**
-   * @deprecated 旧邮箱 OTP 密码重置第二步，返回短期 reset_token。已替换为 resetPasswordWithSms。保留以备回滚。
-   */
-  verifyPasswordResetOtp(
-    email: string,
-    code: string,
-  ): Promise<{ verified: boolean; reset_token: string }> {
-    return apiRequest('/api/auth/password-reset/verify-otp', {
-      method: 'POST',
-      body: JSON.stringify({ email, code }),
-    });
-  },
-
-  /**
-   * @deprecated 旧邮箱 OTP 密码重置第三步，用 reset_token + 新密码提交改密。已替换为 resetPasswordWithSms。保留以备回滚。
-   */
-  setNewPassword(reset_token: string, new_password: string): Promise<{ reset: boolean }> {
-    return apiRequest('/api/auth/password-reset/set-password', {
-      method: 'POST',
-      body: JSON.stringify({ reset_token, new_password }),
     });
   },
 };

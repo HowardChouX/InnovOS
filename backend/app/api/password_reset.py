@@ -25,7 +25,7 @@ from app.auth.users import get_user_manager
 from app.core.config import settings
 from app.db.models import User
 from app.db.session import get_session
-from app.exceptions.sms_verification import SmsRateLimited, SmsSendFailed
+from app.exceptions.sms_verification import SmsPhoneNotFound, SmsRateLimited, SmsSendFailed
 from app.schemas.sms_verification import SmsSendOut
 from app.services.sms_client import sms_client
 
@@ -43,14 +43,22 @@ class PasswordResetVerifyIn(BaseModel):
 
 
 @router.post("/send-code", response_model=SmsSendOut, status_code=202)
-async def send_reset_code(payload: PasswordResetSendIn, request: Request) -> SmsSendOut:
+async def send_reset_code(
+    payload: PasswordResetSendIn,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> SmsSendOut:
     ip = request.client.host if request.client else "unknown"
     if not sms_otp_ip_limiter.check(ip)[0]:
         raise SmsRateLimited(60)
     if not sms_otp_request_limiter.check(payload.phone)[0]:
         raise SmsRateLimited(60)
 
-    # 防探测：不查询用户，未知手机号同样下发验证码并返回 202
+    # 预检手机号已注册，未注册提示先注册（UX 优先，放弃防枚举探测）
+    exists = session.execute(select(User.id).where(User.phone == payload.phone)).scalar_one_or_none()
+    if not exists:
+        raise SmsPhoneNotFound()
+
     result = await sms_client.send_code(payload.phone, settings.SMS_RESET_PASSWORD_TEMPLATE_CODE)
     if not result["success"]:
         raise SmsSendFailed()

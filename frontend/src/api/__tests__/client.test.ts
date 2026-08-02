@@ -72,6 +72,74 @@ describe('apiRequest', () => {
     await expect(apiRequest('/bad-request')).rejects.toThrow('请求参数错误');
   });
 
+  it('extracts reason when detail is a structured object', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            detail: { code: 'REGISTER_INVALID_PASSWORD', reason: '密码至少 8 位' },
+          }),
+        ),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const { apiRequest } = await import('../client');
+
+    await expect(apiRequest('/register')).rejects.toThrow('密码至少 8 位');
+  });
+
+  it('prefers top-level reason and carries code on ApiError', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            code: 'LOGIN_USER_NOT_VERIFIED',
+            reason: '账号未验证，请先完成手机验证',
+          }),
+        ),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const { apiRequest, ApiError } = await import('../client');
+
+    try {
+      await apiRequest('/login');
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApiError);
+      expect((e as InstanceType<typeof ApiError>).code).toBe('LOGIN_USER_NOT_VERIFIED');
+      expect((e as Error).message).toBe('账号未验证，请先完成手机验证');
+    }
+  });
+
+  it('extracts first msg from 422 validation array', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 422,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            detail: [
+              {
+                loc: ['body', 'phone'],
+                msg: '手机号格式不正确（11 位数字，1 开头）',
+                type: 'string_pattern_mismatch',
+              },
+            ],
+          }),
+        ),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const { apiRequest } = await import('../client');
+
+    await expect(apiRequest('/register')).rejects.toThrow('手机号格式不正确（11 位数字，1 开头）');
+  });
+
   it('throws fallback error when no detail in response', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: false,

@@ -40,8 +40,10 @@ class SmsPhoneNotFound(SmsVerificationError):
 
 async def sms_verification_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     if not isinstance(exc, SmsVerificationError):
-        return JSONResponse(status_code=500, content={"code": "INTERNAL", "message": "服务异常"})
-    body: dict[str, Any] = {"code": exc.code, "message": exc.message}
+        return JSONResponse(status_code=500, content={"code": "INTERNAL", "message": "服务异常", "reason": "服务异常"})
+    # reason 与 message 同值：reason 是全站统一的用户可见中文错误字段（{code, reason} 契约），
+    # message 保留以向后兼容既有调用方。
+    body: dict[str, Any] = {"code": exc.code, "message": exc.message, "reason": exc.message}
     if exc.detail:
         body["detail"] = exc.detail
     return JSONResponse(status_code=exc.status, content=body)

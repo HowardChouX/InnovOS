@@ -46,14 +46,13 @@ export function LoginPage() {
       await login(phone, password);
       navigate('/');
     } catch (err) {
-      const er = err as { status?: number; message?: string; detail?: string };
-      const detail = (er?.detail ?? er?.message ?? '').toString();
-      if (detail.includes('LOGIN_USER_NOT_VERIFIED') || detail.includes('未验证')) {
+      const apiErr = err as { code?: string; message?: string };
+      if (apiErr.code === 'LOGIN_USER_NOT_VERIFIED') {
         navigate(`/verify-phone?phone=${encodeURIComponent(phone)}`);
         setError('请先完成手机号验证');
         return;
       }
-      setError(detail || '登录失败');
+      setError(apiErr.message || '登录失败');
     }
   };
 

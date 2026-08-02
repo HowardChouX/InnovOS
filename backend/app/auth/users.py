@@ -53,13 +53,6 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         """
         pass
 
-    async def on_after_request_verify(
-        self, user: User, token: str,
-        request: Optional[Request] = None,
-    ):
-        from app.services.email_service import email_service
-        email_service.send_verification_email_sync(user, token, request)
-
     async def on_after_verify(
         self, user: User, request: Optional[Request] = None
     ):

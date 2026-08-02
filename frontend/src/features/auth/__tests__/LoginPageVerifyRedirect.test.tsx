@@ -12,8 +12,8 @@ import { LoginPage } from '../LoginPage';
 
 test('未验证用户登录 → 跳 /verify-phone', async () => {
   loginMock.mockRejectedValueOnce(
-    Object.assign(new Error('Request failed'), {
-      detail: 'LOGIN_USER_NOT_VERIFIED',
+    Object.assign(new Error('账号未验证，请先完成手机验证'), {
+      code: 'LOGIN_USER_NOT_VERIFIED',
     }),
   );
   render(

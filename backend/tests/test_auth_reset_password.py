@@ -21,12 +21,12 @@ def _patch_sms_client(monkeypatch):
 
 
 class TestResetPassword:
-    def test_send_code(self, auth_client, monkeypatch):
-        """下发验证码返回 202 + 有效期字段。"""
+    def test_send_code(self, auth_client, seed_user, monkeypatch):
+        """已注册手机号下发验证码返回 202 + 有效期字段。"""
         _patch_sms_client(monkeypatch)
         resp = auth_client.post(
             "/api/auth/password-reset/send-code",
-            json={"phone": "13700000000"},
+            json={"phone": "13800000001"},
         )
         assert resp.status_code == 202, resp.text
         data = resp.json()
@@ -34,13 +34,14 @@ class TestResetPassword:
         assert data["next_resend_in"] == 60
 
     def test_send_code_unknown_phone(self, auth_client, monkeypatch):
-        """未知手机号同样返回 202（防探测，不暴露是否注册）。"""
+        """未注册手机号 → 404 PHONE_NOT_FOUND（预检，UX 优先）。"""
         _patch_sms_client(monkeypatch)
         resp = auth_client.post(
             "/api/auth/password-reset/send-code",
             json={"phone": "13999999999"},
         )
-        assert resp.status_code == 202, resp.text
+        assert resp.status_code == 404, resp.text
+        assert resp.json()["code"] == "PHONE_NOT_FOUND"
 
     def test_send_code_invalid_phone(self, auth_client):
         """非法手机号 → 422。"""
@@ -50,7 +51,7 @@ class TestResetPassword:
         )
         assert resp.status_code == 422
 
-    def test_send_code_rate_limited(self, auth_client, monkeypatch):
+    def test_send_code_rate_limited(self, auth_client, seed_user, monkeypatch):
         """60s 内同一手机号第二次请求 → 429 SMS_RATE_LIMITED。"""
         _patch_sms_client(monkeypatch)
         first = auth_client.post(

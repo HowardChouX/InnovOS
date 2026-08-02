@@ -214,10 +214,10 @@ async def shutdown():
 
 # ── FastAPI Users 路由 ──────────────────────────────────
 from app.api.auth_login import router as auth_login_router
+from app.api.auth_password_login import router as auth_password_login_router
 from app.api.auth_register import router as auth_register_router
 from app.api.password_reset import router as password_reset_router
 from app.api.phone_verification import router as phone_verification_router
-from app.auth.backend import auth_backend
 from app.auth.exceptions import fastapi_users_exception_handler
 from app.auth.instance import fastapi_users
 from app.auth.schemas import UserRead, UserUpdate
@@ -232,21 +232,13 @@ from fastapi_users.exceptions import (
     UserNotExists,
 )
 
-app_.include_router(
-    fastapi_users.get_auth_router(auth_backend, requires_verification=True),
-    prefix="/api/auth/jwt", tags=["auth"],
-)
+app_.include_router(auth_password_login_router)  # 自定义密码登录（phone-first）替代 get_auth_router
 # 自定义注册路由（phone 必填 + 短信自动下发）替代 fastapi_users 默认注册端点
 app_.include_router(auth_register_router)
 # 自定义验证码登录路由（phone + SMS code）
 app_.include_router(auth_login_router)
 # 短信验证码发送/核验端点（发送 OTP + 注册验证翻 is_verified）
 app_.include_router(phone_verification_router)
-# 保留 fastapi-users 内置重置密码路由（向后兼容，前端走自研 /password-reset/*）
-app_.include_router(
-    fastapi_users.get_reset_password_router(),
-    prefix="/api/auth", tags=["auth"],
-)
 # 移除 fastapi_users.get_verify_router(UserRead) -- 改用自实现 /api/auth/sms-verifications
 app_.include_router(
     fastapi_users.get_users_router(UserRead, UserUpdate, requires_verification=True),
@@ -254,6 +246,10 @@ app_.include_router(
 )
 app_.include_router(password_reset_router)
 app_.add_exception_handler(SmsVerificationError, sms_verification_exception_handler)
+# 全局 422 校验错误中文化（覆盖所有端点的英文校验消息）
+from fastapi.exceptions import RequestValidationError
+from app.exceptions.validation import validation_exception_handler
+app_.add_exception_handler(RequestValidationError, validation_exception_handler)
 for exc in (
     UserAlreadyExists, UserNotExists,
     InvalidResetPasswordToken, InvalidPasswordException,

@@ -5,10 +5,11 @@ from pydantic import EmailStr, Field
 
 
 class UserRead(schemas.BaseUser[int]):
-    """用户读取 schema。"""
+    """用户读取 schema。email 可选（phone-first，仅通知用）。"""
 
     username: str | None = None
     phone: str
+    email: EmailStr | None = None
 
 
 class UserCreate(schemas.BaseUserCreate):

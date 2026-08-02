@@ -85,16 +85,13 @@ export function RegisterPage() {
             <p className="text-xs text-slate-500 mt-1">用于登录与接收短信验证码</p>
           </div>
 
-          {/* Email (notification only) */}
+          {/* Email (notification only, optional) */}
           <div>
-            <label className="text-sm text-slate-400 mb-1 block">
-              邮箱 <span className="text-red-400">*</span>
-            </label>
+            <label className="text-sm text-slate-400 mb-1 block">邮箱（可选）</label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="email"
-                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"

@@ -69,18 +69,15 @@ def auth_app(auth_session):
     )
 
     from app.api.auth_login import router as auth_login_router
+    from app.api.auth_password_login import router as auth_password_login_router
     from app.api.auth_register import router as auth_register_router
-    from app.auth.backend import auth_backend
     from app.auth.exceptions import fastapi_users_exception_handler
     from app.auth.instance import fastapi_users
     from app.auth.schemas import UserRead, UserUpdate
 
     app = FastAPI()
-    app.include_router(
-        fastapi_users.get_auth_router(auth_backend),
-        prefix="/api/auth/jwt",
-        tags=["auth"],
-    )
+    # 自定义密码登录路由（phone-first）替代 fastapi_users.get_auth_router
+    app.include_router(auth_password_login_router)
     # 自定义注册路由（phone 必填）替代 fastapi_users 默认注册端点
     app.include_router(auth_register_router)
     app.include_router(auth_login_router)
@@ -104,8 +101,10 @@ def auth_app(auth_session):
     # HTTP route integration tests can exercise the endpoints via auth_client
     # without depending on the full app_.
     from app.api.password_reset import router as password_reset_router
+    from app.api.phone_verification import router as phone_verification_router
 
     app.include_router(password_reset_router)
+    app.include_router(phone_verification_router)
     # SMS 限流/校验异常 → 429/400 JSON（password-reset、phone-verification、login/code 共用）
     from app.exceptions.sms_verification import (
         SmsVerificationError,
@@ -113,6 +112,11 @@ def auth_app(auth_session):
     )
 
     app.add_exception_handler(SmsVerificationError, sms_verification_exception_handler)
+
+    # 全局 422 校验错误中文化（与 main.py 一致）
+    from fastapi.exceptions import RequestValidationError
+    from app.exceptions.validation import validation_exception_handler
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
     for exc in (
         UserAlreadyExists,

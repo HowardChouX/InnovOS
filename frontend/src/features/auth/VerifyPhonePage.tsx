@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { authApi } from '../../api/auth';
-import { Smartphone, ShieldCheck } from 'lucide-react';
+import { useAuthStore } from '../../store/useAuthStore';
+import { Smartphone, ShieldCheck, CheckCircle2 } from 'lucide-react';
 
 export function VerifyPhonePage() {
   const [params] = useSearchParams();
@@ -11,6 +12,7 @@ export function VerifyPhonePage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [cooldown, setCooldown] = useState(60);
+  const [verified, setVerified] = useState(false);
   const refs = useRef<Array<HTMLInputElement | null>>([null, null, null, null, null, null]);
 
   useEffect(() => {
@@ -41,7 +43,16 @@ export function VerifyPhonePage() {
         refs.current[0]?.focus();
         return;
       }
-      navigate(`/login?phone=${encodeURIComponent(phone)}`);
+      // 验证通过：后端已自动登录（Set-Cookie），写入 store 后展示成功画面并进入应用
+      if (result.user) {
+        useAuthStore.setState({
+          user: result.user,
+          isAdmin: result.user.is_superuser ?? false,
+          loading: false,
+        });
+      }
+      setVerified(true);
+      setTimeout(() => navigate('/', { replace: true }), 1400);
     } catch (e) {
       setError(e instanceof Error ? e.message : '验证失败');
       setDigits(['', '', '', '', '', '']);
@@ -77,6 +88,25 @@ export function VerifyPhonePage() {
     setDigits(arr);
     const next = Math.min(text.length, 5);
     refs.current[next]?.focus();
+  }
+
+  // 验证成功过渡画面：短暂停留后自动进入应用
+  if (verified) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center p-4 bg-slate-950"
+        style={{ background: 'radial-gradient(circle at top right, #1a2540 0%, #0b1120 40%)' }}
+      >
+        <div className="text-center animate-[fade-in-up_0.4s_ease-out]">
+          <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
+          <h2 className="text-white font-bold text-xl mb-2">注册成功</h2>
+          <p className="text-slate-400 text-sm flex items-center justify-center gap-2">
+            <span className="w-3.5 h-3.5 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin inline-block" />
+            正在进入 InnovOS…
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (

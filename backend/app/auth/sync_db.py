@@ -22,7 +22,17 @@ class SyncSQLAlchemyUserDatabase:
         return self.session.get(User, id)
 
     async def get_by_email(self, email: str) -> User | None:
+        # phone-first：email 为可选通知字段。email=None 时返回 None，
+        # 避免 `User.email == None` 生成 `IS NULL` 误匹配所有无邮箱用户
+        # （BaseUserManager.create 的唯一性前置检查依赖此行为）。
+        if not email:
+            return None
         statement = select(User).where(User.email == email)
+        return self.session.execute(statement).scalar_one_or_none()
+
+    async def get_by_phone(self, phone: str) -> User | None:
+        """按手机号查找（主登录标识）。"""
+        statement = select(User).where(User.phone == phone)
         return self.session.execute(statement).scalar_one_or_none()
 
     async def get_by_oauth_account(self, oauth: str, account_id: str) -> User | None:
