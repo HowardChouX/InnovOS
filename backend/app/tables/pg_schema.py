@@ -179,6 +179,36 @@ def init_feedbacks(db):
     """)
 
 
+def init_video_tasks(db):
+    """视频生成任务表 — MiniMax 文生视频异步任务持久化。"""
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS video_tasks (
+            id              TEXT PRIMARY KEY,
+            user_id         INTEGER NOT NULL,
+            provider_id     TEXT NOT NULL DEFAULT 'minimax',
+            model           TEXT NOT NULL DEFAULT 'MiniMax-H3',
+            prompt          TEXT NOT NULL,
+            resolution      TEXT NOT NULL DEFAULT '768P',
+            duration        INTEGER NOT NULL DEFAULT 5,
+            ratio           TEXT NOT NULL DEFAULT '16:9',
+            remote_task_id  TEXT,
+            status          TEXT NOT NULL DEFAULT 'pending',
+            video_url       TEXT,
+            error           TEXT,
+            created_at      TIMESTAMPTZ DEFAULT now(),
+            updated_at      TIMESTAMPTZ DEFAULT now()
+        );
+    """)
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_video_tasks_user "
+        "ON video_tasks(user_id, created_at DESC)"
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_video_tasks_status "
+        "ON video_tasks(status)"
+    )
+
+
 def init_audit_log(db):
     """审计日志表 — 记录所有破坏性操作以便安全审查。"""
     db.execute("""
@@ -763,6 +793,7 @@ def init_all_tables(db):
             ("updated_at", "TEXT DEFAULT (to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'))"),
         ],
     )
+    init_video_tasks(db)
 
     # ── 清空 model_providers 与 api_keys(按用户要求:删除所有现有数据,由管理员 UI 重新录入) ──
     # 默认不执行 TRUNCATE(防止生产数据被静默擦除)。
