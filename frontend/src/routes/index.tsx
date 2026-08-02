@@ -32,7 +32,7 @@ const ProblemDefinitionMockPage = lazyPage(
 );
 const SolutionMockPage = lazyPage(() => import('../features/workflow/SolutionMockPage'));
 const EvaluationMockPage = lazyPage(() => import('../features/workflow/EvaluationMockPage'));
-const VideoDisplayMockPage = lazyPage(() => import('../features/workflow/VideoDisplayMockPage'));
+const VideoDisplayPage = lazyPage(() => import('../features/workflow/VideoDisplayPage'));
 
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
@@ -58,7 +58,7 @@ export const routes: RouteObject[] = [
           { path: 'workflow/modeling', element: <ProblemDefinitionMockPage /> },
           { path: 'workflow/solution', element: <SolutionMockPage /> },
           { path: 'workflow/evaluation', element: <EvaluationMockPage /> },
-          { path: 'workflow/video', element: <VideoDisplayMockPage /> },
+          { path: 'workflow/video', element: <VideoDisplayPage /> },
           { path: 'guide', element: <GuidePage /> },
           { path: 'profile', element: <ProfilePage /> },
           {
