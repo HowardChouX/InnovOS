@@ -166,7 +166,7 @@ class TestUpdateIsEnabledInteger:
         # SQL: UPDATE ... SET name=%s, notes=%s, api_host=%s, api_model=%s, is_enabled=%s WHERE provider_id=%s
         # params 顺序: (name, notes, api_host, api_model, is_enabled, provider_id)
         bound_is_enabled = params[4]
-        assert isinstance(bound_is_enabled, int), (
+        assert type(bound_is_enabled) is int, (
             f"is_enabled bound as {type(bound_is_enabled).__name__}, "
             f"expected int — psycopg2 maps Python bool → PostgreSQL BOOLEAN → mismatch"
         )
@@ -199,7 +199,7 @@ class TestUpdateIsEnabledInteger:
         assert len(update_calls) == 1
         _, params = update_calls[0]
         bound_is_enabled = params[4]
-        assert isinstance(bound_is_enabled, int)
+        assert type(bound_is_enabled) is int
         assert bound_is_enabled == 0
 
     def test_update_preserves_existing_when_is_enabled_omitted(self, monkeypatch):

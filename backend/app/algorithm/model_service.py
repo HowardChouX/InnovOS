@@ -77,7 +77,7 @@ class ModelService:
                 db.execute(
                     "INSERT INTO model_providers (provider_id, name, notes, api_host, "
                     "api_model, protocol, models, max_rpm, is_enabled) "
-                    "VALUES (%s, %s, %s, %s, %s, 'openai', '[]', 60, TRUE)",
+                    "VALUES (%s, %s, %s, %s, %s, 'openai', '[]', 60, 1)",
                     (provider_id, name, notes or "", api_host, api_model or ""),
                 )
             else:
@@ -119,7 +119,7 @@ class ModelService:
                 "UPDATE model_providers SET name=%s, notes=%s, api_host=%s, "
                 "api_model=%s, is_enabled=%s WHERE provider_id=%s",
                 (merged["name"], merged["notes"], merged["api_host"],
-                 merged["api_model"], merged["is_enabled"], provider_id),
+                 merged["api_model"], int(bool(merged["is_enabled"])), provider_id),
             )
             db.commit()
         finally:
