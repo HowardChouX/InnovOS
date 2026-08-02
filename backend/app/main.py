@@ -24,6 +24,7 @@ from app.api import knowledge as knowledge_api
 from app.api import knowledge_bases as knowledge_bases_api
 from app.api import models as models_api
 from app.api import profile as profile_api
+from app.api import video as video_api
 from app.api.admin import router as admin_router
 from app.api.sidebar import router as sidebar_router
 from app.api.workflow_steps import router as workflow_steps_router
@@ -150,6 +151,12 @@ async def startup():
     await knowledge_orchestration_service.start()
     logger.info("知识库作业系统已启动")
 
+    # 4.6 启动视频生成轮询器
+    from app.services.video_poller import video_poller
+
+    await video_poller.start()
+    logger.info("视频生成轮询器已启动")
+
     # 5. 启动自动快照备份服务
     from app.services.backup_service import backup_service
 
@@ -204,6 +211,11 @@ async def shutdown():
     from app.services.backup_service import backup_service
 
     await backup_service.stop()
+
+    # 停止视频生成轮询器
+    from app.services.video_poller import video_poller
+
+    await video_poller.stop()
 
     # 取消所有后台任务
     pending_tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
@@ -270,6 +282,7 @@ app_.include_router(knowledge_api.router)
 app_.include_router(knowledge_bases_api.router)
 app_.include_router(kb_tools_api.router)
 app_.include_router(models_api.router)
+app_.include_router(video_api.router)
 app_.include_router(modeling.router)
 app_.include_router(profile_api.router)
 app_.include_router(conversion_api.router)
