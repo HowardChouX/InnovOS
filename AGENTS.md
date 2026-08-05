@@ -143,7 +143,8 @@ frontend/
   - **Alembic 拥有 users 表 DDL**（`alembic/versions/0001_users_fastapi_users_schema.py`）：is_active INTEGER→BOOLEAN、is_superuser/is_verified 字段、email NOT NULL UNIQUE、username 改可空、phone 字段。
   - **数据回填**：一次性的 `scripts/migrate_users_to_fastapi_users.py`（已执行并删除）。
   - **兼容垫片**：`app/_legacy_compat.py` 与 `app/auth/__init__.py` 为尚未迁移的 25+ 路由提供旧符号（`get_current_user`/`require_admin`/`create_access_token` 等），用 `pyjwt` 实现。后续逐步替换为 FastAPI Users 的 `current_active_user`/`current_superuser`。
-- **Admin 模型**：真实 DB 用户（`is_superuser=True`），不再使用 id=0 幽灵用户。`.env` 中的 `INNOVOS_ADMIN_USER`（别名 `FIRST_SUPERUSER`）是种子邮箱，启动时由 `app/auth/seed.py:seed_first_superuser_if_configured()` 幂等创建/提升。
+- **Admin 模型**：真实 DB 用户（`is_superuser=True`），不再使用 id=0 幽灵用户。无环境变量种子化——超级用户由开发者手动设置：`UPDATE users SET is_superuser=true, role='admin' WHERE phone='<手机号>';`
+- **Patent data flow**: 专利功能只使用本地 PostgreSQL（`patents` + `patent_vectors` 表）。`/api/patents/search`（关键词/IPC/申请人筛选，排序字段白名单）与 `/api/patents/detail/{pid}`（内部 ID → 专利号 → 公开号）均直查本地库；工作流专利检索由 `app/algorithm/patent_service.py` 按创新方向关键词本地检索并分组。外部专利接口（CNIPR、PatentHub）已于 2026-08 彻底移除，不留 Provider 兼容层。
 - **Knowledge Base pipeline**: Upload → `KnowledgePipeline` (read + chunk + embed via Embedder) → `VectorStore` write via pgvector. Orchestrated by async job system (`KnowledgeJobManager`). Supports async file processing with retry and exponential backoff.
 - **Job system**: 5 job types in `backend/app/services/knowledge_jobs/` — `prepare-root`, `index-documents`, `check-file-processing-result`, `delete-subtree`, `reindex-subtree`. Enqueued with idempotency keys, retry 3x with exponential backoff. Error callbacks on all async tasks.
 - **Model registry**: `backend/app/algorithm/model_registry.py` loads 2600+ model entries lazily on first access. Capabilities (embedding, rerank, chat) determined by registry lookup → regex inference fallback.

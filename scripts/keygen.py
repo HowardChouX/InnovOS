@@ -5,7 +5,6 @@ InnovOS 本地密钥管理 — 类似 ssh-keygen 的体验。
     python scripts/keygen.py                    # 生成所有密钥
     python scripts/keygen.py --show             # 显示当前配置
     python scripts/keygen.py --rotate jwt       # 轮换 JWT 密钥
-    python scripts/keygen.py --rotate admin     # 轮换管理员密码
 """
 
 import os
@@ -91,8 +90,6 @@ def keygen():
 
     if config.get("INNOVOS_JWT_SECRET", "").startswith("your-"):
         secrets_data["JWT_SECRET"] = generate_secret(256)
-    if config.get("INNOVOS_ADMIN_PASSWORD", "").startswith("your-"):
-        secrets_data["ADMIN_PASSWORD"] = generate_password(24)
     if config.get("POSTGRES_PASSWORD", "").startswith("your-"):
         secrets_data["DB_PASSWORD"] = generate_password(20)
     if config.get("MINIO_ROOT_PASSWORD", "").startswith("your-"):
@@ -116,8 +113,6 @@ def keygen():
     # 写入 .env
     if "JWT_SECRET" in secrets_data:
         write_env_value("INNOVOS_JWT_SECRET", secrets_data["JWT_SECRET"])
-    if "ADMIN_PASSWORD" in secrets_data:
-        write_env_value("INNOVOS_ADMIN_PASSWORD", secrets_data["ADMIN_PASSWORD"])
     if "DB_PASSWORD" in secrets_data:
         write_env_value("POSTGRES_PASSWORD", secrets_data["DB_PASSWORD"])
     if "MINIO_PASSWORD" in secrets_data:
@@ -148,14 +143,9 @@ def rotate(key_name: str):
     if key_name == "jwt":
         write_env_value("INNOVOS_JWT_SECRET", generate_secret(256))
         print("⚠ 注意：轮换 JWT 密钥会使所有现有 token 失效")
-    elif key_name == "admin":
-        new_pass = generate_password(24)
-        write_env_value("INNOVOS_ADMIN_PASSWORD", new_pass)
-        print(f"⚠ 新管理员密码: {new_pass}")
-        print(f"   请立即保存！不会再次显示。")
     else:
         print(f"未知密钥: {key_name}")
-        print("可用: jwt, admin")
+        print("可用: jwt")
 
 
 def show():
@@ -163,7 +153,6 @@ def show():
     config = read_env()
     secrets_keys = [
         "INNOVOS_JWT_SECRET",
-        "INNOVOS_ADMIN_PASSWORD",
         "POSTGRES_PASSWORD",
         "MINIO_ROOT_PASSWORD",
     ]

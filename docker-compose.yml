@@ -3,13 +3,12 @@
 # 容器间无需访问宿主机网络，端口通过 ports 映射暴露。
 
 services:
-
   postgres:
     image: pgvector/pgvector:pg17
     networks:
       - innovos-net
     ports:
-      - "5432:5432"
+      - '5432:5432'
     env_file: ./.env
     environment:
       POSTGRES_DB: innovos
@@ -55,8 +54,8 @@ services:
     networks:
       - innovos-net
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - '9000:9000'
+      - '9001:9001'
     command: server /data --console-address ":9001"
     env_file: ./.env
     environment:
@@ -106,7 +105,7 @@ services:
     networks:
       - innovos-net
     ports:
-      - "8000:8000"
+      - '8000:8000'
     depends_on:
       postgres:
         condition: service_healthy
@@ -122,8 +121,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       DATABASE_URL: postgresql://innovos:${POSTGRES_PASSWORD}@postgres:5432/innovos
       INNOVOS_JWT_SECRET: ${INNOVOS_JWT_SECRET}
-      INNOVOS_ADMIN_USER: ${INNOVOS_ADMIN_USER}
-      INNOVOS_ADMIN_PASSWORD: ${INNOVOS_ADMIN_PASSWORD}
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY: ${MINIO_ROOT_USER}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
@@ -132,10 +129,6 @@ services:
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost}
       REDIS_URL: redis://redis:6379/0
       INNOVOS_ENCRYPT_KEY: ${INNOVOS_ENCRYPT_KEY:?required}
-      CNIPR_CLIENT_ID: ${CNIPR_CLIENT_ID}
-      CNIPR_CLIENT_SECRET: ${CNIPR_CLIENT_SECRET}
-      CNIPR_USERNAME: ${CNIPR_USERNAME:-}
-      CNIPR_PASSWORD: ${CNIPR_PASSWORD:-}
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost}
       ENV: production
     restart: unless-stopped
@@ -153,7 +146,7 @@ services:
     networks:
       - innovos-net
     ports:
-      - "80:80"
+      - '80:80'
     depends_on:
       - backend
     restart: unless-stopped

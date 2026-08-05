@@ -618,7 +618,7 @@ async def run_analysis_background(
                 db.commit()
                 return
 
-        # Step 3: 专利分析 - 统一检索服务（PatentHub 主数据源 + 本地降级）
+        # Step 3: 专利分析 - 本地专利库检索
         if _is_step_pending(db, task_id, "agent5"):
             update_workflow_step(db, task_id, "agent5", "running")
 
@@ -638,10 +638,10 @@ async def run_analysis_background(
                         except (json.JSONDecodeError, TypeError):
                             pass
 
-                # 使用统一专利检索服务
+                # 使用本地专利检索服务
                 from app.algorithm.patent_service import patent_search
 
-                search_result = await patent_search(
+                search_result = patent_search(
                     innovations=innovations_with_ratings,
                     task_description=task_description,
                     max_results=50,
@@ -649,10 +649,7 @@ async def run_analysis_background(
                 patent_info = search_result["patents"]
                 direction_patents = search_result["direction_patents"]
 
-                logger.info(
-                    f"专利检索完成(source={search_result['source']}): "
-                    f"找到 {search_result['total_found']} 条相关专利"
-                )
+                logger.info(f"专利检索完成: 找到 {search_result['total_found']} 条相关专利")
 
             except Exception as e:
                 logger.error(f"专利检索异常: {e}")

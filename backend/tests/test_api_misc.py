@@ -80,63 +80,124 @@ class MockDB:
             return cast_m.group(1), cast_m.group(2).lower()
         return c, None
 
+    @staticmethod
+    def _split_outside_parens(text: str, sep: str) -> list[str]:
+        """Split on sep (case-insensitive) only at parenthesis depth 0."""
+        parts: list[str] = []
+        cur: list[str] = []
+        depth = 0
+        low = text.lower()
+        sepl = sep.lower()
+        i = 0
+        while i < len(text):
+            if text[i] == "(":
+                depth += 1
+            elif text[i] == ")":
+                depth -= 1
+            if depth == 0 and low.startswith(sepl, i):
+                parts.append("".join(cur))
+                cur = []
+                i += len(sepl)
+                continue
+            cur.append(text[i])
+            i += 1
+        parts.append("".join(cur))
+        return parts
+
+    @staticmethod
+    def _is_wrapping_paren(text: str) -> bool:
+        """True if the outermost parens enclose the entire string."""
+        depth = 0
+        for i, ch in enumerate(text):
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+                if depth == 0 and i < len(text) - 1:
+                    return False
+        return True
+
     def _where_conditions(self, sql: str) -> list:
         """Parse WHERE clause into list of condition groups (OR-of-ANDs).
-        Returns list of groups, each group is list of (col, op, is_param, val, func) tuples."""
+        Returns list of groups, each group is list of (col, op, is_param, val, func) tuples.
+        Supports parenthesized sub-expressions: '(A OR B) AND C' is expanded
+        into OR-of-ANDs via distribution → [[A, C], [B, C]]."""
         if "WHERE" not in sql.upper():
             return []
         where_part = sql.split("WHERE", 1)[1].strip()
         where_part = self._strip_suffix(where_part)
-        or_groups = re.split(r'\s+OR\s+', where_part, flags=re.IGNORECASE)
-        result = []
-        for group in or_groups:
-            conditions = []
-            clauses = re.split(r'\s+AND\s+', group.strip(), flags=re.IGNORECASE)
-            for clause in clauses:
-                clause = clause.strip()
-                if not clause:
-                    continue
-                if " LIKE " in clause.upper():
-                    raw = self._strip_alias(clause.split()[0].strip().lower())
-                    col, func = self._extract_func(raw)
-                    val_part = clause.upper().split(" LIKE ")[1].strip()
-                    if val_part == "?":
-                        conditions.append((col, "LIKE", True, None, func))
-                    else:
-                        conditions.append((col, "LIKE", False, val_part.strip("'\""), func))
-                elif " IN " in clause.upper():
-                    raw = self._strip_alias(clause.split()[0].strip().lower())
-                    col, func = self._extract_func(raw)
-                    in_part = clause.upper().split(" IN ")[1]
-                    num_q = in_part.count("?")
-                    conditions.append((col, "IN", True, num_q, func))
-                elif "=?" in clause or "= ?" in clause:
-                    norm = clause.replace("= ?", "=?")
-                    raw = self._strip_alias(norm.split("=?")[0].strip().lower())
-                    col, func = self._extract_func(raw)
-                    right = norm.split("=?")[1].strip() if "=?" in norm else ""
-                    if right == "" or right == "?":
-                        conditions.append((col, "=", True, None, func))
-                    else:
-                        try:
-                            conditions.append((col, "=", False, int(right), func))
-                        except ValueError:
-                            conditions.append((col, "=", False, right.strip("'\""), func))
-                elif "=" in clause:
-                    raw_raw, val_str = clause.split("=", 1)
-                    raw = self._strip_alias(raw_raw.strip().lower())
-                    col, func = self._extract_func(raw)
-                    val_str = val_str.strip()
-                    if val_str.startswith("'"):
-                        conditions.append((col, "=", False, val_str.strip("'"), func))
-                    else:
-                        try:
-                            conditions.append((col, "=", False, int(val_str), func))
-                        except ValueError:
-                            conditions.append((col, "=", False, val_str, func))
-            if conditions:
-                result.append(conditions)
-        return result
+        # Parse top-level AND terms; each term is either a leaf condition
+        # or a nested OR-of-AND structure (from parentheses).
+        terms: list[list[list]] = []
+        for part in self._split_outside_parens(where_part, " and "):
+            part = part.strip()
+            if not part:
+                continue
+            while part.startswith("(") and part.endswith(")") and self._is_wrapping_paren(part):
+                part = part[1:-1].strip()
+            or_parts = [p.strip() for p in self._split_outside_parens(part, " or ")]
+            or_parts = [p for p in or_parts if p]
+            if len(or_parts) > 1:
+                sub = []
+                for clause in or_parts:
+                    cond = self._parse_condition(clause)
+                    if cond:
+                        sub.append([cond])
+                if sub:
+                    terms.append(sub)
+            else:
+                cond = self._parse_condition(or_parts[0] if or_parts else part)
+                if cond:
+                    terms.append([[cond]])
+        # Distribute nested OR groups into flat OR-of-ANDs (cartesian product)
+        flat: list[list] = [[]]
+        for term in terms:
+            flat = [g + alt for g in flat for alt in term]
+        return [g for g in flat if g]
+
+    def _parse_condition(self, clause: str):
+        """Parse a single leaf condition into (col, op, is_param, val, func) or None."""
+        clause = clause.strip()
+        while clause.startswith("(") and clause.endswith(")") and self._is_wrapping_paren(clause):
+            clause = clause[1:-1].strip()
+        if not clause:
+            return None
+        if " LIKE " in clause.upper():
+            raw = self._strip_alias(clause.split()[0].strip().lower())
+            col, func = self._extract_func(raw)
+            val_part = clause.upper().split(" LIKE ")[1].strip()
+            if val_part == "?":
+                return (col, "LIKE", True, None, func)
+            return (col, "LIKE", False, val_part.strip("'\""), func)
+        elif " IN " in clause.upper():
+            raw = self._strip_alias(clause.split()[0].strip().lower())
+            col, func = self._extract_func(raw)
+            in_part = clause.upper().split(" IN ")[1]
+            num_q = in_part.count("?")
+            return (col, "IN", True, num_q, func)
+        elif "=?" in clause or "= ?" in clause:
+            norm = clause.replace("= ?", "=?")
+            raw = self._strip_alias(norm.split("=?")[0].strip().lower())
+            col, func = self._extract_func(raw)
+            right = norm.split("=?")[1].strip() if "=?" in norm else ""
+            if right == "" or right == "?":
+                return (col, "=", True, None, func)
+            try:
+                return (col, "=", False, int(right), func)
+            except ValueError:
+                return (col, "=", False, right.strip("'\""), func)
+        elif "=" in clause:
+            raw_raw, val_str = clause.split("=", 1)
+            raw = self._strip_alias(raw_raw.strip().lower())
+            col, func = self._extract_func(raw)
+            val_str = val_str.strip()
+            if val_str.startswith("'"):
+                return (col, "=", False, val_str.strip("'"), func)
+            try:
+                return (col, "=", False, int(val_str), func)
+            except ValueError:
+                return (col, "=", False, val_str, func)
+        return None
 
     @staticmethod
     def _apply_func(value, func: str | None):
@@ -310,7 +371,7 @@ class MockDB:
             rows.sort(key=lambda r: str(r.get(order_col, "") or ""), reverse=desc)
 
         if "COUNT(*)" in upper:
-            self._last_result = [MockRow({"count(*)": len(rows)})]
+            self._last_result = [MockRow({"count(*)": len(rows), "cnt": len(rows)})]
             return
 
         limit, offset = self._limit_offset(sql, remaining)
@@ -476,11 +537,13 @@ def _patch_all_get_db(monkeypatch, mock_db, *mod_names):
     """Patch get_db at definition site, auth, and specified module names.
 
     This ensures cached module-level references are updated per test.
+    Modules without a get_db attribute (e.g. db_session-only modules)
+    are tolerated via raising=False.
     """
     monkeypatch.setattr("app.database.get_db", lambda: mock_db)
     monkeypatch.setattr("app.auth.get_db", lambda: mock_db)
     for name in mod_names:
-        monkeypatch.setattr(f"{name}.get_db", lambda: mock_db)
+        monkeypatch.setattr(f"{name}.get_db", lambda: mock_db, raising=False)
 
 
 def _user_token(user_id: int = 1) -> str:
@@ -516,16 +579,27 @@ def _seed_user(mock_db, user_id: int = 1, is_superuser: bool = False) -> None:
 
 
 class TestPatentSearch:
-    """GET /api/patents/search"""
+    """GET /api/patents/search（纯本地数据库）"""
 
     @pytest.fixture
     def client(self, mock_db, monkeypatch):
         _patch_all_get_db(monkeypatch, mock_db, "app.api.patents")
         from app.api.patents import router
-        monkeypatch.setattr("app.api.patents.get_db", lambda: mock_db)
         app = FastAPI()
         app.include_router(router)
         return TestClient(app)
+
+    @staticmethod
+    def _patent_row(i, title, abstract, ipc="G06N", applicant="X", score=50):
+        return {"id": i, "title": title, "abstract": abstract,
+                "applicants": json.dumps([applicant], ensure_ascii=False),
+                "inventors": json.dumps(["Y"], ensure_ascii=False),
+                "filing_date": f"2024-{min(i, 12):02d}-01",
+                "publication_date": "2024-12-01",
+                "patent_number": f"CN{i}",
+                "publication_number": f"CN{i}A",
+                "ipc_codes": json.dumps([ipc]),
+                "relevance_score": score}
 
     def test_search_empty(self, client, mock_db):
         """No patents returns empty list."""
@@ -536,58 +610,70 @@ class TestPatentSearch:
         assert data["total"] == 0
 
     def test_search_with_results(self, client, mock_db):
-        """Returns matched patents with proper structure."""
+        """Keyword search matches local patents by title/abstract."""
         mock_db._tables["patents"] = {
-            1: {"id": 1, "title": "智能专利", "abstract": "一种智能算法",
-                "applicants": json.dumps(["公司A"]),
-                "inventors": json.dumps(["张三"]),
-                "filing_date": "2024-01-01",
-                "publication_date": "2024-06-01",
-                "patent_number": "CN123456",
-                "ipc_codes": json.dumps(["G06N"]),
-                "relevance_score": 95},
-            2: {"id": 2, "title": "其他技术", "abstract": "无关内容",
-                "applicants": json.dumps(["公司B"]),
-                "inventors": json.dumps(["李四"]),
-                "filing_date": "2024-02-01",
-                "publication_date": "2024-07-01",
-                "patent_number": "CN789012",
-                "ipc_codes": json.dumps(["H04L"]),
-                "relevance_score": 50},
+            1: self._patent_row(1, "智能专利", "一种智能算法", score=95),
+            2: self._patent_row(2, "其他技术", "无关内容", score=50),
         }
         mock_db._next_ids["patents"] = 3
 
         resp = client.get("/api/patents/search?q=智能")
         assert resp.status_code == 200, resp.text
         data = resp.json()
-        # With empty query (q is just whitespace fallback), returns all
-        # Actually with q='智能' (non-empty), it does hybrid search
-        # For mock DB, keyword search will match patent 1's title/abstract
-        assert len(data["data"]) > 0
+        assert len(data["data"]) == 1
         assert data["code"] == 200
         r = data["data"][0]
         assert "id" in r and "title" in r and "abstract" in r
         assert "applicants" in r and "inventors" in r
+        # 不再返回供应商 source 字段
+        assert "source" not in r
+
+    def test_search_ignores_source_param(self, client, mock_db):
+        """source 参数已删除，传入时被忽略，仍走本地检索"""
+        mock_db._tables["patents"] = {
+            1: self._patent_row(1, "P1", "A1", score=90),
+        }
+        mock_db._next_ids["patents"] = 2
+
+        resp = client.get("/api/patents/search?q=&source=external")
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["total"] == 1
+        assert "source" not in data["data"][0]
+
+    def test_search_ipc_filter(self, client, mock_db):
+        """IPC 分类号筛选"""
+        mock_db._tables["patents"] = {
+            1: self._patent_row(1, "P1", "A1", ipc="H01M"),
+            2: self._patent_row(2, "P2", "A2", ipc="G06N"),
+        }
+        mock_db._next_ids["patents"] = 3
+
+        resp = client.get("/api/patents/search?ipc_code=H01M")
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["data"][0]["title"] == "P1"
+
+    def test_search_applicant_filter(self, client, mock_db):
+        """申请人筛选"""
+        mock_db._tables["patents"] = {
+            1: self._patent_row(1, "P1", "A1", applicant="华为"),
+            2: self._patent_row(2, "P2", "A2", applicant="中兴"),
+        }
+        mock_db._next_ids["patents"] = 3
+
+        resp = client.get("/api/patents/search?applicant=华为")
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["data"][0]["title"] == "P1"
 
     def test_search_empty_query(self, client, mock_db):
-        """Empty q returns all (non-hybrid) results."""
+        """Empty q returns all local patents (paginated)."""
         mock_db._tables["patents"] = {
-            1: {"id": 1, "title": "P1", "abstract": "A1",
-                "applicants": json.dumps(["A"]),
-                "inventors": json.dumps(["B"]),
-                "filing_date": "2024-01-01",
-                "publication_date": "2024-06-01",
-                "patent_number": "CN1",
-                "ipc_codes": json.dumps(["G06N"]),
-                "relevance_score": 90},
-            2: {"id": 2, "title": "P2", "abstract": "A2",
-                "applicants": json.dumps(["C"]),
-                "inventors": json.dumps(["D"]),
-                "filing_date": "2024-02-01",
-                "publication_date": "2024-07-01",
-                "patent_number": "CN2",
-                "ipc_codes": json.dumps(["H04L"]),
-                "relevance_score": 80},
+            1: self._patent_row(1, "P1", "A1", score=90),
+            2: self._patent_row(2, "P2", "A2", score=80),
         }
         mock_db._next_ids["patents"] = 3
 
@@ -598,16 +684,9 @@ class TestPatentSearch:
         assert data["total"] == 2
 
     def test_search_pagination(self, client, mock_db):
-        """Page and page_size work for non-hybrid search."""
+        """Page and page_size work with consistent total count."""
         mock_db._tables["patents"] = {
-            i: {"id": i, "title": f"P{i}", "abstract": f"A{i}",
-                "applicants": json.dumps(["X"]),
-                "inventors": json.dumps(["Y"]),
-                "filing_date": f"2024-{i:02d}-01",
-                "publication_date": "2024-12-01",
-                "patent_number": f"CN{i}",
-                "ipc_codes": json.dumps(["G06N"]),
-                "relevance_score": 50 + i}
+            i: self._patent_row(i, f"P{i}", f"A{i}", score=50 + i)
             for i in range(1, 6)
         }
         mock_db._next_ids["patents"] = 6
@@ -621,53 +700,44 @@ class TestPatentSearch:
         assert data["page_size"] == 2
         assert data["total_pages"] == 3  # ceil(5/2)
 
-
-class TestPatentStats:
-    """GET /api/patents/stats"""
-
-    @pytest.fixture
-    def client(self, mock_db, monkeypatch):
-        _patch_all_get_db(monkeypatch, mock_db, "app.api.patents")
-        from app.api.patents import router
-        app = FastAPI()
-        app.include_router(router)
-        return TestClient(app)
-
-    def test_stats_with_data(self, client, mock_db):
+    def test_search_pagination_with_filter(self, client, mock_db):
+        """总数与列表使用相同筛选条件"""
         mock_db._tables["patents"] = {
-            i: {"id": i, "title": f"P{i}", "abstract": f"A{i}",
-                "applicants": json.dumps(["X"]),
-                "inventors": json.dumps(["Y"]),
-                "filing_date": "2024-01-01",
-                "publication_date": "2024-06-01",
-                "patent_number": f"CN{i}",
-                "ipc_codes": json.dumps(["G06N"]),
-                "relevance_score": i * 10}
-            for i in range(1, 11)
+            i: self._patent_row(i, f"智能专利{i}", f"A{i}", score=i)
+            for i in range(1, 6)
         }
-        mock_db._next_ids["patents"] = 11
+        mock_db._next_ids["patents"] = 6
 
-        resp = client.get("/api/patents/stats")
+        resp = client.get("/api/patents/search?q=智能&page=2&page_size=2")
         assert resp.status_code == 200, resp.text
         data = resp.json()
-        assert data["data"]["totalCount"] == 10
-        assert data["data"]["relatedCount"] == 10
-        assert data["data"]["coreCount"] == 10  # min(36, 10)
-        assert data["data"]["analyzedCount"] == 10
-        assert len(data["data"]["topPatents"]) == 3  # top 3 by relevance_score
+        assert data["total"] == 5
+        assert len(data["data"]) == 2
+        assert data["page"] == 2
 
-    def test_stats_empty(self, client, mock_db):
-        """Empty patent table returns zeros."""
-        resp = client.get("/api/patents/stats")
+    def test_search_sort_whitelist(self, client, mock_db):
+        """非法排序字段/方向回退到白名单默认值"""
+        mock_db._tables["patents"] = {
+            1: self._patent_row(1, "P1", "A1", score=10),
+            2: self._patent_row(2, "P2", "A2", score=90),
+        }
+        mock_db._next_ids["patents"] = 3
+
+        # 注入式排序字段不会拼进 SQL，回退为 relevance_score DESC
+        resp = client.get(
+            "/api/patents/search?q=&sort_by=title;DROP%20TABLE&order=weird"
+        )
         assert resp.status_code == 200, resp.text
         data = resp.json()
-        assert data["data"]["totalCount"] == 0
-        assert data["data"]["relatedCount"] == 0
-        assert data["data"]["topPatents"] == []
+        assert data["data"][0]["title"] == "P2"  # 按 relevance_score 降序
+
+        resp = client.get("/api/patents/search?q=&sort_by=filing_date&order=asc")
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"][0]["title"] == "P1"  # 按 filing_date 升序
 
 
 class TestPatentDetail:
-    """GET /api/patents/{patent_id}"""
+    """GET /api/patents/detail/{pid}（纯本地数据库）"""
 
     @pytest.fixture
     def client(self, mock_db, monkeypatch):
@@ -677,30 +747,53 @@ class TestPatentDetail:
         app.include_router(router)
         return TestClient(app)
 
-    def test_detail_exists(self, client, mock_db):
-        mock_db._tables["patents"] = {
-            42: {"id": 42, "title": "发明", "abstract": "一种方法",
-                 "applicants": json.dumps(["某公司"]),
-                 "inventors": json.dumps(["某人"]),
-                 "filing_date": "2024-03-15",
-                 "publication_date": "2024-09-15",
-                 "patent_number": "CN999",
-                 "ipc_codes": json.dumps(["G06Q"]),
-                 "relevance_score": 88},
-        }
+    @staticmethod
+    def _detail_row():
+        return {"id": 42, "title": "发明", "abstract": "一种方法",
+                "applicants": json.dumps(["某公司"]),
+                "inventors": json.dumps(["某人"]),
+                "filing_date": "2024-03-15",
+                "publication_date": "2024-09-15",
+                "patent_number": "CN999",
+                "publication_number": "CN999A",
+                "ipc_codes": json.dumps(["G06Q"]),
+                "relevance_score": 88,
+                "claims": "权利要求全文",
+                "description": "说明书全文"}
+
+    def test_detail_by_id(self, client, mock_db):
+        mock_db._tables["patents"] = {42: self._detail_row()}
         mock_db._next_ids["patents"] = 43
 
-        resp = client.get("/api/patents/42")
+        resp = client.get("/api/patents/detail/42")
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert data["data"]["id"] == "42"
         assert data["data"]["title"] == "发明"
         assert data["data"]["patentNumber"] == "CN999"
+        assert data["data"]["claims"] == "权利要求全文"
+        assert data["data"]["description"] == "说明书全文"
+
+    def test_detail_by_patent_number(self, client, mock_db):
+        mock_db._tables["patents"] = {42: self._detail_row()}
+        mock_db._next_ids["patents"] = 43
+
+        resp = client.get("/api/patents/detail/CN999")
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"]["patentNumber"] == "CN999"
+
+    def test_detail_by_publication_number(self, client, mock_db):
+        mock_db._tables["patents"] = {42: self._detail_row()}
+        mock_db._next_ids["patents"] = 43
+
+        resp = client.get("/api/patents/detail/CN999A")
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"]["id"] == "42"
 
     def test_detail_not_found(self, client, mock_db):
-        resp = client.get("/api/patents/999")
+        resp = client.get("/api/patents/detail/999")
         assert resp.status_code == 404
-        assert "不存在" in resp.json()["detail"]
+        assert "未找到" in resp.json()["detail"]
 
 
 # ══════════════════════════════════════════════════════════════

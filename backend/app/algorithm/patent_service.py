@@ -1,254 +1,254 @@
 """
-统一专利检索服务 — PatentHub 主数据源 + 本地数据库降级
-自动关键词提取 → 查询生成 → 相关度评分 → 结果合并
+专利检索服务 — 纯本地数据库
+
+专利搜索与详情均从本地 PostgreSQL patents 表检索，
+不再对接任何外部专利 API。
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
-from app.database import get_db
+from app.database import db_session
 
 logger = logging.getLogger(__name__)
 
+# 常见泛化词/停用词，不作为检索词
+_STOP_WORDS = {
+    "方法",
+    "装置",
+    "系统",
+    "结构",
+    "模块",
+    "单元",
+    "设备",
+    "一种",
+    "一个",
+    "该",
+    "其",
+    "的",
+    "了",
+    "基于",
+    "根据",
+    "用于",
+    "利用",
+    "采用",
+    "使用",
+    "进行",
+    "通过",
+    "包括",
+    "设置",
+    "提供",
+    "实现",
+    "发明",
+    "本",
+    "新型",
+    "型",
+    "方案",
+    "技术",
+    "问题",
+    "这是",
+    "可以",
+    "以及",
+    "或者",
+    "如果",
+    "对于",
+    "相关",
+    "研究",
+}
+
+
+def extract_keywords(text: str, max_keywords: int = 5) -> list[str]:
+    """从文本中提取检索关键词（jieba 分词、去重、过滤停用词与过短词元）。"""
+    if not text or not text.strip():
+        return []
+    import jieba
+
+    keywords: list[str] = []
+    seen: set[str] = set()
+    for token in jieba.cut(text.strip()):
+        token = token.strip(" \t,.;:、，。；！？!?\"'“”‘’")
+        lowered = token.lower()
+        if len(token) < 2 or lowered in seen or lowered in _STOP_WORDS:
+            continue
+        if not re.search(r"[a-zA-Z0-9一-鿿]", token):
+            continue
+        seen.add(lowered)
+        keywords.append(token)
+        if len(keywords) >= max_keywords:
+            break
+    return keywords
+
 
 # ══════════════════════════════════════════════════════════
-#  统一检索入口
+#  行 → 字典映射（服务层统一负责，API 与工作流共用）
 # ══════════════════════════════════════════════════════════
 
-async def patent_search(
+
+def _parse_list_field(value: Any) -> list:
+    """applicants/inventors/ipc_codes 在库中为 JSON 字符串，统一解析。"""
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, list) else [str(parsed)]
+        except (ValueError, TypeError):
+            return [value]
+    return []
+
+
+def row_to_patent_dict(row: Any, relevance: float | int | None = None) -> dict:
+    """将 patents 表行转为前端期望的字典格式。"""
+    applicants = _parse_list_field(row["applicants"])
+    inventors = _parse_list_field(row["inventors"])
+    ipc_codes = _parse_list_field(row["ipc_codes"])
+    score = relevance if relevance is not None else (row["relevance_score"] or 0)
+    return {
+        "id": str(row["id"]),
+        "title": row["title"],
+        "summary": row["abstract"] or "",
+        "abstract": row["abstract"] or "",
+        "applicant": ", ".join(applicants),
+        "inventor": ", ".join(inventors),
+        "applicants": applicants,
+        "inventors": inventors,
+        "mainIpc": ipc_codes[0] if ipc_codes else "",
+        "ipc": ", ".join(ipc_codes),
+        "ipcCodes": ipc_codes,
+        "legalStatus": "",
+        "type": "",
+        "documentNumber": row["patent_number"] or "",
+        "patentNumber": row["patent_number"] or "",
+        "patent_number": row["patent_number"] or "",
+        "relevance_score": score,
+        "relevance": score,
+        "relevanceScore": score,
+        "filingDate": row["filing_date"] or "",
+        "filing_date": row["filing_date"] or "",
+        "publicationDate": row["publication_date"] or "",
+        "publication_date": row["publication_date"] or "",
+        "applicationDate": row["filing_date"] or "",
+        "documentDate": row["publication_date"] or "",
+    }
+
+
+# ══════════════════════════════════════════════════════════
+#  工作流专利检索（纯本地）
+# ══════════════════════════════════════════════════════════
+
+
+def patent_search(
     innovations: list[dict],
     task_description: str = "",
     max_results: int = 50,
 ) -> dict[str, Any]:
     """
-    统一专利检索：PatentHub 主数据源 + 本地数据库降级。
+    工作流专利检索：仅查询本地数据库。
 
-    Args:
-        innovations: 创新方向列表（含 description, user_rating）
-        task_description: 任务描述（用于 fallback）
-        max_results: 最大返回数
+    按创新方向提取关键词检索本地专利库，并按方向分组、跨方向去重；
+    无创新方向时用任务描述兜底。无匹配结果时返回空结果，工作流继续。
 
     Returns:
         {
-            "patents": list[dict],         # 专利列表（含 relevance_score）
+            "patents": list[dict],          # 专利列表（含 relevance_score、source_innovation）
             "direction_patents": dict,      # 创新方向 → 专利标题映射
-            "source": str,                  # "patenthub" | "local" | "mixed"
             "total_found": int,
         }
     """
-    patent_info: list[dict] = []
+    patents: list[dict] = []
     direction_patents: dict[str, list[str]] = {}
-    source = "patenthub"
+    seen_ids: set[str] = set()
 
-    # ── 1. 尝试 PatentHub 智能搜索 ──
-    try:
-        from app.algorithm.patent_search_optimizer import optimized_patent_search
+    # (方向名, 检索文本)；方向名为空表示任务描述兜底
+    sources: list[tuple[str, str]] = []
+    for inn in innovations or []:
+        desc = (inn.get("description") or "").strip()
+        if desc:
+            sources.append((desc, desc))
+    if not sources:
+        text = (task_description or "").strip()
+        if text:
+            sources.append(("", text))
 
-        if innovations:
-            logger.info(f"PatentHub 智能搜索: {len(innovations)} 个创新方向")
-            patent_info = await optimized_patent_search(innovations, max_results=max_results)
-        else:
-            # 无创新方向，用任务描述兜底
-            from app.algorithm.patent_hub_client import search_patents as ph_search
+    for direction, text in sources:
+        if len(patents) >= max_results:
+            break
+        keywords = extract_keywords(text)
+        if not keywords:
+            continue
+        rows = _search_rows_by_keywords(keywords, limit=max_results - len(patents))
+        for row in rows:
+            pid = str(row["id"])
+            if pid in seen_ids:
+                continue
+            seen_ids.add(pid)
+            patent = row_to_patent_dict(row, relevance=_keyword_relevance(row, keywords))
+            patent["source_innovation"] = direction
+            patents.append(patent)
+            if direction:
+                direction_patents.setdefault(direction, []).append(patent["title"])
 
-            logger.info("无创新方向数据，使用任务描述进行 PatentHub 搜索")
-            fallback_result = await ph_search(
-                q=f"title:{task_description[:30]}", page_size=10
-            )
-            patent_info = fallback_result.get("patents", [])
-
-        # 按创新方向分组
-        for patent in patent_info:
-            source_inn = patent.get("source_innovation", "")
-            if source_inn:
-                direction_patents.setdefault(source_inn, []).append(
-                    patent.get("title", "未命名专利")
-                )
-
-        logger.info(f"PatentHub 搜索完成: 找到 {len(patent_info)} 条相关专利")
-
-    except Exception as e:
-        logger.warning(f"PatentHub 专利检索失败: {e}")
-
-        # ── 2. 降级到本地数据库 ──
-        try:
-            logger.info("降级到本地数据库搜索...")
-            patent_keywords = [
-                inn.get("description", "")[:30] for inn in (innovations or [])
-            ][:3]
-            if not patent_keywords:
-                patent_keywords = [task_description[:50]]
-
-            patent_info = _local_like_search(task_description, patent_keywords)
-            source = "local"
-            logger.info(f"本地数据库搜索完成: 找到 {len(patent_info)} 条相关专利")
-        except Exception as fallback_e:
-            logger.warning(f"本地数据库搜索也失败: {fallback_e}")
-            source = "none"
-
+    patents.sort(key=lambda p: p["relevance_score"], reverse=True)
     return {
-        "patents": patent_info,
+        "patents": patents,
         "direction_patents": direction_patents,
-        "source": source,
-        "total_found": len(patent_info),
+        "total_found": len(patents),
     }
 
 
-# ══════════════════════════════════════════════════════════
-#  本地数据库降级搜索
-# ══════════════════════════════════════════════════════════
+def _search_rows_by_keywords(keywords: list[str], limit: int) -> list:
+    """按关键词检索本地专利（title/abstract 模糊匹配，参数化查询）。"""
+    conditions = " OR ".join("(title LIKE ? OR abstract LIKE ?)" for _ in keywords)
+    params: list[Any] = []
+    for kw in keywords:
+        like = f"%{kw}%"
+        params.extend([like, like])
+    sql = f"SELECT * FROM patents WHERE {conditions} ORDER BY relevance_score DESC, id LIMIT ?"
+    with db_session() as db:
+        return db.execute(sql, [*params, limit]).fetchall()
 
-def _local_like_search(task_description: str, keywords: list[str]) -> list[dict]:
-    """
-    本地数据库 LIKE 搜索（降级策略）。
-    在已上传的专利中进行关键词匹配。
-    """
-    import json as _json
 
-    db = get_db()
-    try:
-        or_conditions = []
-        params = []
-        for kw in keywords[:3]:
-            like = f"%{kw}%"
-            or_conditions.append("(title LIKE ? OR abstract LIKE ?)")
-            params.extend([like, like])
-
-        if not or_conditions:
-            return []
-
-        sql = f"SELECT * FROM patents WHERE {' OR '.join(or_conditions)} ORDER BY created_at DESC LIMIT 10"
-        rows = db.execute(sql, params).fetchall()
-    finally:
-        db.close()
-
-    results = []
-    for r in rows:
-        applicants = r["applicants"]
-        if isinstance(applicants, str):
-            try:
-                applicants = _json.loads(applicants)
-            except (ValueError, TypeError):
-                applicants = [applicants] if applicants else []
-
-        inventors = r["inventors"]
-        if isinstance(inventors, str):
-            try:
-                inventors = _json.loads(inventors)
-            except (ValueError, TypeError):
-                inventors = [inventors] if inventors else []
-
-        ipc_codes = r["ipc_codes"]
-        if isinstance(ipc_codes, str):
-            try:
-                ipc_codes = _json.loads(ipc_codes)
-            except (ValueError, TypeError):
-                ipc_codes = [ipc_codes] if ipc_codes else []
-
-        results.append({
-            "id": r["id"],
-            "title": r["title"],
-            "summary": r["abstract"] or "",
-            "abstract": r["abstract"] or "",
-            "applicant": ", ".join(applicants) if isinstance(applicants, list) else str(applicants),
-            "inventor": ", ".join(inventors) if isinstance(inventors, list) else str(inventors),
-            "applicants": applicants if isinstance(applicants, list) else [applicants] if applicants else [],
-            "inventors": inventors if isinstance(inventors, list) else [inventors] if inventors else [],
-            "mainIpc": ipc_codes[0] if isinstance(ipc_codes, list) and ipc_codes else "",
-            "ipc": ", ".join(ipc_codes) if isinstance(ipc_codes, list) else "",
-            "ipcCodes": ipc_codes if isinstance(ipc_codes, list) else [],
-            "legalStatus": "",
-            "type": "",
-            "documentNumber": r["patent_number"] or "",
-            "patentNumber": r["patent_number"] or "",
-            "patent_number": r["patent_number"] or "",
-            "relevance_score": r["relevance_score"] or 0,
-            "relevance": r["relevance_score"] or 0,
-            "relevanceScore": r["relevance_score"] or 0,
-            "filingDate": r["filing_date"] or "",
-            "filing_date": r["filing_date"] or "",
-            "publicationDate": r["publication_date"] or "",
-            "publication_date": r["publication_date"] or "",
-            "applicationDate": r["filing_date"] or "",
-            "documentDate": r["publication_date"] or "",
-            "source": "local",
-        })
-
-    return results
+def _keyword_relevance(row: Any, keywords: list[str]) -> int:
+    """以关键词命中率作为相关度（0-100），用于结果排序。"""
+    if not keywords:
+        return 0
+    text = f"{row['title'] or ''} {row['abstract'] or ''}".lower()
+    hits = sum(1 for kw in keywords if kw.lower() in text)
+    return round(hits * 100 / len(keywords))
 
 
 # ══════════════════════════════════════════════════════════
-#  专利详情获取（统一接口）
+#  专利详情（纯本地）
 # ══════════════════════════════════════════════════════════
 
-async def get_patent_detail(patent_id: str) -> dict[str, Any] | None:
+
+def get_patent_detail(pid: str) -> dict[str, Any] | None:
     """
-    获取专利完整详情（PatentHub 优先，本地数据库兜底）。
+    获取专利详情（仅本地数据库）。
+
+    依次按 内部 ID → 专利号 → 公开号 查找；未找到返回 None。
     """
-    # 优先从 PatentHub 获取
-    try:
-        from app.algorithm.patent_hub_client import get_patent_full
+    pid = (pid or "").strip()
+    if not pid:
+        return None
 
-        patent = await get_patent_full(patent_id)
-        if patent:
-            patent["source"] = "patenthub"
-            return patent
-    except Exception as e:
-        logger.warning(f"PatentHub 获取详情失败(id={patent_id}): {e}")
-
-    # 降级到本地数据库
-    return _get_local_patent(patent_id)
-
-
-def _get_local_patent(patent_id: str) -> dict[str, Any] | None:
-    """从本地数据库获取专利详情"""
-    import json as _json
-
-    db = get_db()
-    try:
-        row = db.execute("SELECT * FROM patents WHERE id = ?", [patent_id]).fetchone()
-    finally:
-        db.close()
+    with db_session() as db:
+        row = None
+        if pid.isdigit():
+            row = db.execute("SELECT * FROM patents WHERE id = ?", [int(pid)]).fetchone()
+        if not row:
+            row = db.execute("SELECT * FROM patents WHERE patent_number = ?", [pid]).fetchone()
+        if not row:
+            row = db.execute("SELECT * FROM patents WHERE publication_number = ?", [pid]).fetchone()
 
     if not row:
         return None
 
-    applicants = row["applicants"]
-    if isinstance(applicants, str):
-        try:
-            applicants = _json.loads(applicants)
-        except (ValueError, TypeError):
-            applicants = [applicants] if applicants else []
-
-    inventors = row["inventors"]
-    if isinstance(inventors, str):
-        try:
-            inventors = _json.loads(inventors)
-        except (ValueError, TypeError):
-            inventors = [inventors] if inventors else []
-
-    ipc_codes = row["ipc_codes"]
-    if isinstance(ipc_codes, str):
-        try:
-            ipc_codes = _json.loads(ipc_codes)
-        except (ValueError, TypeError):
-            ipc_codes = [ipc_codes] if ipc_codes else []
-
-    return {
-        "id": str(row["id"]),
-        "title": row["title"],
-        "summary": row["abstract"] or "",
-        "applicant": ", ".join(applicants) if isinstance(applicants, list) else str(applicants),
-        "inventor": ", ".join(inventors) if isinstance(inventors, list) else str(inventors),
-        "mainIpc": ipc_codes[0] if isinstance(ipc_codes, list) and ipc_codes else "",
-        "ipc": ", ".join(ipc_codes) if isinstance(ipc_codes, list) else "",
-        "legalStatus": "",
-        "type": "",
-        "documentNumber": row["patent_number"] or "",
-        "claims": row["claims"] or "",
-        "description": row["description"] or "",
-        "source": "local",
-    }
+    patent = row_to_patent_dict(row)
+    patent["claims"] = row["claims"] or ""
+    patent["description"] = row["description"] or ""
+    return patent

@@ -1,4 +1,4 @@
-import type { Patent, PatentStats } from '../types/patent';
+import type { Patent } from '../types/patent';
 import { apiRequest } from './client';
 
 export interface PatentSearchParams {
@@ -33,10 +33,5 @@ export const patentsApi = {
     const qs = searchParams.toString();
     const res = await apiRequest<PatentSearchResult>(`/api/patents/search${qs ? `?${qs}` : ''}`);
     return res;
-  },
-
-  async getStats(): Promise<PatentStats> {
-    const res = await apiRequest<{ data: PatentStats }>('/api/patents/stats');
-    return res.data;
   },
 };

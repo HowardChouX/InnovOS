@@ -11,7 +11,6 @@ export interface Patent {
   legalStatus: string;
   type: string;
   documentNumber: string;
-  source: 'patenthub' | 'local' | 'cnipr';
   relevance_score?: number;
   source_innovation?: string;
   search_query?: string;
@@ -24,14 +23,6 @@ export interface Patent {
   publicationDate?: string;
   patentNumber?: string;
   ipcCodes?: string[];
-}
-
-export interface PatentStats {
-  totalCount: number;
-  relatedCount: number;
-  coreCount: number;
-  analyzedCount: number;
-  topPatents: Patent[];
 }
 
 export interface PatentSearchQuery {
