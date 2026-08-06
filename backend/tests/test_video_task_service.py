@@ -100,3 +100,29 @@ def test_apply_remote_status_updates_url(fake_db):
     assert "UPDATE video_tasks" in sql
     assert "succeeded" in params
     assert "https://x/y.mp4" in params
+
+
+def test_create_with_provider_and_model(fake_db):
+    """INSERT 应包含 provider_id 和 model 列。"""
+    db, captured = fake_db
+    row = {
+        "id": "tid", "user_id": 1, "provider_id": "minimax", "model": "MiniMax-H3",
+        "prompt": "x", "resolution": "768P", "duration": 5, "ratio": "16:9",
+        "remote_task_id": None, "status": "pending", "video_url": None,
+        "error": None, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z",
+    }
+    db._cursor = FakeCursor(fetchone_val=row)
+
+    svc = VideoTaskService()
+    svc.create(
+        1, prompt="x", resolution="768P", duration=5, ratio="16:9",
+        provider_id="minimax", model="MiniMax-H3",
+    )
+
+    insert_sql, insert_params = captured[0]
+    assert "INSERT INTO video_tasks" in insert_sql
+    assert "provider_id" in insert_sql
+    assert "model" in insert_sql
+    # provider_id 与 model 出现在参数中
+    assert "minimax" in insert_params
+    assert "MiniMax-H3" in insert_params

@@ -42,14 +42,17 @@ class VideoTaskService:
         resolution: str,
         duration: int,
         ratio: str,
+        provider_id: str = "minimax",
+        model: str = "MiniMax-H3",
     ) -> dict[str, Any]:
         task_id = str(uuid.uuid4())
         with db_session() as db:
             db.execute(
                 "INSERT INTO video_tasks "
-                "(id, user_id, prompt, resolution, duration, ratio, status) "
-                "VALUES (?, ?, ?, ?, ?, ?, 'pending')",
-                (task_id, user_id, prompt, resolution, duration, ratio),
+                "(id, user_id, prompt, resolution, duration, ratio, provider_id, model, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')",
+                (task_id, user_id, prompt, resolution, duration, ratio,
+                 provider_id, model),
             )
             row = db.execute(
                 "SELECT * FROM video_tasks WHERE id = ?", (task_id,)
