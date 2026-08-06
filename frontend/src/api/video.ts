@@ -1,6 +1,7 @@
-// 视频生成 API 客户端（MiniMax 文生视频，异步任务）。
+// 视频生成 API 客户端（多供应商异步任务）。
 //
 // 端点契约（见 backend/app/api/video.py）：
+// - GET    /api/video/options       → {data: VideoOptions}（当前用户已开通供应商能力）
 // - POST   /api/video/generate      {prompt, resolution, duration, ratio} → {data:{taskId}}
 // - GET    /api/video/tasks         → {data: VideoTask[]}
 // - GET    /api/video/tasks/{id}    → {data: VideoTask}
@@ -28,9 +29,23 @@ export interface VideoTask {
 
 export interface GenerateInput {
   prompt: string;
-  resolution: '768P' | '2K';
+  resolution: string;
   duration: number;
-  ratio: '21:9' | '16:9' | '4:3' | '1:1' | '3:4' | '9:16';
+  ratio: string;
+}
+
+export interface VideoCapabilities {
+  resolutions: string[];
+  duration: { min: number; max: number };
+  ratios: string[];
+}
+
+export interface VideoOptions {
+  providerId: string;
+  providerName: string;
+  protocol: string;
+  model: string;
+  capabilities: VideoCapabilities;
 }
 
 interface Envelope<T> {
@@ -40,6 +55,10 @@ interface Envelope<T> {
 }
 
 export const videoApi = {
+  getOptions(): Promise<Envelope<VideoOptions>> {
+    return apiRequest('/api/video/options');
+  },
+
   generate(input: GenerateInput): Promise<Envelope<{ taskId: string }>> {
     return apiRequest('/api/video/generate', {
       method: 'POST',

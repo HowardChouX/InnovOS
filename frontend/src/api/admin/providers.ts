@@ -8,6 +8,7 @@ export interface Provider {
   notes: string;
   apiHost: string;
   apiModel: string;
+  protocol: string;
   isEnabled: boolean;
   health?: ProviderHealth;
   createdAt?: string;
@@ -21,6 +22,7 @@ export interface AddProviderInput {
   api_host: string;
   api_key: string;
   api_model?: string;
+  protocol?: string;
 }
 
 export interface UpdateProviderInput {
@@ -30,6 +32,7 @@ export interface UpdateProviderInput {
   api_key?: string;
   api_model?: string;
   is_enabled?: boolean;
+  protocol?: string;
 }
 
 export const providersApi = {

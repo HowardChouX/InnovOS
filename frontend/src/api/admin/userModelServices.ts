@@ -1,4 +1,5 @@
 import { apiRequest } from '../client';
+import type { VideoCapabilities } from '../video';
 
 export interface UserModelService {
   provider_id: string;
@@ -6,11 +7,13 @@ export interface UserModelService {
   name: string;
   api_host: string;
   api_model: string;
+  protocol?: string;
   failover_order: number;
   is_enabled: boolean;
   is_healthy?: boolean;
   consecutive_failures?: number;
   cooldown_until?: string | null;
+  video_capabilities?: VideoCapabilities | null;
 }
 
 export interface AvailableModelService {
@@ -28,12 +31,19 @@ export const userModelServicesApi = {
       `/api/admin/users/${userId}/model-services?capability=${encodeURIComponent(capability)}`,
     ),
 
-  listAvailable: (userId: number, capability: string = 'chat'): Promise<{ data: AvailableModelService[] }> =>
+  listAvailable: (
+    userId: number,
+    capability: string = 'chat',
+  ): Promise<{ data: AvailableModelService[] }> =>
     apiRequest<{ data: AvailableModelService[] }>(
       `/api/admin/users/${userId}/model-services/available?capability=${encodeURIComponent(capability)}`,
     ),
 
-  add: (userId: number, providerId: string, capability: string = 'chat'): Promise<{ data: UserModelService[] }> =>
+  add: (
+    userId: number,
+    providerId: string,
+    capability: string = 'chat',
+  ): Promise<{ data: UserModelService[] }> =>
     apiRequest(`/api/admin/users/${userId}/model-services`, {
       method: 'POST',
       body: JSON.stringify({ provider_id: providerId, capability }),
@@ -59,7 +69,11 @@ export const userModelServicesApi = {
       },
     ),
 
-  reorder: (userId: number, providerIds: string[], capability: string = 'chat'): Promise<{ data: UserModelService[] }> =>
+  reorder: (
+    userId: number,
+    providerIds: string[],
+    capability: string = 'chat',
+  ): Promise<{ data: UserModelService[] }> =>
     apiRequest(`/api/admin/users/${userId}/model-services/order`, {
       method: 'PUT',
       body: JSON.stringify({ provider_ids: providerIds, capability }),
