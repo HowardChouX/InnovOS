@@ -54,6 +54,7 @@ def _load(user_id: int, capability: str = "chat") -> list[dict[str, Any]]:
                 mp.name,
                 mp.api_host,
                 mp.api_model,
+                mp.protocol,
                 COALESCE(ph.is_healthy, TRUE) AS is_healthy,
                 COALESCE(ph.consecutive_failures, 0) AS consecutive_failures,
                 ph.cooldown_until
@@ -67,15 +68,33 @@ def _load(user_id: int, capability: str = "chat") -> list[dict[str, Any]]:
         ).fetchall()
     finally:
         db.close()
-    return [_row_to_dict(r) for r in rows]
+    result = [_row_to_dict(r) for r in rows]
+    # 对 video 能力附加 adapter 能力元数据，供管理员页只读展示
+    if capability == "video":
+        from app.algorithm.clients.video_base import VideoRegistry
+
+        for item in result:
+            protocol = item.get("protocol") or ""
+            if protocol.startswith("video_"):
+                try:
+                    item["video_capabilities"] = VideoRegistry.get(protocol).capabilities()
+                except Exception:  # noqa: BLE001
+                    item["video_capabilities"] = None
+            else:
+                item["video_capabilities"] = None
+    return result
 
 
 def _load_available(user_id: int, capability: str = "chat") -> list[dict[str, Any]]:
     """返回可开通的供应商列表（尚未开通该能力的）"""
     db = get_db()
     try:
+        protocol_filter = ""
+        params = [user_id, capability]
+        if capability == "video":
+            protocol_filter = " AND mp.protocol LIKE 'video_%'"
         rows = db.execute(
-            """
+            f"""
             SELECT
                 mp.provider_id,
                 mp.name,
@@ -90,9 +109,10 @@ def _load_available(user_id: int, capability: str = "chat") -> list[dict[str, An
                 ) AS already_enabled
             FROM model_providers mp
             LEFT JOIN provider_health ph ON ph.provider_id = mp.provider_id
+            WHERE mp.is_enabled = TRUE{protocol_filter}
             ORDER BY mp.name ASC
             """,
-            (user_id, capability),
+            tuple(params),
         ).fetchall()
     finally:
         db.close()

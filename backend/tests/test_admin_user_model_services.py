@@ -127,11 +127,13 @@ class _FakeCursor:
             "chat": list(SERVICES_CHAT),
             "embedding": list(SERVICES_EMBEDDING),
             "rerank": [],
+            "video": [],
         }
         self._available = {
             "chat": list(AVAILABLE_CHAT),
             "embedding": list(AVAILABLE_EMBEDDING),
             "rerank": [],
+            "video": [],
         }
         # Controls for add_service and toggle tests
         self._existing_check: dict | None = None
@@ -162,7 +164,7 @@ class _FakeCursor:
     def _extract_capability(params) -> str:
         if params and isinstance(params, tuple):
             for p in params:
-                if p in ("chat", "embedding", "rerank"):
+                if p in ("chat", "embedding", "rerank", "video"):
                     return str(p)
         return "chat"
 
@@ -734,3 +736,81 @@ class TestAuth:
             json={"provider_ids": ["openai"]},
         )
         assert response.status_code == 403
+
+
+# ====================================================================
+# video 能力过滤 + video_capabilities
+# ====================================================================
+
+
+class TestVideoCapability:
+    """video 能力应过滤 protocol，并附加 adapter 能力元数据。"""
+
+    def test_available_video_filters_protocol(self, client, fake_cursor):
+        """available?capability=video 的 SQL 应包含 protocol LIKE 'video_%' 过滤。"""
+        client.get(
+            "/api/admin/users/1/model-services/available", params={"capability": "video"}
+        )
+        avail_calls = [c for c in fake_cursor.calls if "already_enabled" in c[0].lower()]
+        assert len(avail_calls) >= 1
+        sql, params = avail_calls[0]
+        assert "protocol" in sql
+        assert "LIKE" in sql.upper()
+        assert "video_%" in sql
+        assert "video" in params
+
+    def test_list_video_attaches_capabilities(self, client, fake_cursor):
+        """已开通的 video 服务应附带 video_capabilities（来自 adapter 元数据）。"""
+        fake_cursor.set_services("video", [
+            {
+                "provider_id": "minimax",
+                "capability": "video",
+                "failover_order": 1,
+                "is_enabled": True,
+                "name": "MiniMax",
+                "api_host": "https://api.minimaxi.com",
+                "api_model": "MiniMax-H3",
+                "protocol": "video_minimax",
+                "is_healthy": True,
+                "consecutive_failures": 0,
+                "cooldown_until": None,
+            },
+        ])
+        resp = client.get(
+            "/api/admin/users/1/model-services", params={"capability": "video"}
+        )
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert len(data) == 1
+        item = data[0]
+        assert item["provider_id"] == "minimax"
+        assert item["protocol"] == "video_minimax"
+        caps = item["video_capabilities"]
+        assert caps is not None
+        assert "768P" in caps["resolutions"]
+        assert caps["duration"]["min"] == 4
+
+    def test_list_video_non_video_protocol_has_null_capabilities(self, client, fake_cursor):
+        """protocol 非 video_* 的服务 video_capabilities 为 None。"""
+        fake_cursor.set_services("video", [
+            {
+                "provider_id": "deepseek",
+                "capability": "video",
+                "failover_order": 1,
+                "is_enabled": True,
+                "name": "DeepSeek",
+                "api_host": "https://api.deepseek.com",
+                "api_model": "deepseek-chat",
+                "protocol": "openai",
+                "is_healthy": True,
+                "consecutive_failures": 0,
+                "cooldown_until": None,
+            },
+        ])
+        resp = client.get(
+            "/api/admin/users/1/model-services", params={"capability": "video"}
+        )
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert len(data) == 1
+        assert data[0]["video_capabilities"] is None
