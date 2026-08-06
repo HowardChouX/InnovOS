@@ -16,20 +16,30 @@ from typing import Any
 
 import httpx
 
+from app.algorithm.clients.video_base import VideoAdapter, VideoAdapterError
+
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "MiniMax-H3"
 
-
-class MinimaxVideoError(Exception):
+class MinimaxVideoError(VideoAdapterError):
     """MiniMax 接口返回非 2xx，携带其 error message。"""
 
 
-class MinimaxVideoAdapter:
+class MinimaxVideoAdapter(VideoAdapter):
     """MiniMax 视频生成 REST 适配器（即用即构造 client）。"""
+
+    protocol = "video_minimax"
+    default_model = "MiniMax-H3"
 
     def __init__(self, timeout: float = 30.0) -> None:
         self._timeout = timeout
+
+    def capabilities(self) -> dict[str, Any]:
+        return {
+            "resolutions": ["768P", "2K"],
+            "duration": {"min": 4, "max": 15},
+            "ratios": ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
+        }
 
     @staticmethod
     def _extract_error_message(data: Any, status_code: int) -> str:
@@ -54,6 +64,7 @@ class MinimaxVideoAdapter:
         *,
         api_key: str,
         api_host: str,
+        model: str,
         prompt: str,
         resolution: str,
         duration: int,
@@ -62,7 +73,7 @@ class MinimaxVideoAdapter:
         """创建文生视频任务，返回 MiniMax 侧 task_id。"""
         url = f"{api_host.rstrip('/')}/v2/video_generation"
         body = {
-            "model": DEFAULT_MODEL,
+            "model": model,
             "content": [{"type": "text", "text": prompt}],
             "resolution": resolution,
             "duration": duration,
@@ -99,11 +110,18 @@ class MinimaxVideoAdapter:
                 self._extract_error_message(data, resp.status_code)
             )
         task = (data or {}).get("task", {}) if isinstance(data, dict) else {}
-        status = task.get("status", "")
+        raw_status = task.get("status", "")
+        # 归一化状态
+        if raw_status == "succeeded":
+            status = "succeeded"
+        elif raw_status in ("failed", "cancelled", "expired"):
+            status = "failed"
+        else:
+            status = "running"
         video_url = None
         if status == "succeeded":
             video_url = (task.get("content") or {}).get("url")
-        error = task.get("error") if status in ("failed", "expired") else None
+        error = task.get("error") if raw_status in ("failed", "expired") else None
         # error 可能是 dict/其他类型，而 video_tasks.error 为 TEXT 列：
         # 统一转为字符串，避免 psycopg2 AdaptationError
         if error is not None and not isinstance(error, str):

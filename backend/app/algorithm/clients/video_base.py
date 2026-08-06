@@ -72,3 +72,11 @@ class VideoRegistry:
                 f"已注册: {list(cls._registry.keys())}"
             )
         return adapter
+
+
+# ── 注册内置视频适配器 ──
+from app.algorithm.clients.minimax_video import minimax_video_adapter
+from app.algorithm.clients.dashscope_video import dashscope_video_adapter
+
+VideoRegistry.register(minimax_video_adapter)
+VideoRegistry.register(dashscope_video_adapter)
