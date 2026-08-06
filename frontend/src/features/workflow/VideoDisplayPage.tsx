@@ -1,15 +1,12 @@
 /**
- * 视频展示阶段 — 真实实现（MiniMax-H3 文生视频）。
+ * 视频展示阶段 — 多供应商动态实现。
  *
- * 替换原 VideoDisplayMockPage：用户输入 prompt → 异步生成 → 后台轮询推进 →
- * 成功后原生 <video> 播放。历史列表 5s 轮询，直到无未终态任务。
+ * 挂载时拉取 /api/video/options 获取当前用户已开通供应商的能力元数据，
+ * 据此动态渲染分辨率/时长/宽高比下拉。未开通 → 403 → 显示提示并隐藏表单。
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { videoApi, type GenerateInput, type VideoTask } from '../../api/video';
+import { videoApi, type VideoCapabilities, type VideoTask } from '../../api/video';
 
-const RESOLUTIONS: GenerateInput['resolution'][] = ['768P', '2K'];
-const RATIOS: GenerateInput['ratio'][] = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'];
-const DURATIONS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 const POLL_INTERVAL_MS = 5000;
 
 const NON_TERMINAL = new Set(['pending', 'queued', 'running']);
@@ -27,14 +24,41 @@ export default function VideoDisplayPage() {
   const [tasks, setTasks] = useState<VideoTask[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // 动态选项（来自后端 capabilities）
+  const [capabilities, setCapabilities] = useState<VideoCapabilities | null>(null);
+  const [providerName, setProviderName] = useState('');
+  const [optionsLoaded, setOptionsLoaded] = useState(false);
+  const [noProvider, setNoProvider] = useState(false);
+
   const [prompt, setPrompt] = useState('');
-  const [resolution, setResolution] = useState<GenerateInput['resolution']>('768P');
+  const [resolution, setResolution] = useState('');
   const [duration, setDuration] = useState(5);
-  const [ratio, setRatio] = useState<GenerateInput['ratio']>('16:9');
+  const [ratio, setRatio] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // 加载 options（未开通 → 403 → noProvider）
+  useEffect(() => {
+    videoApi
+      .getOptions()
+      .then((res) => {
+        const caps = res.data.capabilities;
+        setCapabilities(caps);
+        setProviderName(res.data.providerName);
+        setResolution(caps.resolutions[0]);
+        setRatio(caps.ratios[0]);
+        setDuration(caps.duration.min);
+        setNoProvider(false);
+      })
+      .catch(() => {
+        setNoProvider(true);
+      })
+      .finally(() => {
+        setOptionsLoaded(true);
+      });
+  }, []);
 
   const loadTasks = useCallback(async () => {
     try {
@@ -45,7 +69,7 @@ export default function VideoDisplayPage() {
     }
   }, []);
 
-  // 首次加载
+  // 首次加载任务
   useEffect(() => {
     videoApi
       .listTasks()
@@ -93,6 +117,21 @@ export default function VideoDisplayPage() {
     }
   };
 
+  const durationOptions: number[] = capabilities
+    ? Array.from(
+        { length: capabilities.duration.max - capabilities.duration.min + 1 },
+        (_, i) => capabilities.duration.min + i,
+      )
+    : [];
+
+  if (!optionsLoaded) {
+    return (
+      <div className="card" style={{ padding: 24 }}>
+        加载中…
+      </div>
+    );
+  }
+
   return (
     <div
       className="card"
@@ -100,89 +139,91 @@ export default function VideoDisplayPage() {
     >
       <div className="card-title">视频展示</div>
       <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-        输入描述，用 MiniMax-H3 生成方案演示视频
+        {noProvider ? '未开通视频生成服务，请联系管理员' : `使用 ${providerName} 生成方案演示视频`}
       </div>
 
-      {/* ── 生成表单 ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="描述你想生成的视频画面，例如：手机散热结构分层爆炸图动画"
-          maxLength={7000}
-          rows={3}
-          style={{
-            width: '100%',
-            resize: 'vertical',
-            padding: 10,
-            borderRadius: 8,
-            border: '1px solid var(--border)',
-            background: 'var(--bg-card)',
-            color: 'var(--text-primary)',
-            fontSize: 13,
-            fontFamily: 'inherit',
-          }}
-        />
-        <div
-          style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', fontSize: 12 }}
-        >
-          <label style={{ color: 'var(--text-secondary)' }}>
-            分辨率{' '}
-            <select
-              value={resolution}
-              onChange={(e) => setResolution(e.target.value as GenerateInput['resolution'])}
-            >
-              {RESOLUTIONS.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label style={{ color: 'var(--text-secondary)' }}>
-            时长{' '}
-            <select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
-              {DURATIONS.map((d) => (
-                <option key={d} value={d}>
-                  {d}s
-                </option>
-              ))}
-            </select>
-          </label>
-          <label style={{ color: 'var(--text-secondary)' }}>
-            宽高比{' '}
-            <select
-              value={ratio}
-              onChange={(e) => setRatio(e.target.value as GenerateInput['ratio'])}
-            >
-              {RATIOS.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            onClick={handleGenerate}
-            disabled={submitting}
+      {/* ── 生成表单（未开通时隐藏）── */}
+      {noProvider ? null : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="描述你想生成的视频画面，例如：手机散热结构分层爆炸图动画"
+            maxLength={7000}
+            rows={3}
             style={{
-              marginLeft: 'auto',
-              padding: '8px 18px',
+              width: '100%',
+              resize: 'vertical',
+              padding: 10,
               borderRadius: 8,
-              border: 'none',
-              background: '#f97316',
-              color: '#fff',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-card)',
+              color: 'var(--text-primary)',
               fontSize: 13,
-              fontWeight: 600,
-              cursor: submitting ? 'not-allowed' : 'pointer',
-              opacity: submitting ? 0.6 : 1,
+              fontFamily: 'inherit',
+            }}
+          />
+          <div
+            style={{
+              display: 'flex',
+              gap: 12,
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              fontSize: 12,
             }}
           >
-            {submitting ? '提交中…' : '生成视频'}
-          </button>
+            <label style={{ color: 'var(--text-secondary)' }}>
+              分辨率{' '}
+              <select value={resolution} onChange={(e) => setResolution(e.target.value)}>
+                {capabilities?.resolutions.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ color: 'var(--text-secondary)' }}>
+              时长{' '}
+              <select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
+                {durationOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {d}s
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ color: 'var(--text-secondary)' }}>
+              宽高比{' '}
+              <select value={ratio} onChange={(e) => setRatio(e.target.value)}>
+                {capabilities?.ratios.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              onClick={handleGenerate}
+              disabled={submitting}
+              style={{
+                marginLeft: 'auto',
+                padding: '8px 18px',
+                borderRadius: 8,
+                border: 'none',
+                background: '#f97316',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                opacity: submitting ? 0.6 : 1,
+              }}
+            >
+              {submitting ? '提交中…' : '生成视频'}
+            </button>
+          </div>
+          {formError && <div style={{ fontSize: 12, color: '#ef4444' }}>{formError}</div>}
         </div>
-        {formError && <div style={{ fontSize: 12, color: '#ef4444' }}>{formError}</div>}
-      </div>
+      )}
 
       {/* ── 主播放区 ── */}
       <div
@@ -204,7 +245,9 @@ export default function VideoDisplayPage() {
               fontSize: 13,
             }}
           >
-            选择下方任务以预览，或输入描述生成新视频
+            {noProvider
+              ? '请联系管理员开通视频生成服务'
+              : '选择下方任务以预览，或输入描述生成新视频'}
           </div>
         )}
         {selected && selected.status === 'succeeded' && selected.videoUrl && (

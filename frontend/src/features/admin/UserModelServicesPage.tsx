@@ -20,10 +20,11 @@ const CAPABILITIES = [
     status: 'active' as const,
   },
   { key: 'rerank', label: '重排模型', description: '相关性重排、精排', status: 'active' as const },
+  { key: 'video', label: '视频模型', description: '视频生成', status: 'active' as const },
   {
     key: 'image',
-    label: '图片/视频模型',
-    description: '图片生成、视频生成（即将支持）',
+    label: '图片模型',
+    description: '图片生成（即将支持）',
     status: 'coming_soon' as const,
   },
 ] as const;
@@ -257,6 +258,13 @@ function ModelServiceSection({
                 <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
                   {e.api_host} · {e.api_model || '（无默认模型）'}
                 </div>
+                {e.video_capabilities && (
+                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>
+                    分辨率: {e.video_capabilities.resolutions.join(', ')} · 时长:{' '}
+                    {e.video_capabilities.duration.min}~{e.video_capabilities.duration.max}s · 比例:{' '}
+                    {e.video_capabilities.ratios.join(', ')}
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => handleToggle(e.provider_id, !e.is_enabled)}

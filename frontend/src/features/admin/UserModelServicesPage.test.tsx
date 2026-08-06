@@ -39,6 +39,28 @@ vi.mock('../../api/admin/userModelServices', () => ({
           ],
         });
       }
+      if (capability === 'video') {
+        return Promise.resolve({
+          data: [
+            {
+              provider_id: 'vp1',
+              capability: 'video',
+              name: 'Video Provider',
+              api_host: 'https://video-a',
+              api_model: 'vm1',
+              protocol: 'video_minimax',
+              failover_order: 1,
+              is_enabled: true,
+              is_healthy: true,
+              video_capabilities: {
+                resolutions: ['768P', '2K'],
+                duration: { min: 4, max: 15 },
+                ratios: ['16:9', '9:16'],
+              },
+            },
+          ],
+        });
+      }
       // default: chat
       return Promise.resolve({
         data: [
@@ -94,6 +116,20 @@ vi.mock('../../api/admin/userModelServices', () => ({
           ],
         });
       }
+      if (capability === 'video') {
+        return Promise.resolve({
+          data: [
+            {
+              provider_id: 'vp2',
+              name: 'Video Two (available)',
+              api_host: 'https://video-b',
+              api_model: 'vm2',
+              already_enabled: false,
+              is_healthy: true,
+            },
+          ],
+        });
+      }
       // default: chat
       return Promise.resolve({
         data: [
@@ -115,35 +151,34 @@ vi.mock('../../api/admin/userModelServices', () => ({
   },
 }));
 
+function renderPage() {
+  return render(
+    <MemoryRouter initialEntries={['/admin/users/1/model-services']}>
+      <Routes>
+        <Route path="/admin/users/:userId/model-services" element={<UserModelServicesPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 describe('UserModelServicesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renders all 4 capability sections', async () => {
-    render(
-      <MemoryRouter initialEntries={['/admin/users/1/model-services']}>
-        <Routes>
-          <Route path="/admin/users/:userId/model-services" element={<UserModelServicesPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+  it('renders all 5 capability sections', async () => {
+    renderPage();
     await waitFor(() => {
       expect(screen.getByText('文本模型')).toBeInTheDocument();
       expect(screen.getByText('嵌入模型')).toBeInTheDocument();
       expect(screen.getByText('重排模型')).toBeInTheDocument();
-      expect(screen.getByText('图片/视频模型')).toBeInTheDocument();
+      expect(screen.getByText('视频模型')).toBeInTheDocument();
+      expect(screen.getByText('图片模型')).toBeInTheDocument();
     });
   });
 
   it('renders chat capability providers', async () => {
-    render(
-      <MemoryRouter initialEntries={['/admin/users/1/model-services']}>
-        <Routes>
-          <Route path="/admin/users/:userId/model-services" element={<UserModelServicesPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderPage();
     await waitFor(() => {
       expect(screen.getByText('Provider One')).toBeInTheDocument();
       expect(screen.getByText('Provider Two')).toBeInTheDocument();
@@ -152,13 +187,7 @@ describe('UserModelServicesPage', () => {
   });
 
   it('renders embedding capability providers', async () => {
-    render(
-      <MemoryRouter initialEntries={['/admin/users/1/model-services']}>
-        <Routes>
-          <Route path="/admin/users/:userId/model-services" element={<UserModelServicesPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderPage();
     await waitFor(() => {
       expect(screen.getByText('Embed One')).toBeInTheDocument();
       expect(screen.getByText('Embed Two (available)')).toBeInTheDocument();
@@ -166,62 +195,50 @@ describe('UserModelServicesPage', () => {
   });
 
   it('renders rerank capability providers', async () => {
-    render(
-      <MemoryRouter initialEntries={['/admin/users/1/model-services']}>
-        <Routes>
-          <Route path="/admin/users/:userId/model-services" element={<UserModelServicesPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderPage();
     await waitFor(() => {
       expect(screen.getByText('Rerank One')).toBeInTheDocument();
       expect(screen.getByText('Rerank Two (available)')).toBeInTheDocument();
     });
   });
 
-  it('shows coming soon placeholder for image capability', async () => {
-    render(
-      <MemoryRouter initialEntries={['/admin/users/1/model-services']}>
-        <Routes>
-          <Route path="/admin/users/:userId/model-services" element={<UserModelServicesPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+  it('renders video capability providers with capabilities', async () => {
+    renderPage();
     await waitFor(() => {
-      expect(screen.getByText(/图片生成、视频生成（即将支持）/)).toBeInTheDocument();
+      expect(screen.getByText('Video Provider')).toBeInTheDocument();
+      expect(screen.getByText('Video Two (available)')).toBeInTheDocument();
+      // video_capabilities 展示
+      expect(screen.getByText(/768P, 2K/)).toBeInTheDocument();
+      expect(screen.getByText(/4~15s/)).toBeInTheDocument();
+    });
+  });
+
+  it('shows coming soon placeholder for image capability', async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText(/图片生成（即将支持）/)).toBeInTheDocument();
     });
   });
 
   it('shows priority markers across sections', async () => {
-    render(
-      <MemoryRouter initialEntries={['/admin/users/1/model-services']}>
-        <Routes>
-          <Route path="/admin/users/:userId/model-services" element={<UserModelServicesPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderPage();
     await waitFor(() => {
-      // #1 appears in all 3 active sections (chat, embedding, rerank)
-      expect(screen.getAllByText('#1').length).toBe(3);
+      // #1 appears in all 4 active sections (chat, embedding, rerank, video)
+      expect(screen.getAllByText('#1').length).toBe(4);
       // #2 only appears in chat section (2 providers)
       expect(screen.getByText('#2')).toBeInTheDocument();
     });
   });
 
   it('calls list with correct capability for each active section', async () => {
-    render(
-      <MemoryRouter initialEntries={['/admin/users/1/model-services']}>
-        <Routes>
-          <Route path="/admin/users/:userId/model-services" element={<UserModelServicesPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderPage();
     await waitFor(() => {
       expect(screen.getByText('文本模型')).toBeInTheDocument();
     });
     expect(userModelServicesApi.list).toHaveBeenCalledWith(1, 'chat');
     expect(userModelServicesApi.list).toHaveBeenCalledWith(1, 'embedding');
     expect(userModelServicesApi.list).toHaveBeenCalledWith(1, 'rerank');
+    expect(userModelServicesApi.list).toHaveBeenCalledWith(1, 'video');
     // image capability is coming_soon, so list should not be called for it
     expect(userModelServicesApi.list).not.toHaveBeenCalledWith(1, 'image');
   });
