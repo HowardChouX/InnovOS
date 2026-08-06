@@ -57,6 +57,7 @@ export function ModelServiceForm({ open, mode, initial, onClose, onSave }: Model
   const [apiHost, setApiHost] = useState(initial?.apiHost ?? '');
   const [apiKey, setApiKey] = useState('');
   const [apiModel, setApiModel] = useState(initial?.apiModel ?? '');
+  const [protocol, setProtocol] = useState(initial?.protocol ?? 'openai');
   const [showKey, setShowKey] = useState(false);
   const [detected, setDetected] = useState<Array<{ id: string; name: string }>>([]);
   const [detecting, setDetecting] = useState(false);
@@ -75,6 +76,7 @@ export function ModelServiceForm({ open, mode, initial, onClose, onSave }: Model
       setApiHost(initial?.apiHost ?? '');
       setApiKey('');
       setApiModel(initial?.apiModel ?? '');
+      setProtocol(initial?.protocol ?? 'openai');
       setShowKey(false);
       setDetected([]);
       setDetecting(false);
@@ -122,6 +124,7 @@ export function ModelServiceForm({ open, mode, initial, onClose, onSave }: Model
           api_host: apiHost.trim(),
           api_key: apiKey,
           api_model: apiModel.trim(),
+          protocol,
         });
       } else if (initial) {
         await providersApi.update(initial.providerId, {
@@ -130,6 +133,7 @@ export function ModelServiceForm({ open, mode, initial, onClose, onSave }: Model
           api_host: apiHost.trim(),
           api_key: apiKey,
           api_model: apiModel.trim(),
+          protocol,
         });
       }
       onSave();
@@ -258,6 +262,20 @@ export function ModelServiceForm({ open, mode, initial, onClose, onSave }: Model
                 {showKey ? '隐藏' : '显示'}
               </button>
             </div>
+          </div>
+          <div>
+            <label style={labelStyle}>协议</label>
+            <select
+              style={inputStyle}
+              value={protocol}
+              onChange={(e) => setProtocol(e.target.value)}
+              name="innovos_protocol"
+              aria-label="协议"
+            >
+              <option value="openai">openai（文本/通用）</option>
+              <option value="video_minimax">video_minimax（MiniMax 视频）</option>
+              <option value="video_dashscope">video_dashscope（百炼 Wan 视频）</option>
+            </select>
           </div>
           <div>
             <label style={labelStyle}>默认模型</label>

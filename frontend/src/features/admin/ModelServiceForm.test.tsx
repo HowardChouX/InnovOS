@@ -53,4 +53,39 @@ describe('ModelServiceForm', () => {
       expect(providersApi.detect).toHaveBeenCalledWith('https://api.example.com/v1', 'sk-test-key');
     });
   });
+
+  it('renders protocol dropdown with video options', () => {
+    render(<ModelServiceForm open mode="add" onClose={() => {}} onSave={() => {}} />);
+    expect(screen.getByText('openai（文本/通用）')).toBeInTheDocument();
+    expect(screen.getByText('video_minimax（MiniMax 视频）')).toBeInTheDocument();
+    expect(screen.getByText('video_dashscope（百炼 Wan 视频）')).toBeInTheDocument();
+  });
+
+  it('submits protocol with add request', async () => {
+    const { providersApi } = await import('../../api/admin/providers');
+    render(<ModelServiceForm open mode="add" onClose={() => {}} onSave={() => {}} />);
+
+    fireEvent.change(screen.getByPlaceholderText('例如 my-deepseek'), {
+      target: { value: 'my-video' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('DeepSeek (生产)'), {
+      target: { value: 'My Video' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('https://api.example.com/v1'), {
+      target: { value: 'https://api.test.com' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('sk-...'), { target: { value: 'sk-test' } });
+
+    // 选择 video_minimax
+    fireEvent.change(screen.getByRole('combobox', { name: '协议' }), {
+      target: { value: 'video_minimax' },
+    });
+
+    fireEvent.click(screen.getByText('保存'));
+    await waitFor(() => {
+      expect(providersApi.add).toHaveBeenCalledWith(
+        expect.objectContaining({ protocol: 'video_minimax' }),
+      );
+    });
+  });
 });
