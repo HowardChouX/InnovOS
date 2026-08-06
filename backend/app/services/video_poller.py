@@ -1,43 +1,45 @@
-"""后台视频任务轮询器。
+"""后台视频任务轮询器 — 多供应商分组轮询。
 
 startup 启动 asyncio 循环，每 interval_seconds 秒扫描未终态任务，
-向 MiniMax 查询并回写状态。用户离开页面任务仍推进。
+按 provider_id 分组，为每个供应商租用各自密钥、读取对应协议 adapter，
+向远端查询并回写状态。用户离开页面任务仍推进。
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
-from app.algorithm.clients.minimax_video import (
-    MinimaxVideoError,
-    minimax_video_adapter,
-)
+from app.algorithm.clients.video_base import VideoProtocolError, VideoRegistry
 from app.services.video_task_service import video_task_service
 
 logger = logging.getLogger(__name__)
 
-MINIMAX_PROVIDER_ID = "minimax"
 TERMINAL_STATUSES = {"succeeded", "failed", "expired"}
 # 无 remote_task_id 的 pending 任务超过该时长视为孤儿，标记 failed 避免永久滞留
 STALE_PENDING_THRESHOLD = timedelta(minutes=10)
 
 
-def _lease_minimax_key() -> tuple[str | None, str | None]:
+def _lease_key(provider_id: str) -> str | None:
     from app.database import db_session
     from app.services.api_key_service import get_api_key_service
 
     svc = get_api_key_service()
-    lease = svc.lease_key(provider_id=MINIMAX_PROVIDER_ID)
-    if not lease:
-        return None, None
+    lease = svc.lease_key(provider_id=provider_id)
+    return lease.plaintext if lease else None
+
+
+def _read_provider_row(provider_id: str) -> dict | None:
+    """读取 model_providers 的 protocol 和 api_host。"""
+    from app.database import db_session
+
     with db_session() as db:
         row = db.execute(
-            "SELECT api_host FROM model_providers WHERE provider_id = ?",
-            (MINIMAX_PROVIDER_ID,),
+            "SELECT protocol, api_host FROM model_providers WHERE provider_id = ?",
+            (provider_id,),
         ).fetchone()
-    api_host = row["api_host"] if row else "https://api.minimaxi.com"
-    return lease.plaintext, api_host
+    return dict(row) if row else None
 
 
 def _is_stale_pending(task: dict) -> bool:
@@ -73,7 +75,7 @@ class VideoPoller:
             self._task.cancel()
             try:
                 await self._task
-            except (asyncio.CancelledError, Exception):
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
                 pass
             self._task = None
         logger.info("视频轮询器已停止")
@@ -113,27 +115,48 @@ class VideoPoller:
         if not to_query:
             return count
 
-        api_key, api_host = _lease_minimax_key()
-        if not api_key:
-            logger.debug("无 MiniMax 密钥，跳过本轮轮询")
-            return count
-
+        # 按 provider_id 分组
+        groups: dict[str, list[dict]] = defaultdict(list)
         for task in to_query:
-            remote_id = task["remoteTaskId"]
-            try:
-                result = await minimax_video_adapter.query_task(
-                    api_key=api_key, api_host=api_host, remote_task_id=remote_id
-                )
-            except (MinimaxVideoError, Exception) as exc:  # noqa: BLE001
-                logger.warning(f"查询任务 {task['id']} 失败: {exc}")
+            groups[task.get("providerId", "unknown")].append(task)
+
+        for provider_id, tasks in groups.items():
+            api_key = _lease_key(provider_id)
+            if not api_key:
+                logger.debug("供应商 %s 无密钥，跳过该组", provider_id)
                 continue
-            video_task_service.apply_remote_status(
-                task["id"],
-                status=result["status"],
-                video_url=result["video_url"],
-                error=result["error"],
-            )
-            count += 1
+
+            provider_row = _read_provider_row(provider_id)
+            if not provider_row:
+                logger.debug("供应商 %s 不存在，跳过该组", provider_id)
+                continue
+
+            try:
+                adapter = VideoRegistry.get(provider_row["protocol"])
+            except VideoProtocolError:
+                logger.debug(
+                    "供应商 %s 协议 %s 未注册，跳过该组",
+                    provider_id, provider_row.get("protocol"),
+                )
+                continue
+
+            api_host = provider_row["api_host"]
+            for task in tasks:
+                remote_id = task["remoteTaskId"]
+                try:
+                    result = await adapter.query_task(
+                        api_key=api_key, api_host=api_host, remote_task_id=remote_id,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(f"查询任务 {task['id']} 失败: {exc}")
+                    continue
+                video_task_service.apply_remote_status(
+                    task["id"],
+                    status=result["status"],
+                    video_url=result["video_url"],
+                    error=result["error"],
+                )
+                count += 1
         return count
 
 
