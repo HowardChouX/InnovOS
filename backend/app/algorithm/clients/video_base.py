@@ -65,6 +65,7 @@ class VideoRegistry:
 
     @classmethod
     def get(cls, protocol: str) -> VideoAdapter:
+        _ensure_builtins_registered()
         adapter = cls._registry.get(protocol)
         if adapter is None:
             raise VideoProtocolError(
@@ -74,9 +75,17 @@ class VideoRegistry:
         return adapter
 
 
-# ── 注册内置视频适配器 ──
-from app.algorithm.clients.minimax_video import minimax_video_adapter
-from app.algorithm.clients.dashscope_video import dashscope_video_adapter
+def _ensure_builtins_registered() -> None:
+    """惰性注册内置视频适配器。
 
-VideoRegistry.register(minimax_video_adapter)
-VideoRegistry.register(dashscope_video_adapter)
+    延迟导入避免与子类模块（minimax_video / dashscope_video）循环依赖：
+    这两个模块导入时会 import video_base，若 video_base 在模块级反向
+    import 它们，会触发 "partially initialized module" ImportError。
+    """
+    if "video_minimax" in VideoRegistry._registry and "video_dashscope" in VideoRegistry._registry:
+        return
+    from app.algorithm.clients.minimax_video import minimax_video_adapter
+    from app.algorithm.clients.dashscope_video import dashscope_video_adapter
+
+    VideoRegistry.register(minimax_video_adapter)
+    VideoRegistry.register(dashscope_video_adapter)

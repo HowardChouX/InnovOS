@@ -25,7 +25,7 @@ class ModelService:
         db = get_db()
         try:
             rows = db.execute(
-                "SELECT provider_id, name, notes, api_host, api_model, is_enabled, "
+                "SELECT provider_id, name, notes, api_host, api_model, protocol, is_enabled, "
                 "created_at, updated_at "
                 "FROM model_providers ORDER BY id ASC"
             ).fetchall()
@@ -37,7 +37,7 @@ class ModelService:
         db = get_db()
         try:
             row = db.execute(
-                "SELECT provider_id, name, notes, api_host, api_model, is_enabled, "
+                "SELECT provider_id, name, notes, api_host, api_model, protocol, is_enabled, "
                 "created_at, updated_at "
                 "FROM model_providers WHERE provider_id=%s",
                 (provider_id,),
@@ -57,6 +57,7 @@ class ModelService:
         api_host: str,
         api_key_plaintext: str,
         api_model: str = "",
+        protocol: str = "openai",
     ) -> dict[str, Any]:
         if not provider_id or not provider_id.strip():
             raise ValueError("provider_id is required")
@@ -66,6 +67,10 @@ class ModelService:
             raise ValueError("api_host is required")
         if not api_key_plaintext:
             raise ValueError("api_key is required")
+
+        VALID_PROTOCOLS = {"openai", "video_minimax", "video_dashscope"}
+        if protocol not in VALID_PROTOCOLS:
+            raise ValueError(f"invalid protocol: {protocol}")
 
         db = get_db()
         try:
@@ -77,14 +82,14 @@ class ModelService:
                 db.execute(
                     "INSERT INTO model_providers (provider_id, name, notes, api_host, "
                     "api_model, protocol, models, max_rpm, is_enabled) "
-                    "VALUES (%s, %s, %s, %s, %s, 'openai', '[]', 60, 1)",
-                    (provider_id, name, notes or "", api_host, api_model or ""),
+                    "VALUES (%s, %s, %s, %s, %s, %s, '[]', 60, 1)",
+                    (provider_id, name, notes or "", api_host, api_model or "", protocol),
                 )
             else:
                 db.execute(
                     "UPDATE model_providers SET name=%s, notes=%s, api_host=%s, "
-                    "api_model=%s WHERE provider_id=%s",
-                    (name, notes or "", api_host, api_model or "", provider_id),
+                    "api_model=%s, protocol=%s WHERE provider_id=%s",
+                    (name, notes or "", api_host, api_model or "", protocol, provider_id),
                 )
             db.commit()
         finally:
@@ -102,24 +107,31 @@ class ModelService:
         api_host: Optional[str] = None,
         api_model: Optional[str] = None,
         is_enabled: Optional[bool] = None,
+        protocol: Optional[str] = None,
     ) -> Optional[dict[str, Any]]:
         current = self.get(provider_id)
         if current is None:
             return None
+        if protocol is not None:
+            VALID_PROTOCOLS = {"openai", "video_minimax", "video_dashscope"}
+            if protocol not in VALID_PROTOCOLS:
+                raise ValueError(f"invalid protocol: {protocol}")
         merged = {
             "name": name if name is not None else current["name"],
             "notes": notes if notes is not None else current["notes"],
             "api_host": api_host if api_host is not None else current["apiHost"],
             "api_model": api_model if api_model is not None else current["apiModel"],
             "is_enabled": is_enabled if is_enabled is not None else current["isEnabled"],
+            "protocol": protocol if protocol is not None else current["protocol"],
         }
         db = get_db()
         try:
             db.execute(
                 "UPDATE model_providers SET name=%s, notes=%s, api_host=%s, "
-                "api_model=%s, is_enabled=%s WHERE provider_id=%s",
+                "api_model=%s, is_enabled=%s, protocol=%s WHERE provider_id=%s",
                 (merged["name"], merged["notes"], merged["api_host"],
-                 merged["api_model"], int(bool(merged["is_enabled"])), provider_id),
+                 merged["api_model"], int(bool(merged["is_enabled"])),
+                 merged["protocol"], provider_id),
             )
             db.commit()
         finally:
@@ -256,6 +268,7 @@ class ModelService:
             "notes": d.get("notes") or "",
             "apiHost": d.get("api_host") or "",
             "apiModel": d.get("api_model") or "",
+            "protocol": d.get("protocol") or "openai",
             "isEnabled": bool(d.get("is_enabled", True)),
             "createdAt": str(d.get("created_at") or ""),
             "updatedAt": str(d.get("updated_at") or ""),

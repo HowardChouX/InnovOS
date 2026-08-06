@@ -25,6 +25,7 @@ class AddProviderInput(BaseModel):
     api_host: str
     api_key: str
     api_model: str = ""
+    protocol: str = "openai"
 
 
 class UpdateProviderInput(BaseModel):
@@ -34,6 +35,7 @@ class UpdateProviderInput(BaseModel):
     api_key: str | None = None
     api_model: str | None = None
     is_enabled: bool | None = None
+    protocol: str | None = None
 
 
 class DetectInput(BaseModel):
@@ -61,6 +63,7 @@ def add_provider(body: AddProviderInput, user: dict = Depends(require_admin)) ->
         api_host=body.api_host,
         api_key_plaintext=body.api_key,
         api_model=body.api_model,
+        protocol=body.protocol,
     )
     return {"data": result, "message": "供应商已添加"}
 
@@ -82,6 +85,8 @@ def update_provider(
         update_kwargs["api_model"] = body.api_model
     if body.is_enabled is not None:
         update_kwargs["is_enabled"] = body.is_enabled
+    if body.protocol is not None:
+        update_kwargs["protocol"] = body.protocol
 
     current = model_service.get(provider_id)
     if current is None:
@@ -95,6 +100,7 @@ def update_provider(
             api_host=update_kwargs.get("api_host", current["apiHost"]),
             api_key_plaintext=body.api_key,
             api_model=update_kwargs.get("api_model", current["apiModel"]),
+            protocol=update_kwargs.get("protocol", current["protocol"]),
         )
     elif update_kwargs:
         model_service.update(provider_id, **update_kwargs)
