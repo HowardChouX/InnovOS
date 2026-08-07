@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InnovOS需求分析 - 进化法则</title>
+<style>
+  :root{
+    --ink:#141414; --paper:#ffffff; --bg:#f2f1ec; --muted:#6b6b6b;
+    --border:2px solid var(--ink); --shadow:4px 4px 0 rgba(20,20,20,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);padding:26px}
+  .frame{max-width:1240px;margin:0 auto;background:var(--paper);border:var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+
+  /* 浏览器栏 */
+  .browser{padding:14px 20px 10px;border-bottom:var(--border)}
+  .addr{display:inline-block;border:var(--border);border-radius:10px;padding:6px 18px;font-size:13px;font-weight:600}
+  .nav-arrows{margin-top:8px;font-size:18px;font-weight:700;display:flex;gap:16px}
+
+  /* 头部 */
+  .topbar{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:var(--border)}
+  .logo{font-weight:800;font-size:18px}
+  .sub{font-size:13px;font-weight:600;border-left:2px solid #ddd;padding-left:12px}
+  .slogan{flex:1;text-align:center;font-size:13px;color:var(--muted);font-weight:600}
+  .userpill{display:flex;align-items:center;gap:8px;background:#101026;color:#fff;border-radius:10px;padding:6px 10px}
+  .explore{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer}
+  .avatar{width:24px;height:24px;border-radius:50%;background:#4A90D9;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+  .username{font-size:12px}
+
+  /* 布局 */
+  .layout{display:flex}
+  .side{width:168px;padding:16px 14px;display:flex;flex-direction:column;gap:10px;border-right:var(--border)}
+  .side button{border:var(--border);border-radius:10px;background:#fff;padding:10px 0;font-size:14px;font-weight:600;cursor:pointer;box-shadow:var(--shadow)}
+  .side button.on{background:var(--ink);color:#fff}
+  .main{flex:1;padding:16px 18px 24px;min-width:0}
+
+  /* 页签 */
+  .tabs{display:flex;gap:10px;flex-wrap:wrap}
+  .tab{border:var(--border);border-radius:10px;padding:8px 18px;background:#fff;font-weight:600;font-size:14px;cursor:pointer;box-shadow:var(--shadow)}
+  .tab.on{background:var(--ink);color:#fff}
+
+  .panel{border:var(--border);border-radius:14px;margin-top:14px;padding:20px;background:#fdfdfb}
+  .panel h2{font-size:20px}
+  .intro{font-size:13px;color:var(--muted);margin:8px 0 16px;line-height:1.8}
+
+  /* 法则卡片 */
+  .law-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .law-card{border:var(--border);border-radius:12px;background:#fff;padding:14px;cursor:pointer;box-shadow:var(--shadow);transition:transform .15s}
+  .law-card:hover{transform:translateY(-2px)}
+  .law-card.on{transform:translateY(-3px);box-shadow:5px 5px 0 var(--c)}
+  .law-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:14px}
+  .law-icon{width:30px;height:30px;border:var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--c);font-size:15px;flex:none}
+  .law-card p{font-size:12px;color:#444;line-height:1.7}
+  .law-case{margin-top:8px;font-size:11.5px;color:var(--muted);border-top:1px dashed #bbb;padding-top:6px}
+
+  /* 推演器 */
+  .sim{margin-top:16px;border:var(--border);border-radius:14px;background:#fff;padding:16px;box-shadow:var(--shadow)}
+  .sim-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .sim-head h3{font-size:15px;flex:1}
+  .sim-hint{font-size:12px;color:var(--muted)}
+  .route{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:16px 0}
+  .step{border:var(--border);border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:700;background:#fff;cursor:pointer;transition:all .15s}
+  .step:hover{transform:translateY(-1px)}
+  .step.cur{background:var(--ink);color:#fff}
+  .step.next{border-color:var(--c);color:var(--c);box-shadow:3px 3px 0 var(--c)}
+  .arrow{font-style:normal;font-weight:700;color:#999}
+  .advice{border:2px solid var(--c);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.9;background:#fafafa}
+  .advice b{color:var(--c)}
+
+  /* 工作表 */
+  .sheet{margin-top:16px;border:var(--border);border-radius:14px;background:#fff;padding:16px;box-shadow:var(--shadow)}
+  .sheet h3{font-size:15px;margin-bottom:12px}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .form-grid label{font-size:12px;font-weight:700;display:flex;flex-direction:column;gap:6px}
+  .full{grid-column:1/-1}
+  input,select,textarea{border:var(--border);border-radius:8px;padding:8px 10px;font-size:12.5px;background:#fff;font-family:inherit}
+  textarea{resize:vertical;min-height:64px}
+  .btn-row{margin-top:14px;display:flex;gap:10px}
+  .btn{border:var(--border);border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;background:#fff}
+  .btn.dark{background:var(--ink);color:#fff}
+  .report{margin-top:14px;border:2px solid #999;border-radius:10px;padding:14px;font-size:13px;line-height:1.9;background:#fafafa}
+  .hidden{display:none}
+
+  .toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);background:#141414;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:99}
+  .toast.show{opacity:1}
+  @media (max-width:960px){.law-grid{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr}.side{width:130px}}
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <div class="browser">
+    <div class="addr">InnovOS需求分析</div>
+    <div class="nav-arrows"><span>←</span><span>→</span></div>
+  </div>
+
+  <header class="topbar">
+    <span class="logo">InnovOS</span><span class="sub">创新智能操作系统</span>
+    <span class="slogan">让创新更智能，让想法变方案</span>
+    <div class="userpill">
+      <button class="explore">创新探索</button>
+      <span class="avatar">C</span><span class="username">chen</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="side">
+      <button data-page="home">首页</button>
+      <button data-page="proj">项目管理</button>
+      <button data-page="req" class="on">需求分析</button>
+      <button data-page="prob">问题定义</button>
+      <button data-page="search">领域检索</button>
+      <button data-page="gen">方案生成</button>
+      <button data-page="eval">方案评估</button>
+      <button data-page="video">视频展示</button>
+      <button data-page="kb">知识库</button>
+    </aside>
+
+    <section class="main">
+      <div class="tabs">
+        <button class="tab">九屏幕法</button>
+        <button class="tab">最终理想解</button>
+        <button class="tab">STC算子</button>
+        <button class="tab">S曲线分析</button>
+        <button class="tab on" data-id="laws">进化法则</button>
+      </div>
+
+      <div class="panel">
+        <h2>进化法则（技术系统进化预测）</h2>
+        <p class="intro">技术系统的进化不是随机的，而是遵循八大客观法则。点击法则卡片查看其进化路线；在推演器中标记产品当前位置，系统会自动推荐“下一代进化方向”；最后在工作表中生成进化分析报告。</p>
+
+        <!-- 八大法则卡片 -->
+        <div class="law-grid" id="lawGrid"></div>
+
+        <!-- 进化路线推演器 -->
+        <div class="sim" id="simCard">
+          <div class="sim-head">
+            <h3 id="simName">—</h3>
+            <span class="sim-hint">👆 点击路线节点，标记产品当前位置</span>
+          </div>
+          <div class="route" id="route"></div>
+          <div class="advice" id="advice"></div>
+        </div>
+
+        <!-- 进化分析工作表 -->
+        <div class="sheet">
+          <h3>进化分析工作表</h3>
+          <div class="form-grid">
+            <label>分析对象（产品/系统）<input id="wObj" placeholder="如：家用门锁"></label>
+            <label>选用法则<select id="wLaw"></select></label>
+            <label class="full">当前系统主要瓶颈<textarea id="wPain" placeholder="如：机械锁芯易被技术开锁，钥匙易丢失…"></textarea></label>
+            <label>当前所处阶段<select id="wPos"></select></label>
+            <label>下一代产品构想<textarea id="wIdea" placeholder="点击“代入推演结果”可自动填充推荐方向"></textarea></label>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="fillBtn">⬆ 代入推演结果</button>
+            <button class="btn dark" id="reportBtn">生成进化分析报告</button>
+          </div>
+          <div class="report hidden" id="report"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= 八大进化法则数据 ================= */
+const LAWS=[
+ {name:'提高理想度法则',icon:'✨',color:'#4A90D9',
+  meaning:'系统朝着“功能增加、成本与有害作用减少”的方向进化，终极目标是系统本身消失但功能保留（IFR）。',
+  route:['增加有用功能','降低成本/体积','消除有害功能','系统消失·功能保留'],
+  caseEx:'字典 → 电子词典 → 手机APP → 脑机接口',
+  question:'如何让系统在不增加成本的前提下提供更多功能？能否让系统本身消失，利用环境资源实现功能？'},
+ {name:'系统完备性法则',icon:'🧩',color:'#27AE60',
+  meaning:'完整的技术系统必须包含四部件：动力装置、传输装置、执行装置、控制装置，缺一不可。',
+  route:['部件缺失','四部件齐备','部件功能合并','功能转移给超系统'],
+  caseEx:'自行车（人力+链条+车轮+车把）→ 无人驾驶自行车（电机+AI 替代人）',
+  question:'系统的动力、传输、执行、控制是否齐备？哪个部件可以用更优的方式替代？'},
+ {name:'能量传递法则',icon:'⚡',color:'#F2994A',
+  meaning:'能量（物质/信息）必须高效、低损耗地在系统各部件间传递，传递方式不断升级。',
+  route:['机械传递','液压/气动','电磁传递','场传递（无线）'],
+  caseEx:'齿轮传动轴 → 液压 → 轮毂电机 → 无线充电',
+  question:'能量损耗发生在哪里？能否去掉中间传递环节，改用“场”直接传递？'},
+ {name:'协调性法则',icon:'🎯',color:'#9B51E0',
+  meaning:'系统各部件的频率、节奏、材料特性必须相互协调，或利用共振完成特定功能。',
+  route:['不协调','静态协调','动态协调','自适应协调'],
+  caseEx:'浸泡清洗 → 超声波共振清洗',
+  question:'各部件的节奏与频率是否匹配？能否主动利用共振（或刻意避免共振）？'},
+ {name:'不均衡进化法则',icon:'⚖️',color:'#EB5757',
+  meaning:'系统各部件发展速度不同，落后部件与先进部件的冲突就是技术矛盾的根源。',
+  route:['发现瓶颈部件','定义技术矛盾','解决矛盾','系统均衡跃迁'],
+  caseEx:'发动机动力过强 vs 刹车落后 → 催生盘式刹车与 ABS',
+  question:'系统中哪个部件发展最落后？它与其他部件产生了什么矛盾？'},
+ {name:'动态性进化法则',icon:'🌀',color:'#2F80ED',
+  meaning:'系统从刚性、固定结构向柔性、可动、自适应方向进化，以应对多变环境。',
+  route:['刚性体','单铰链','多铰链','柔性体','液体/气体','场'],
+  caseEx:'直尺 → 卷尺 → 软皮尺 → 激光测距仪',
+  question:'系统的哪个刚性部分可以变得可动、柔性或自适应？'},
+ {name:'向超系统进化法则',icon:'🌐',color:'#219653',
+  meaning:'单系统达到极限后，会与同类/互补系统组合成多系统，或将功能外包给超系统。',
+  route:['单系统','双系统','多系统','与超系统融合'],
+  caseEx:'单摄 → 双摄/三摄 → 云端计算摄影',
+  question:'能否与同类或互补系统组合？能否把功能交给超系统（云端/环境）执行？'},
+ {name:'向微观级进化法则',icon:'🔬',color:'#6B6B6B',
+  meaning:'系统的作用层次从宏观机械结构向微观（分子、原子、电子、场）发展。',
+  route:['宏观机械','微观结构','分子级','原子级','电子/场'],
+  caseEx:'机械锁 → 磁卡锁 → 指纹/人脸识别锁',
+  question:'能否用微观粒子、分子、电子或“场”替代宏观机械动作？'}
+];
+
+let curLaw=5, curPos=0; // 默认：动态性进化法则
+
+/* ================= 渲染法则卡片 ================= */
+const grid=document.getElementById('lawGrid');
+grid.innerHTML=LAWS.map((l,i)=>`
+  <div class="law-card" data-i="${i}" style="--c:${l.color}">
+    <div class="law-head"><span class="law-icon">${l.icon}</span><b>${l.name}</b></div>
+    <p>${l.meaning}</p>
+    <div class="law-case">案例：${l.caseEx}</div>
+  </div>`).join('');
+grid.querySelectorAll('.law-card').forEach(c=>c.onclick=()=>{selectLaw(+c.dataset.i);
+  document.getElementById('simCard').scrollIntoView({behavior:'smooth',block:'center'});});
+
+/* ================= 推演器 ================= */
+function selectLaw(i){
+  curLaw=i; curPos=0;
+  grid.querySelectorAll('.law-card').forEach((c,idx)=>c.classList.toggle('on',idx===i));
+  document.getElementById('wLaw').innerHTML=LAWS.map((l,idx)=>`<option ${idx===i?'selected':''}>${l.name}</option>`).join('');
+  renderSim();
+}
+function renderSim(){
+  const l=LAWS[curLaw];
+  document.getElementById('simName').textContent=`${l.icon} ${l.name} · 进化路线`;
+  document.getElementById('wPos').innerHTML=l.route.map((s,idx)=>`<option ${idx===curPos?'selected':''}>${s}</option>`).join('');
+  document.getElementById('route').innerHTML=l.route.map((s,idx)=>
+    `<span class="step ${idx===curPos?'cur':''} ${idx===curPos+1?'next':''}" data-idx="${idx}" style="--c:${l.color}">${s}</span>${idx<l.route.length-1?'<i class="arrow">→</i>':''}`).join('');
+  document.getElementById('route').querySelectorAll('.step').forEach(st=>st.onclick=()=>{curPos=+st.dataset.idx;renderSim();});
+  const adv=document.getElementById('advice');
+  adv.style.borderColor=l.color;
+  if(curPos<l.route.length-1){
+    adv.innerHTML=`当前阶段：<b>${l.route[curPos]}</b>　⇒　推荐进化方向：<b>${l.route[curPos+1]}</b><br>
+    💡 引导问题：${l.question}<br>📌 参考案例：${l.caseEx}`;
+  }else{
+    adv.innerHTML=`当前阶段：<b>${l.route[curPos]}</b>（已到达该路线终点）<br>
+    💡 建议：切换其他进化法则寻找新空间，或构建全新的 S 曲线。`;
+  }
+}
+
+/* ================= 工作表 ================= */
+document.getElementById('wLaw').onchange=e=>{selectLaw(LAWS.findIndex(l=>l.name===e.target.value));};
+document.getElementById('wPos').onchange=e=>{curPos=LAWS[curLaw].route.indexOf(e.target.value);renderSim();};
+document.getElementById('fillBtn').onclick=()=>{
+  const l=LAWS[curLaw];
+  document.getElementById('wIdea').value = curPos<l.route.length-1
+    ? `沿「${l.name}」向【${l.route[curPos+1]}】进化：`
+    : `该路线已达终点，尝试切换法则或构建新S曲线。`;
+  toast('已代入推演结果');
+};
+document.getElementById('reportBtn').onclick=()=>{
+  const l=LAWS[curLaw], obj=document.getElementById('wObj').value||'（未填写分析对象）';
+  const pain=document.getElementById('wPain').value||'（未填写）';
+  const idea=document.getElementById('wIdea').value||'（未填写）';
+  const next=curPos<l.route.length-1?l.route[curPos+1]:'路线终点，建议切换法则';
+  const box=document.getElementById('report');
+  box.classList.remove('hidden'); box.style.borderColor=l.color;
+  box.innerHTML=`<b style="color:${l.color}">《${obj}》进化分析报告</b><br>
+  ① 选用法则：${l.icon} ${l.name}<br>
+  ② 当前瓶颈：${pain}<br>
+  ③ 当前阶段：${l.route[curPos]}　→　④ 推荐方向：<b style="color:${l.color}">${next}</b><br>
+  ⑤ 进化构想：${idea}<br>
+  ⑥ 引导问题：${l.question}`;
+  box.scrollIntoView({behavior:'smooth',block:'center'});
+};
+
+/* ================= 页签 / 侧栏 / Toast ================= */
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),1800);}
+document.querySelectorAll('.tab').forEach(tab=>tab.onclick=()=>{
+  if(tab.dataset.id==='laws'){toast('当前位于：进化法则');return;}
+  toast(`演示版：「${tab.textContent}」模块暂未开放`);
+});
+document.querySelectorAll('.side button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.side button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  if(b.dataset.page!=='req') toast(`演示版：「${b.textContent}」页面暂未开放`);
+});
+
+selectLaw(5); // 初始化
+</script>
+</body>
+</html>

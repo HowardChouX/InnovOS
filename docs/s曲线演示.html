@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InnovOS需求分析 - S曲线分析</title>
+<style>
+  :root{
+    --ink:#141414; --paper:#ffffff; --bg:#f2f1ec; --muted:#6b6b6b;
+    --blue:#4A90D9; --green:#27AE60; --orange:#F2994A; --red:#EB5757;
+    --border:2px solid var(--ink); --shadow:4px 4px 0 rgba(20,20,20,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);padding:26px}
+  .frame{max-width:1240px;margin:0 auto;background:var(--paper);border:var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+
+  /* ===== 顶部浏览器栏 ===== */
+  .browser{padding:14px 20px 10px;border-bottom:var(--border)}
+  .addr{display:inline-block;border:var(--border);border-radius:10px;padding:6px 18px;font-size:13px;font-weight:600}
+  .nav-arrows{margin-top:8px;font-size:18px;font-weight:700;display:flex;gap:16px}
+
+  /* ===== 头部 ===== */
+  .topbar{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:var(--border)}
+  .logo{font-weight:800;font-size:18px}
+  .sub{font-size:13px;font-weight:600;border-left:2px solid #ddd;padding-left:12px}
+  .slogan{flex:1;text-align:center;font-size:13px;color:var(--muted);font-weight:600}
+  .userpill{display:flex;align-items:center;gap:8px;background:#101026;color:#fff;border-radius:10px;padding:6px 10px}
+  .explore{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer}
+  .avatar{width:24px;height:24px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+  .username{font-size:12px}
+
+  /* ===== 主体布局 ===== */
+  .layout{display:flex}
+  .side{width:168px;padding:16px 14px;display:flex;flex-direction:column;gap:10px;border-right:var(--border)}
+  .side button{border:var(--border);border-radius:10px;background:#fff;padding:10px 0;font-size:14px;font-weight:600;cursor:pointer;box-shadow:var(--shadow)}
+  .side button:hover{transform:translateY(-1px)}
+  .side button.on{background:var(--ink);color:#fff}
+  .main{flex:1;padding:16px 18px 24px;min-width:0}
+
+  /* ===== 页签 ===== */
+  .tabs{display:flex;gap:10px;flex-wrap:wrap}
+  .tab{border:var(--border);border-radius:10px;padding:8px 18px;background:#fff;font-weight:600;font-size:14px;cursor:pointer;box-shadow:var(--shadow)}
+  .tab.on{background:var(--ink);color:#fff}
+
+  .panel{border:var(--border);border-radius:14px;margin-top:14px;padding:20px;background:#fdfdfb}
+  .panel h2{font-size:20px}
+  .panel .intro{font-size:13px;color:var(--muted);margin:8px 0 16px;line-height:1.7}
+
+  /* ===== 图表卡片 ===== */
+  .chart-card{border:var(--border);border-radius:14px;padding:16px;background:#fff;box-shadow:var(--shadow)}
+  .chart-head{display:flex;align-items:center;gap:14px;margin-bottom:8px;flex-wrap:wrap}
+  .chart-head h3{font-size:15px;flex:1}
+  #playBtn{border:var(--border);border-radius:8px;background:#fff;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer}
+  #playBtn:hover{background:var(--ink);color:#fff}
+  #stageNow{font-size:12px;color:var(--muted)}
+  #chartWrap{position:relative}
+  #chartWrap svg{width:100%;height:auto;display:block}
+  .region{cursor:pointer;transition:fill-opacity .2s}
+  .tip{position:absolute;pointer-events:none;background:#141414;color:#fff;border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.6;max-width:250px;display:none;z-index:5}
+  .tip.show{display:block}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--muted);align-items:center}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+
+  /* ===== 阶段卡片 ===== */
+  .stage-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+  .stage-card{border:var(--border);border-radius:12px;padding:14px;background:#fff;cursor:pointer;box-shadow:var(--shadow);transition:transform .15s}
+  .stage-card:hover{transform:translateY(-2px)}
+  .stage-card.active{transform:translateY(-3px);box-shadow:5px 5px 0 var(--c)}
+  .stage-card h4{display:flex;align-items:center;gap:8px;font-size:15px;margin-bottom:10px}
+  .stage-card h4 i{width:12px;height:12px;border-radius:50%;background:var(--c)}
+  .stage-card ul{list-style:none}
+  .stage-card li{font-size:12px;color:#444;line-height:1.6;margin-bottom:5px}
+  .stage-card li b{color:var(--ink)}
+  .stage-card .st{margin-top:8px;padding-top:8px;border-top:1px dashed #bbb;font-size:12px;color:var(--c);font-weight:700}
+
+  /* ===== 诊断 & 战略 ===== */
+  .two-col{display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-top:16px}
+  .card{border:var(--border);border-radius:14px;padding:16px;background:#fff;box-shadow:var(--shadow)}
+  .card h3{font-size:15px;margin-bottom:12px}
+  .diag-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .diag-grid label{font-size:12px;font-weight:700;display:flex;flex-direction:column;gap:6px}
+  select{border:var(--border);border-radius:8px;padding:7px 8px;background:#fff;font-size:12px}
+  #diagBtn{margin-top:12px;border:var(--border);border-radius:8px;background:var(--ink);color:#fff;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer}
+  .result{margin-top:12px;border:2px solid #999;border-radius:10px;padding:12px;font-size:13px;line-height:1.7;background:#fafafa}
+  .hidden{display:none}
+  .flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;font-weight:700}
+  .flow span{border:var(--border);border-radius:8px;padding:4px 10px;background:#fff}
+  .card p.note{font-size:12px;color:var(--muted);line-height:1.8}
+
+  .toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);background:#141414;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:99}
+  .toast.show{opacity:1}
+  @media (max-width:960px){.stage-grid{grid-template-columns:repeat(2,1fr)}.two-col{grid-template-columns:1fr}.side{width:130px}}
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <!-- 浏览器栏 -->
+  <div class="browser">
+    <div class="addr">InnovOS需求分析</div>
+    <div class="nav-arrows"><span>←</span><span>→</span></div>
+  </div>
+
+  <!-- 头部 -->
+  <header class="topbar">
+    <span class="logo">InnovOS</span><span class="sub">创新智能操作系统</span>
+    <span class="slogan">让创新更智能，让想法变方案</span>
+    <div class="userpill">
+      <button class="explore">创新探索</button>
+      <span class="avatar">C</span><span class="username">chen</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- 左侧导航 -->
+    <aside class="side">
+      <button data-page="home">首页</button>
+      <button data-page="proj">项目管理</button>
+      <button data-page="req" class="on">需求分析</button>
+      <button data-page="prob">问题定义</button>
+      <button data-page="search">领域检索</button>
+      <button data-page="gen">方案生成</button>
+      <button data-page="eval">方案评估</button>
+      <button data-page="video">视频展示</button>
+      <button data-page="kb">知识库</button>
+    </aside>
+
+    <!-- 主区域 -->
+    <section class="main">
+      <div class="tabs">
+        <button class="tab">九屏幕法</button>
+        <button class="tab">最终理想解</button>
+        <button class="tab">STC算子</button>
+        <button class="tab on" data-id="scurve">S曲线分析</button>
+        <button class="tab">进化法则</button>
+      </div>
+
+      <div class="panel">
+        <h2>S曲线分析（技术系统生命周期）</h2>
+        <p class="intro">任何技术系统的性能提升都遵循“S”形生命周期：婴儿期 → 成长期 → 成熟期 → 衰退期。通过专利数量、专利级别、性能参数与利润趋势四项指标，判断产品所处阶段，并决定是继续优化还是跃迁到“第二曲线”。</p>
+
+        <!-- 图表 -->
+        <div class="chart-card" id="chartCard">
+          <div class="chart-head">
+            <h3>技术系统进化 S 曲线</h3>
+            <span id="stageNow">当前阶段：—</span>
+            <button id="playBtn">▶ 播放进化动画</button>
+          </div>
+          <div id="chartWrap"><div class="tip" id="tip"></div></div>
+          <div class="legend">
+            <span><i style="background:var(--blue)"></i>婴儿期</span>
+            <span><i style="background:var(--green)"></i>成长期</span>
+            <span><i style="background:var(--orange)"></i>成熟期</span>
+            <span><i style="background:var(--red)"></i>衰退期</span>
+            <span>—— 当前技术曲线</span><span>- - - 第二曲线</span>
+          </div>
+        </div>
+
+        <!-- 四阶段卡片 -->
+        <div class="stage-grid">
+          <div class="stage-card" data-id="infancy" style="--c:var(--blue)">
+            <h4><i></i>婴儿期</h4>
+            <ul>
+              <li><b>性能：</b>提升缓慢，投入大产出低</li>
+              <li><b>利润：</b>通常为负（亏损）</li>
+              <li><b>专利：</b>数量少，多为 1-2 级</li>
+            </ul>
+            <div class="st">策略：解决初始矛盾，活下来</div>
+          </div>
+          <div class="stage-card" data-id="growth" style="--c:var(--green)">
+            <h4><i></i>成长期</h4>
+            <ul>
+              <li><b>性能：</b>指数级飙升</li>
+              <li><b>利润：</b>快速增长，市场扩大</li>
+              <li><b>专利：</b>爆发式增长，多 3-4 级</li>
+            </ul>
+            <div class="st">策略：集中资源，快速抢占市场</div>
+          </div>
+          <div class="stage-card" data-id="maturity" style="--c:var(--orange)">
+            <h4><i></i>成熟期</h4>
+            <ul>
+              <li><b>性能：</b>逼近极限，提升停滞</li>
+              <li><b>利润：</b>达到顶峰后下滑</li>
+              <li><b>专利：</b>数量多但多为 1-2 级</li>
+            </ul>
+            <div class="st">策略：停止死磕，准备跃迁第二曲线</div>
+          </div>
+          <div class="stage-card" data-id="decline" style="--c:var(--red)">
+            <h4><i></i>衰退期</h4>
+            <ul>
+              <li><b>性能：</b>达到物理极限</li>
+              <li><b>利润：</b>持续下滑</li>
+              <li><b>专利：</b>数量锐减</li>
+            </ul>
+            <div class="st">策略：切换全新技术原理</div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <!-- 快速诊断 -->
+          <div class="card">
+            <h3>产品阶段快速诊断</h3>
+            <div class="diag-grid">
+              <label>专利数量趋势
+                <select id="dPatent"><option>上升</option><option>平稳</option><option>下降</option></select>
+              </label>
+              <label>专利级别分布
+                <select id="dLevel"><option>3-4级为主</option><option>混合分布</option><option>1-2级为主</option></select>
+              </label>
+              <label>利润表现
+                <select id="dProfit"><option>亏损</option><option>快速增长</option><option>顶峰后下滑</option></select>
+              </label>
+            </div>
+            <button id="diagBtn">开始诊断</button>
+            <div id="diagResult" class="result hidden"></div>
+          </div>
+
+          <!-- 第二曲线战略 -->
+          <div class="card">
+            <h3>第二曲线 · 技术跃迁示例</h3>
+            <div class="flow"><span>机械表</span>→<span>石英表</span>→<span>智能表</span></div>
+            <div class="flow"><span>胶卷相机</span>→<span>数码相机</span>→<span>计算摄影</span></div>
+            <div class="flow"><span>功能机</span>→<span>智能手机</span>→<span>AI 终端</span></div>
+            <p class="note">当诊断结果为「成熟期 / 衰退期」时，应结合<b>进化法则</b>（向微观级进化、动态性进化、向超系统进化等）主动构建下一条 S 曲线，而非在旧曲线上做渐进式改良。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= S曲线绘制 ================= */
+const W=880,H=430,ML=64,MR=26,MT=34,MB=56;
+const X=t=>ML+t*(W-ML-MR), Y=v=>H-MB-v*(H-MT-MB);
+const logi=(t,t0,k)=>1/(1+Math.exp(-k*(t-t0)));
+
+const stages=[
+ {id:'infancy', name:'婴儿期', color:'#4A90D9', from:0,   to:0.32, desc:'性能提升缓慢 · 利润亏损 · 专利少且级别低'},
+ {id:'growth',  name:'成长期', color:'#27AE60', from:0.32,to:0.62, desc:'性能指数上升 · 利润激增 · 高级别专利爆发'},
+ {id:'maturity',name:'成熟期', color:'#F2994A', from:0.62,to:0.86, desc:'逼近极限 · 利润顶峰后下滑 · 低级别专利泛滥'},
+ {id:'decline', name:'衰退期', color:'#EB5757', from:0.86,to:1,    desc:'达到物理极限 · 利润下滑 · 将被新曲线取代'}
+];
+
+function path(t0,k,from,to,scale){
+  let d='';for(let i=0;i<=140;i++){
+    const t=from+(to-from)*i/140, v=logi(t,t0,k)*scale;
+    d+=(i?'L':'M')+X(t).toFixed(1)+','+Y(v).toFixed(1)+' ';
+  }return d;
+}
+
+(function buildChart(){
+  let g='';
+  stages.forEach(s=>{
+    g+=`<rect class="region" data-id="${s.id}" x="${X(s.from)}" y="${MT}" width="${X(s.to)-X(s.from)}" height="${H-MT-MB}" fill="${s.color}" fill-opacity="0.07"></rect>`;
+    if(s.to<1) g+=`<line x1="${X(s.to)}" y1="${MT}" x2="${X(s.to)}" y2="${H-MB}" stroke="${s.color}" stroke-dasharray="5 5" stroke-width="1.4" opacity=".7"/>`;
+    g+=`<text x="${(X(s.from)+X(s.to))/2}" y="${MT-12}" text-anchor="middle" font-size="13" font-weight="700" fill="${s.color}">${s.name}</text>`;
+  });
+  const axes=`
+    <line x1="${ML}" y1="${H-MB}" x2="${W-MR+4}" y2="${H-MB}" stroke="#141414" stroke-width="2"/>
+    <line x1="${ML}" y1="${H-MB}" x2="${ML}" y2="${MT-14}" stroke="#141414" stroke-width="2"/>
+    <text x="${W-MR}" y="${H-MB+34}" text-anchor="end" font-size="12" fill="#6b6b6b">时间 / 研发投入 →</text>
+    <text x="${ML+8}" y="${MT-16}" font-size="12" fill="#6b6b6b">↑ 系统性能</text>`;
+  const c1=`<path d="${path(0.45,11,0,1,1)}" fill="none" stroke="#141414" stroke-width="3"/>`;
+  const c2=`<path d="${path(0.93,12,0.58,1,0.9)}" fill="none" stroke="#141414" stroke-width="2.4" stroke-dasharray="7 6" opacity=".7"/>`;
+  const c2t=`<text x="${X(0.72)}" y="${Y(logi(0.72,0.93,12)*0.9)-12}" font-size="12" fill="#141414" opacity=".75">第二曲线（技术跃迁）</text>`;
+  const dot=`<circle id="dot" r="6" fill="#141414" opacity="0"/>`;
+  document.getElementById('chartWrap').insertAdjacentHTML('beforeend',
+    `<svg viewBox="0 0 ${W} ${H}">${g}${axes}${c1}${c2}${c2t}${dot}</svg>`);
+})();
+
+/* ============ 悬浮提示 & 高亮 ============ */
+const wrap=document.getElementById('chartWrap'), tip=document.getElementById('tip');
+wrap.querySelectorAll('.region').forEach(r=>{
+  r.addEventListener('mousemove',e=>{
+    const s=stages.find(o=>o.id===r.dataset.id), rc=wrap.getBoundingClientRect();
+    tip.innerHTML=`<b style="color:${s.color}">${s.name}</b><br>${s.desc}`;
+    tip.style.left=(e.clientX-rc.left+14)+'px'; tip.style.top=(e.clientY-rc.top+10)+'px';
+    tip.classList.add('show');
+  });
+  r.addEventListener('mouseleave',()=>tip.classList.remove('show'));
+});
+function highlight(id){
+  wrap.querySelectorAll('.region').forEach(r=>r.setAttribute('fill-opacity', r.dataset.id===id?'0.22':'0.07'));
+  document.querySelectorAll('.stage-card').forEach(c=>c.classList.toggle('active', c.dataset.id===id));
+}
+document.querySelectorAll('.stage-card').forEach(c=>c.onclick=()=>{
+  highlight(c.dataset.id);
+  const s=stages.find(o=>o.id===c.dataset.id);
+  document.getElementById('stageNow').innerHTML=`当前阶段：<b style="color:${s.color}">${s.name}</b>`;
+});
+
+/* ============ 进化动画 ============ */
+let anim=null;
+document.getElementById('playBtn').onclick=()=>{
+  const dot=document.getElementById('dot'); dot.setAttribute('opacity','1');
+  cancelAnimationFrame(anim); const t0=performance.now(), dur=5000;
+  const step=now=>{
+    const t=Math.min(1,(now-t0)/dur);
+    dot.setAttribute('cx',X(t)); dot.setAttribute('cy',Y(logi(t,0.45,11)));
+    const s=stages.find(o=>t>=o.from&&t<o.to)||stages[3];
+    document.getElementById('stageNow').innerHTML=`当前阶段：<b style="color:${s.color}">${s.name}</b>`;
+    highlight(s.id);
+    if(t<1) anim=requestAnimationFrame(step);
+  };
+  anim=requestAnimationFrame(step);
+};
+
+/* ============ 快速诊断 ============ */
+document.getElementById('diagBtn').onclick=()=>{
+  const p=document.getElementById('dPatent').value, m=document.getElementById('dProfit').value;
+  let id;
+  if(m==='亏损') id='infancy';
+  else if(m==='快速增长') id='growth';
+  else id=(p==='下降')?'decline':'maturity';
+  const s=stages.find(o=>o.id===id);
+  const advice={
+    infancy:'系统处于导入期：集中力量解决初始技术矛盾，控制投入节奏，保证技术活到成长期。',
+    growth:'系统处于黄金期：集中资源、沿进化法则快速迭代，用高级别专利构建竞争壁垒。',
+    maturity:'系统接近极限：继续投入边际收益递减，建议启动 STC 算子与进化法则，寻找第二曲线。',
+    decline:'系统正被取代：停止旧方案渐进改良，切换全新技术原理，开启新 S 曲线。'
+  }[id];
+  const box=document.getElementById('diagResult');
+  box.classList.remove('hidden'); box.style.borderColor=s.color;
+  box.innerHTML=`<b style="color:${s.color}">诊断结果：${s.name}</b><br>${advice}`;
+  highlight(id);
+  document.getElementById('chartCard').scrollIntoView({behavior:'smooth',block:'center'});
+};
+
+/* ============ 页签 / 侧边栏（演示提示） ============ */
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),1800);}
+document.querySelectorAll('.tab').forEach(tab=>tab.onclick=()=>{
+  if(tab.dataset.id==='scurve'){toast('当前位于：S曲线分析');return;}
+  toast(`演示版：「${tab.textContent}」模块暂未开放`);
+});
+document.querySelectorAll('.side button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.side button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  if(b.dataset.page!=='req') toast(`演示版：「${b.textContent}」页面暂未开放`);
+});
+</script>
+</body>
+</html>

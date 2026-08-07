@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InnovOS需求分析 - 金鱼法</title>
+<style>
+  :root{
+    --ink:#141414; --paper:#ffffff; --bg:#f2f1ec; --muted:#6b6b6b;
+    --gold:#F2994A; --green:#27AE60; --purple:#9B51E0;
+    --border:2px solid var(--ink); --shadow:4px 4px 0 rgba(20,20,20,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);padding:26px}
+  .frame{max-width:1240px;margin:0 auto;background:var(--paper);border:var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+
+  .browser{padding:14px 20px 10px;border-bottom:var(--border)}
+  .addr{display:inline-block;border:var(--border);border-radius:10px;padding:6px 18px;font-size:13px;font-weight:600}
+  .nav-arrows{margin-top:8px;font-size:18px;font-weight:700;display:flex;gap:16px}
+
+  .topbar{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:var(--border)}
+  .logo{font-weight:800;font-size:18px}
+  .sub{font-size:13px;font-weight:600;border-left:2px solid #ddd;padding-left:12px}
+  .slogan{flex:1;text-align:center;font-size:13px;color:var(--muted);font-weight:600}
+  .userpill{display:flex;align-items:center;gap:8px;background:#101026;color:#fff;border-radius:10px;padding:6px 10px}
+  .explore{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer}
+  .avatar{width:24px;height:24px;border-radius:50%;background:#4A90D9;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+  .username{font-size:12px}
+
+  .layout{display:flex}
+  .side{width:168px;padding:16px 14px;display:flex;flex-direction:column;gap:10px;border-right:var(--border)}
+  .side button{border:var(--border);border-radius:10px;background:#fff;padding:10px 0;font-size:14px;font-weight:600;cursor:pointer;box-shadow:var(--shadow)}
+  .side button.on{background:var(--ink);color:#fff}
+  .main{flex:1;padding:16px 18px 24px;min-width:0}
+
+  .tabs{display:flex;gap:10px;flex-wrap:wrap}
+  .tab{border:var(--border);border-radius:10px;padding:8px 18px;background:#fff;font-weight:600;font-size:14px;cursor:pointer;box-shadow:var(--shadow)}
+  .tab.on{background:var(--ink);color:#fff}
+
+  .panel{border:var(--border);border-radius:14px;margin-top:14px;padding:20px;background:#fdfdfb}
+  .panel h2{font-size:20px}
+  .intro{font-size:13px;color:var(--muted);margin:8px 0 16px;line-height:1.8}
+  .intro b{color:var(--gold)}
+
+  .steps{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+  .stepchip{border:var(--border);border-radius:999px;background:#fff;padding:7px 14px;font-size:12.5px;font-weight:700;box-shadow:var(--shadow)}
+  .stepchip b{color:var(--gold)}
+
+  .bench{border:var(--border);border-radius:14px;background:#fff;padding:16px;box-shadow:var(--shadow)}
+  .bench-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .bench-head h3{font-size:15px;flex:1}
+  .btn{border:var(--border);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;background:#fff}
+  .btn.dark{background:var(--ink);color:#fff}
+  .btn.gold{background:var(--gold);color:#fff}
+  .btn:hover{transform:translateY(-1px)}
+  textarea,input{border:var(--border);border-radius:8px;padding:8px 10px;font-size:12.5px;background:#fff;font-family:inherit;width:100%}
+  textarea{resize:vertical;min-height:70px;line-height:1.7}
+
+  .round{border:var(--border);border-radius:12px;padding:14px;margin-top:14px;background:#fdfdfb}
+  .round-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px}
+  .badge{background:var(--ink);color:#fff;border-radius:6px;font-size:11px;padding:2px 8px}
+  .round-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .round-grid label,.why{font-size:12px;font-weight:700;display:flex;flex-direction:column;gap:6px}
+  .round-grid label:first-child{color:var(--green)}
+  .round-grid label:last-child{color:var(--purple)}
+  .why{margin-top:10px;color:var(--muted)}
+  .round-btns{margin-top:12px;display:flex;gap:10px;flex-wrap:wrap}
+
+  .report{margin-top:16px;border:2px solid var(--gold);border-radius:10px;padding:14px;font-size:13px;line-height:1.9;background:#fff8ef}
+  .report ul{margin:6px 0 8px 20px}
+  .hidden{display:none}
+
+  .toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);background:#141414;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:99}
+  .toast.show{opacity:1}
+  @media (max-width:960px){.round-grid{grid-template-columns:1fr}.side{width:130px}}
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <div class="browser">
+    <div class="addr">InnovOS需求分析</div>
+    <div class="nav-arrows"><span>←</span><span>→</span></div>
+  </div>
+
+  <header class="topbar">
+    <span class="logo">InnovOS</span><span class="sub">创新智能操作系统</span>
+    <span class="slogan">让创新更智能，让想法变方案</span>
+    <div class="userpill">
+      <button class="explore">创新探索</button>
+      <span class="avatar">C</span><span class="username">chen</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="side">
+      <button data-page="home">首页</button>
+      <button data-page="proj">项目管理</button>
+      <button data-page="req" class="on">需求分析</button>
+      <button data-page="prob">问题定义</button>
+      <button data-page="search">领域检索</button>
+      <button data-page="gen">方案生成</button>
+      <button data-page="eval">方案评估</button>
+      <button data-page="video">视频展示</button>
+      <button data-page="kb">知识库</button>
+    </aside>
+
+    <section class="main">
+      <div class="tabs">
+        <button class="tab">九屏幕法</button>
+        <button class="tab">最终理想解</button>
+        <button class="tab">STC算子</button>
+        <button class="tab">S曲线分析</button>
+        <button class="tab">进化法则</button>
+        <button class="tab on" data-id="goldfish">金鱼法</button>
+      </div>
+
+      <div class="panel">
+        <h2>🐠 金鱼法（幻想 → 现实转化法）</h2>
+        <p class="intro">金鱼法得名于普希金童话《渔夫与金鱼》——金鱼把渔夫妻子的<b>幻想</b>逐一变成<b>现实</b>。TRIZ借用这一隐喻：不要急于否定“荒谬”的想法，而是把想法反复拆分为「现实部分」与「幻想部分」，从幻想中不断榨取可行元素，直到把幻想“兑现”为可落地的工程方案。</p>
+
+        <div class="steps">
+          <span class="stepchip"><b>①</b> 提出幻想想法</span>
+          <span class="stepchip"><b>②</b> 拆分现实 / 幻想</span>
+          <span class="stepchip"><b>③</b> 追问“为何不可能”，榨取可行元素</span>
+          <span class="stepchip"><b>④</b> 迭代拆分，直至落地为方案</span>
+        </div>
+
+        <div class="bench" id="bench">
+          <div class="bench-head">
+            <h3>幻想拆解工作台</h3>
+            <button class="btn gold" id="demoBtn">📖 载入示例：飞毯</button>
+          </div>
+          <textarea id="idea" placeholder="写下你的幻想想法，如：会走路的房子 / 能隐身的斗篷 / 载人的飞毯…"></textarea>
+          <div class="round-btns"><button class="btn dark" id="startBtn">开始拆分 →</button></div>
+          <div id="rounds"></div>
+          <div class="report hidden" id="report"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const state={idea:'',rounds:[]};
+
+/* ============ 示例：飞毯 ============ */
+const DEMO={
+  idea:'一张能载人、在空中自由飞行的地毯',
+  rounds:[
+    {real:'地毯作为一个供人站立/平躺的“平坦承载平台”，这个概念完全现实。',
+     fantasy:'地毯没有动力、没有机翼，却能载人飞行。',
+     why:'违反升力/推进原理：无能量输入就无法产生升力。'},
+    {real:'向下喷气形成高压气垫托起平台——气垫/地面效应技术现实中已存在。',
+     fantasy:'像童话中那样高空自由飞行，且静音、无需燃料。',
+     why:'高空飞行需要动力系统；“无需燃料”违反能量守恒定律。'},
+    {real:'低空“飞毯”= 气垫悬浮的娱乐/运输平台（悬浮滑板、地效飞行器原理），现有工程即可实现。',
+     fantasy:'完全静音、零能耗的自由飞行。',
+     why:'剩余幻想，暂时搁置，等待未来物理/能源突破。'}
+  ]
+};
+
+/* ============ 渲染拆解轮次 ============ */
+function renderRounds(){
+  const box=document.getElementById('rounds');
+  box.innerHTML=state.rounds.map((r,i)=>`
+    <div class="round">
+      <div class="round-head"><b>第 ${i+1} 轮拆分</b>${i===state.rounds.length-1?'<span class="badge">当前</span>':''}</div>
+      <div class="round-grid">
+        <label>✅ 现实部分<textarea data-i="${i}" data-k="real" placeholder="想法中哪些是现实/
