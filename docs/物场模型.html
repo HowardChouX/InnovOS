@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InnovOS | 问题定义 - 物-场建模</title>
+<style>
+  :root{
+    --primary:#2f54eb; --primary-2:#4f6ef7; --bg:#f5f6fa; --card:#ffffff;
+    --line:#e5e7eb; --text:#1f2937; --muted:#6b7280; --dark:#0f1b33;
+    --green:#16a34a; --orange:#f59e0b; --red:#dc2626; --gray:#94a3b8;
+    --radius:12px; --shadow:0 2px 10px rgba(30,41,59,.08);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif; background:var(--bg); color:var(--text); font-size:14px;}
+  button{font-family:inherit; cursor:pointer;}
+  input,select,textarea{font-family:inherit; font-size:14px; color:var(--text);}
+
+  /* ===== 顶部模拟浏览器条 ===== */
+  .browser-bar{max-width:1400px; margin:14px auto 0; background:var(--card); border:1px solid var(--line); border-radius:14px 14px 0 0; padding:12px 18px 8px;}
+  .addr{border:1.5px solid #111; border-radius:8px; padding:7px 14px; width:340px; font-weight:600;}
+  .nav-arrows{margin-top:8px; font-size:18px; color:#111; letter-spacing:14px;}
+
+  /* ===== 应用头部 ===== */
+  header{max-width:1400px; margin:0 auto; background:var(--card); border:1px solid var(--line); border-top:none; padding:14px 24px; display:flex; align-items:center; gap:26px;}
+  .logo{font-weight:800; font-size:18px; letter-spacing:.5px;}
+  .sys-name{color:var(--text); font-weight:600;}
+  .slogan{color:var(--muted); margin-left:auto; margin-right:auto;}
+  .user-panel{background:var(--dark); border-radius:10px; padding:8px 12px; display:flex; align-items:center; gap:12px; color:#cbd5e1;}
+  .user-panel .guide{background:transparent; border:1px solid #334155; color:#e2e8f0; border-radius:8px; padding:5px 10px;}
+  .user-panel .guide:hover{background:#1e293b;}
+  .avatar{width:28px; height:28px; border-radius:50%; background:var(--primary-2); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700;}
+
+  /* ===== 主体布局 ===== */
+  .layout{max-width:1400px; margin:0 auto 30px; display:flex; gap:16px; padding:16px; align-items:flex-start;}
+  aside{width:170px; flex:0 0 170px; display:flex; flex-direction:column; gap:10px;}
+  aside .menu-item{background:var(--card); border:1.5px solid #1118; border:1.5px solid #111827; border-radius:12px; padding:14px 10px; text-align:center; font-weight:600; box-shadow:2px 2px 0 #d1d5db; cursor:pointer; user-select:none;}
+  aside .menu-item:hover{background:#eef2ff;}
+  aside .menu-item.active{background:var(--primary); color:#fff; border-color:var(--primary);}
+  main{flex:1; background:var(--card); border:1.5px solid #111827; border-radius:14px; box-shadow:3px 3px 0 #d1d5db; padding:16px 18px 26px; min-height:760px;}
+
+  /* ===== 页签 ===== */
+  .tabs{display:flex; gap:12px; border-bottom:2px solid #111827; padding-bottom:12px; flex-wrap:wrap;}
+  .tab{border:1.5px solid #111827; background:#fff; border-radius:10px; padding:8px 18px; font-weight:600;}
+  .tab.active{background:#111827; color:#fff;}
+  .tab:hover:not(.active){background:#f1f5f9;}
+
+  /* ===== 工具区 ===== */
+  .toolbar{display:flex; gap:10px; align-items:center; margin:16px 0 6px; flex-wrap:wrap;}
+  .toolbar select{border:1px solid var(--line); border-radius:8px; padding:7px 10px; background:#fff;}
+  .btn{border:none; border-radius:8px; padding:8px 16px; font-weight:600; background:var(--primary); color:#fff;}
+  .btn:hover{background:#1d39c4;}
+  .btn.ghost{background:#fff; color:var(--primary); border:1px solid var(--primary);}
+  .btn.ghost:hover{background:#eef2ff;}
+  .btn.gray{background:#e2e8f0; color:#334155;}
+  .btn.gray:hover{background:#cbd5e1;}
+  .btn.green{background:var(--green);} .btn.green:hover{background:#15803d;}
+
+  .steps{display:flex; gap:8px; margin:14px 0 18px; flex-wrap:wrap;}
+  .step{border:1px solid var(--line); border-radius:999px; padding:6px 14px; color:var(--muted); background:#f8fafc; font-weight:600;}
+  .step.done{background:#ecfdf5; border-color:var(--green); color:var(--green);}
+
+  .grid{display:grid; grid-template-columns:1.05fr .95fr; gap:18px;}
+  @media (max-width:1100px){ .grid{grid-template-columns:1fr;} }
+  .card{border:1px solid var(--line); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); background:#fff;}
+  .card h3{font-size:15px; margin-bottom:12px; display:flex; align-items:center; gap:8px;}
+  .card h3 .no{background:var(--primary); color:#fff; width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px;}
+  .field{margin-bottom:10px;}
+  .field label{display:block; color:var(--muted); margin-bottom:5px; font-weight:600;}
+  .field input,.field select,.field textarea{width:100%; border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:#fbfcff;}
+  .field textarea{min-height:64px; resize:vertical;}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid #c7d2fe; border-color:var(--primary-2);}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+
+  .type-cards{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .type-card{border:1.5px solid var(--line); border-radius:10px; padding:10px; cursor:pointer; text-align:center; font-weight:600; background:#fbfcff;}
+  .type-card small{display:block; color:var(--muted); font-weight:400; margin-top:3px;}
+  .type-card.sel{border-color:var(--primary); background:#eef2ff; color:var(--primary);}
+
+  /* 物场图 */
+  #diagramBox{background:#fbfcff; border:1px dashed var(--line); border-radius:10px; padding:6px;}
+  .legend{display:flex; gap:14px; flex-wrap:wrap; color:var(--muted); font-size:12px; margin-top:8px;}
+  .legend i{display:inline-block; width:26px; height:0; border-top:3px solid; vertical-align:middle; margin-right:5px;}
+
+  /* 策略 */
+  .strat{border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; background:#fbfcff;}
+  .strat .name{font-weight:600; display:flex; gap:8px; align-items:flex-start;}
+  .strat textarea{width:100%; margin-top:8px; border:1px solid var(--line); border-radius:8px; padding:8px; min-height:56px; background:#fff;}
+  .hint{color:var(--muted); background:#f8fafc; border:1px dashed var(--line); border-radius:8px; padding:10px;}
+
+  /* 方案评估 */
+  table{width:100%; border-collapse:collapse;}
+  th,td{border:1px solid var(--line); padding:8px; text-align:left; vertical-align:top;}
+  th{background:#f8fafc;}
+  td select{border:1px solid var(--line); border-radius:6px; padding:4px;}
+  tr.best{background:#ecfdf5;}
+  .badge{background:var(--green); color:#fff; border-radius:6px; padding:2px 8px; font-size:12px; white-space:nowrap;}
+  .del{border:none; background:#fee2e2; color:var(--red); border-radius:6px; padding:4px 8px;}
+
+  #reportPre{background:#0f172a; color:#e2e8f0; border-radius:10px; padding:16px; white-space:pre-wrap; font-family:Consolas,Menlo,monospace; font-size:13px; min-height:120px; max-height:420px; overflow:auto;}
+
+  .placeholder{padding:60px 20px; text-align:center; color:var(--muted);}
+  .placeholder h2{color:var(--text); margin-bottom:10px;}
+
+  /* toast & modal */
+  #toast{position:fixed; left:50%; top:24px; transform:translateX(-50%); background:#111827; color:#fff; padding:10px 22px; border-radius:999px; display:none; z-index:99; box-shadow:var(--shadow);}
+  .modal-mask{position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:center; justify-content:center; z-index:98;}
+  .modal{background:#fff; border-radius:14px; width:560px; max-width:92vw; padding:22px 26px;}
+  .modal h3{margin-bottom:12px;}
+  .modal ol{padding-left:20px; line-height:1.9; color:#374151;}
+  .modal .close{margin-top:16px;}
+</style>
+</head>
+<body>
+
+<div class="browser-bar">
+  <div class="addr">InnovOS | 问题定义 · 物-场建模</div>
+  <div class="nav-arrows">← →</div>
+</div>
+
+<header>
+  <div class="logo">InnovOS</div>
+  <div class="sys-name">创新智能操作系统</div>
+  <div class="slogan">让创新更智能，让想法变方案</div>
+  <div class="user-panel">
+    <span>☀</span>
+    <button class="guide" id="guideBtn">📖 使用指南</button>
+    <span>🔔</span>
+    <span class="avatar">C</span><span>cnou ▾</span>
+  </div>
+</header>
+
+<div class="layout">
+  <aside id="sideMenu">
+    <div class="menu-item">首页</div>
+    <div class="menu-item">项目管理</div>
+    <div class="menu-item">需求分析</div>
+    <div class="menu-item active">问题定义</div>
+    <div class="menu-item">领域检索</div>
+    <div class="menu-item">方案生成</div>
+    <div class="menu-item">方案评估</div>
+    <div class="menu-item">视频展示</div>
+    <div class="menu-item">知识库</div>
+  </aside>
+
+  <main>
+    <div class="tabs" id="tabs">
+      <button class="tab" data-tab="fn">功能分析</button>
+      <button class="tab" data-tab="causal">因果链分析</button>
+      <button class="tab" data-tab="fish">金鱼法</button>
+      <button class="tab" data-tab="res">资源分析</button>
+      <button class="tab active" data-tab="sufield">物-场建模</button>
+    </div>
+
+    <!-- 其他页签占位 -->
+    <div class="tab-pane" id="pane-fn" hidden><div class="placeholder"><h2>功能分析</h2>演示版本：该模块暂未开放，请在“物-场建模”中体验完整交互分析。</div></div>
+    <div class="tab-pane" id="pane-causal" hidden><div class="placeholder"><h2>因果链分析</h2>演示版本：该模块暂未开放。</div></div>
+    <div class="tab-pane" id="pane-fish" hidden><div class="placeholder"><h2>金鱼法</h2>演示版本：该模块暂未开放。</div></div>
+    <div class="tab-pane" id="pane-res" hidden><div class="placeholder"><h2>资源分析</h2>演示版本：该模块暂未开放。</div></div>
+
+    <!-- ============ 物-场建模 ============ -->
+    <div class="tab-pane" id="pane-sufield">
+      <div class="toolbar">
+        <select id="caseSelect">
+          <option value="">— 案例库：选择示例快速体验 —</option>
+          <option value="onion">切洋葱流眼泪（有害模型）</option>
+          <option value="tool">刀具切削发热磨损（有害模型）</option>
+          <option value="glass">抹布擦玻璃效率低（效应不足模型）</option>
+          <option value="dust">桌面积尘无工具清理（不完整模型）</option>
+        </select>
+        <button class="btn ghost" id="loadCase">载入案例</button>
+        <button class="btn gray" id="resetBtn">重置</button>
+        <span style="margin-left:auto;color:var(--muted)">填写左侧表单，右侧物场图与策略将实时更新</span>
+      </div>
+
+      <div class="steps" id="steps">
+        <span class="step" data-s="1">① 问题描述</span>
+        <span class="step" data-s="2">② 要素识别</span>
+        <span class="step" data-s="3">③ 模型判断</span>
+        <span class="step" data-s="4">④ 解决策略</span>
+        <span class="step" data-s="5">⑤ 方案评估</span>
+        <span class="step" data-s="6">⑥ 报告输出</span>
+      </div>
+
+      <div class="grid">
+        <!-- 左列：表单 -->
+        <div>
+          <div class="card">
+            <h3><span class="no">1</span>问题描述</h3>
+            <div class="row2">
+              <div class="field"><label>问题名称</label><input id="problemName" placeholder="如：切洋葱时流眼泪"></div>
+              <div class="field"><label>技术系统</label><input id="system" placeholder="如：厨房切菜场景"></div>
+            </div>
+            <div class="field"><label>期望功能</label><input id="expect" placeholder="如：顺利切碎洋葱且不刺激眼睛"></div>
+            <div class="field"><label>当前问题现象</label><textarea id="problemDesc" placeholder="描述当前系统中出现的不良现象…"></textarea></div>
+          </div>
+
+          <div class="card" style="margin-top:14px">
+            <h3><span class="no">2</span>物场要素识别</h3>
+            <div class="row2">
+              <div class="field"><label>S1 被作用对象</label><input id="s1" placeholder="如：人的眼睛"></div>
+              <div class="field"><label>S2 工具 / 作用物</label><input id="s2" placeholder="如：洋葱刺激性气体"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>F 场 / 作用方式</label>
+                <select id="f">
+                  <option value="">请选择…</option>
+                  <option>机械场</option><option>热场</option><option>电场</option><option>磁场</option>
+                  <option>化学场</option><option>声场</option><option>光场</option><option>重力场</option>
+                  <option>气流/流体场</option><option value="other">其他…</option>
+                </select>
+              </div>
+              <div class="field" id="fCustomBox" hidden><label>自定义场</label><input id="fCustom" placeholder="输入作用方式"></div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:14px">
+            <h3><span class="no">3</span>物场模型类型判断</h3>
+            <div class="type-cards" id="typeCards">
+              <div class="type-card" data-type="incomplete">不完整模型<small>缺少 S1/S2/F，功能无法实现</small></div>
+              <div class="type-card" data-type="insufficient">效应不足模型<small>有作用，但效果不够好</small></div>
+              <div class="type-card" data-type="harmful">有害模型<small>产生副作用 / 破坏 / 伤害</small></div>
+              <div class="type-card" data-type="excessive">过度作用模型<small>作用过强，造成损伤浪费</small></div>
+              <div class="type-card" data-type="optimize" style="grid-column:1/-1">完整但需优化模型<small>功能正常，需提升效率/成本/可靠性</small></div>
+            </div>
+            <div class="field" id="missingBox" hidden style="margin-top:10px">
+              <label>缺失的要素（可多选）</label>
+              <div style="display:flex;gap:16px">
+                <label style="color:var(--text)"><input type="checkbox" id="missS1"> 缺 S1</label>
+                <label style="color:var(--text)"><input type="checkbox" id="missS2"> 缺 S2</label>
+                <label style="color:var(--text)"><input type="checkbox" id="missF"> 缺 F</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:14px">
+            <h3><span class="no">4</span>解决策略与方案生成</h3>
+            <div id="strategyList"><div class="hint">请先在上方选择物场模型类型，系统将自动给出对应 TRIZ 解决策略。</div></div>
+            <button class="btn" id="addCandBtn" style="margin-top:6px">将勾选的策略方案加入候选方案 →</button>
+          </div>
+
+          <div class="card" style="margin-top:14px">
+            <h3><span class="no">5</span>候选方案评估</h3>
+            <div id="candBox"><div class="hint">暂无候选方案。勾选解决策略并点击上方按钮添加。</div></div>
+          </div>
+        </div>
+
+        <!-- 右列：图 + 报告 -->
+        <div>
+          <div class="card">
+            <h3><span class="no">◆</span>物场模型图（实时生成）</h3>
+            <div id="diagramBox"></div>
+            <div class="legend">
+              <span><i style="border-color:var(--green)"></i>有效作用</span>
+              <span><i style="border-color:var(--orange);border-top-style:dashed"></i>效应不足</span>
+              <span><i style="border-color:var(--red);border-top-style:wave"></i>有害作用</span>
+              <span><i style="border-color:var(--gray);border-top-style:dashed"></i>缺失/无效</span>
+              <span><i style="border-color:#7c3aed;border-top-style:dashed"></i>引入的反向场 F2</span>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:14px">
+            <h3><span class="no">6</span>物场分析报告</h3>
+            <div style="display:flex;gap:10px;margin-bottom:10px">
+              <button class="btn green" id="genReport">生成分析报告</button>
+              <button class="btn ghost" id="copyReport">复制报告</button>
+              <button class="btn ghost" id="downReport">下载 .md</button>
+            </div>
+            <pre id="reportPre">（完成左侧分析后，点击“生成分析报告”）</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<div class="modal-mask" id="guideMask">
+  <div class="modal">
+    <h3>📖 物-场建模 使用指南</h3>
+    <ol>
+      <li><b>问题描述</b>：填写问题名称、技术系统、期望功能与问题现象。</li>
+      <li><b>要素识别</b>：填写 S1（被作用对象）、S2（工具/作用物）、F（场/作用方式）。</li>
+      <li><b>模型判断</b>：选择 不完整 / 效应不足 / 有害 / 过度 / 需优化 模型；右侧实时生成物场三角形图。</li>
+      <li><b>解决策略</b>：系统按模型类型给出 TRIZ 标准解决方向，勾选后可编辑具体方案文本；勾选含 S3/F2 的策略时，图中自动画出新物质/新场。</li>
+      <li><b>方案评估</b>：将方案加入候选列表，按 效果/可行性/成本 打分，自动推荐最高分方案。</li>
+      <li><b>报告输出</b>：一键生成标准物场分析报告，可复制或下载 .md 文件。</li>
+    </ol>
+    <button class="btn close" id="guideClose">我知道了</button>
+  </div>
+</div>
+
+<script>
+/* ================= 数据 ================= */
+const TYPE_NAME = {incomplete:'不完整模型', insufficient:'效应不足模型', harmful:'有害模型', excessive:'过度作用模型', optimize:'完整但需优化模型'};
+
+const STRAT = {
+  incomplete:[
+    {id:'c_s1', name:'补充缺失的 S1（明确目标对象）', tpl:'明确并引入目标对象 S1，使“{S2}”与“{F}”有明确的作用对象。'},
+    {id:'c_s2', name:'补充缺失的 S2（引入工具）', tpl:'引入能够产生“{F}”的工具物质 S2，使其作用于“{S1}”。'},
+    {id:'c_f',  name:'补充缺失的 F（引入场/能量）', tpl:'引入缺失的场 F（考虑机械力、热、电、磁、化学、声、光、流体等），使“{S2}”能够作用于“{S1}”。'},
+    {id:'c_full', name:'构建完整物场三角形', tpl:'同时补齐缺失要素，形成完整的“S2—F—S1”物场模型，使系统功能得以实现。'}
+  ],
+  insufficient:[
+    {id:'i_f_up', name:'增强现有场 F', tpl:'增强“{F}”对“{S1}”的作用强度（增大力度、温度、浓度、频率、时间等）。'},
+    {id:'i_f_ch', name:'改用更高效的场', tpl:'用更高效的场替代当前“{F}”（如机械场→电场/磁场，热场→化学场）。'},
+    {id:'i_s2', name:'改进工具 S2', tpl:'改变“{S2}”的材料、结构、几何形状或状态，提高其对“{S1}”的作用效果。'},
+    {id:'i_s1', name:'改变对象 S1 状态', tpl:'对“{S1}”进行预处理（加热、软化、分割、固定等），使其更易被“{F}”作用。'},
+    {id:'i_s3', name:'引入辅助物质 S3', tpl:'在“{S2}”与“{S1}”之间引入辅助物质 S3（磨料、催化剂、介质、添加剂等）以增强或传递作用。'},
+    {id:'i_f2', name:'叠加新场 F2', tpl:'在现有“{F}”基础上叠加新场 F2，协同增强对“{S1}”的作用效果。'}
+  ],
+  harmful:[
+    {id:'h_s3_iso', name:'引入 S3 隔离有害作用', tpl:'在“{S2}”与“{S1}”之间引入第三物质 S3（防护层、屏障、罩、套等），隔离“{F}”的有害作用。'},
+    {id:'h_s3_abs', name:'引入 S3 吸收有害作用', tpl:'引入能够吸收有害作用的物质 S3（冷却液、吸附材料、缓冲层等），消除对“{S1}”的伤害。'},
+    {id:'h_f2', name:'引入反向场 F2 抵消', tpl:'引入反向场 F2，抵消“{F}”对“{S1}”的有害作用。'},
+    {id:'h_s2', name:'改造工具 S2', tpl:'改变“{S2}”的材料/结构/参数，从源头上消除有害作用的产生。'},
+    {id:'h_f', name:'改变或减弱场 F', tpl:'替换或减弱“{F}”（降温、减速、更换介质等），消除有害能量。'},
+    {id:'h_use', name:'变有害为有用', tpl:'利用该有害作用本身，将其转化为有用功能（余热利用、废气回收、废物利用等）。'}
+  ],
+  excessive:[
+    {id:'e_f', name:'限制场 F 的强度', tpl:'限制“{F}”的强度/时间/作用范围，避免对“{S1}”的过度作用。'},
+    {id:'e_s3', name:'引入缓冲物质 S3', tpl:'在“{S2}”与“{S1}”之间引入缓冲/限流物质 S3，吸收多余作用。'},
+    {id:'e_f2', name:'引入反向场 F2 平衡', tpl:'引入反向场 F2，平衡“{F}”的过度作用。'},
+    {id:'e_s2', name:'改用可控工具 S2', tpl:'将“{S2}”改为可精确控制的工具，实现按需作用、避免过量。'}
+  ],
+  optimize:[
+    {id:'o_f', name:'场升级（向电/磁场进化）', tpl:'将“{F}”升级为更可控、更高效的场（优先向电场、磁场方向进化）。'},
+    {id:'o_s2', name:'工具升级', tpl:'将“{S2}”更换为更智能、更低成本、更耐用的工具。'},
+    {id:'o_s3', name:'引入 S3 扩展功能', tpl:'引入物质 S3，使系统在原有功能基础上获得附加功能。'},
+    {id:'o_self', name:'向自服务/微观级进化', tpl:'让“{S1}”自我完成功能，或将作用转移到微观级别（分子、原子、场级别）。'}
+  ]
+};
+
+const CASES = {
+  onion:{problemName:'切洋葱时流眼泪', system:'厨房切菜场景', expect:'顺利切碎洋葱且不刺激眼睛',
+    problemDesc:'切洋葱时释放刺激性气体，扩散到眼睛，导致流泪、刺痛。',
+    s1:'人的眼睛', s2:'洋葱刺激性气体', f:'化学场', type:'harmful'},
+  tool:{problemName:'刀具切削发热磨损', system:'金属切削加工系统', expect:'高效切削且刀具寿命长',
+    problemDesc:'刀具高速切削零件时产生大量切削热，导致刀具磨损、零件变形。',
+    s1:'金属零件', s2:'机床刀具', f:'机械场', type:'harmful'},
+  glass:{problemName:'抹布擦玻璃效率低', system:'家庭清洁系统', expect:'快速、干净地清洁玻璃',
+    problemDesc:'普通抹布擦玻璃效率低、易留水痕，清洁效果不足。',
+    s1:'玻璃', s2:'抹布', f:'机械场', type:'insufficient'},
+  dust:{problemName:'桌面积尘无法清理', system:'桌面清洁系统', expect:'清除桌面上的灰尘',
+    problemDesc:'桌面上有灰尘，但现场没有任何清洁工具，功能无法实现。',
+    s1:'灰尘', s2:'', f:'机械场', type:'incomplete', missing:{s2:true}}
+};
+
+/* ================= 状态 ================= */
+const state = {modelType:'', missing:{s1:false,s2:false,f:false}, stratText:{}, stratChecked:{}, candidates:[], report:''};
+let candSeq = 1;
+const $ = id => document.getElementById(id);
+const val = id => $(id).value.trim();
+const fLabel = () => val('f')==='other' ? (val('fCustom')||'自定义场') : (val('f')||'场F');
+const s1Name = () => val('s1')||'对象 S1';
+const s2Name = () => val('s2')||'工具 S2';
+const fill = t => t.replaceAll('{S1}', s1Name()).replaceAll('{S2}', s2Name()).replaceAll('{F}', fLabel());
+
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',2200); }
+
+/* ================= 物场图 ================= */
+function wavy(x1,y1,x2,y2){
+  const dx=x2-x1, dy=y2-y1, len=Math.hypot(dx,dy), n=Math.max(4,Math.round(len/26));
+  const px=-dy/len, py=dx/len; let d=`M ${x1} ${y1}`;
+  for(let i=1;i<=n;i++){ const t=i/n, tm=(i-.5)/n, amp=(i===n)?0:((i%2?7:-7));
+    d+=` Q ${(x1+dx*tm+px*amp*2).toFixed(1)} ${(y1+dy*tm+py*amp*2).toFixed(1)} ${(x1+dx*t).toFixed(1)} ${(y1+dy*t).toFixed(1)}`; }
+  return d;
+}
+function node(x,y,sym,name,missing){
+  const w=132,h=56;
+  return `<g>
+    <rect x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="10"
+      fill="${missing?'#f3f4f6':'#eef2ff'}" stroke="${missing?'#9ca3af':'#2f54eb'}" stroke-width="2" ${missing?'stroke-dasharray="6 5"':''}/>
+    <text x="${x}" y="${y-4}" text-anchor="middle" font-size="16" font-weight="800" fill="${missing?'#6b7280':'#1d39c4'}">${sym}${missing?' ?':''}</text>
+    <text x="${x}" y="${y+17}" text-anchor="middle" font-size="11" fill="#475569">${(name||'').slice(0,10)}</text>
+  </g>`;
+}
+function renderDiagram(){
+  const type = state.modelType;
+  const showS3 = Object.keys(state.stratChecked).some(id=>state.stratChecked[id] && id.includes('s3'));
+  const showF2 = Object.keys(state.stratChecked).some(id=>state.stratChecked[id] && id.includes('f2'));
+  const S2={x:110,y:250}, S1={x:490,y:250}, F={x:300,y:70}, S3={x:300,y:250}, F2={x:480,y:70};
+  const miss = type==='incomplete' ? state.missing : {s1:false,s2:false,f:false};
+
+  let act = {color:'#64748b', label:'作用', dash:'', width:2.5, marker:'m-gray', wavy:false};
+  if(type==='optimize'||type==='') act={color:'#16a34a', label:'有效作用', dash:'', width:2.5, marker:'m-green', wavy:false};
+  if(type==='incomplete') act={color:'#94a3b8', label:'缺失/无效作用', dash:'7 6', width:2.5, marker:'m-gray', wavy:false};
+  if(type==='insufficient') act={color:'#f59e0b', label:'效应不足', dash:'8 6', width:2.5, marker:'m-orange', wavy:false};
+  if(type==='harmful') act={color:'#dc2626', label:'有害作用', dash:'', width:2.5, marker:'m-red', wavy:true};
+  if(type==='excessive') act={color:'#dc2626', label:'过度作用', dash:'', width:4.5, marker:'m-red', wavy:false};
+
+  let svg = `<svg viewBox="0 0 620 320" width="100%">
+  <defs>
+    ${['gray:#94a3b8','green:#16a34a','orange:#f59e0b','red:#dc2626','purple:#7c3aed','blue:#2f54eb'].map(s=>{const [n,c]=s.split(':');return `<marker id="m-${n}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="${c}"/></marker>`;}).join('')}
+  </defs>`;
+
+  // F 到两个物质的连线
+  if(!miss.f){
+    svg += `<line x1="${F.x-30}" y1="${F.y+26}" x2="${S2.x+40}" y2="${S2.y-34}" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#m-gray)"/>
+            <line x1="${F.x+30}" y1="${F.y+26}" x2="${S1.x-40}" y2="${S1.y-34}" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#m-gray)"/>`;
+  }
+  // 底部作用箭头
+  const drawAct=(x1,x2)=>{
+    const y=S2.y, pad=70;
+    const path = act.wavy ? wavy(x1+pad,y,x2-pad,y) : `M ${x1+pad} ${y} L ${x2-pad} ${y}`;
+    return `<path d="${path}" fill="none" stroke="${act.color}" stroke-width="${act.width}" ${act.dash?`stroke-dasharray="${act.dash}"`:''} marker-end="url(#${act.marker})"/>`;
+  };
+  if(showS3){ svg += drawAct(S2.x,S3.x) + drawAct(S3.x,S1.x); }
+  else { svg += drawAct(S2.x,S1.x); }
+  svg += `<text x="300" y="${S2.y+34}" text-anchor="middle" font-size="13" font-weight="700" fill="${act.color}">${act.label}</text>`;
+
+  // F2 反向场
+  if(showF2){ svg += `<path d="M ${F2.x} ${F2.y+30} L ${S1.x+6} ${S1.y-36}" fill="none" stroke="#7c3aed" stroke-width="2.2" stroke-dasharray="6 5" marker-end="url(#m-purple)"/>
+    <text x="${F2.x-40}" y="${F2.y+52}" font-size="11" fill="#7c3aed">反向场/抵消</text>`; }
+
+  // 节点
+  svg += node(F.x,F.y,'F', fLabel(), miss.f);
+  svg += node(S2.x,S2.y,'S2', s2Name(), miss.s2);
+  svg += node(S1.x,S1.y,'S1', s1Name(), miss.s1);
+  if(showS3) svg += node(S3.x,S3.y-0,'S3','引入的新物质',false);
+  if(showF2) svg += node(F2.x,F2.y,'F2','引入的新场',false);
+  svg += `</svg>`;
+  $('diagramBox').innerHTML = svg;
+}
+
+/* ================= 策略 ================= */
+function renderStrategies(){
+  const box = $('strategyList');
+  if(!state.modelType){ box.innerHTML = '<div class="hint">请先在上方选择物场模型类型，系统将自动给出对应 TRIZ 解决策略。</div>'; return; }
+  const list = STRAT[state.modelType]||[];
+  box.innerHTML = list.map(s=>{
+    const checked = !!state.stratChecked[s.id];
+    const text = state.stratText[s.id] || fill(s.tpl);
+    return `<div class="strat">
+      <div class="name"><input type="checkbox" data-id="${s.id}" ${checked?'checked':''}> <span>${s.name}</span></div>
+      <textarea data-textid="${s.id}" ${checked?'':'hidden'}>${text}</textarea>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.onchange = ()=>{ state.stratChecked[cb.dataset.id]=cb.checked;
+      const ta=box.querySelector(`textarea[data-textid="${cb.dataset.id}"]`);
+      if(cb.checked){ if(!state.stratText[cb.dataset.id]) state.stratText[cb.dataset.id]=ta.value; ta.hidden=false; } else ta.hidden=true;
+      renderDiagram(); updateSteps(); };
+  });
+  box.querySelectorAll('textarea').forEach(ta=>{ ta.oninput=()=>{ state.stratText[ta.dataset.textid]=ta.value; }; });
+}
+
+/* ================= 候选方案 ================= */
+function addCandidates(){
+  if(!state.modelType){ toast('请先选择物场模型类型'); return; }
+  const list = STRAT[state.modelType]||[]; let n=0;
+  list.forEach(s=>{ if(state.stratChecked[s.id]){ state.candidates.push({id:candSeq++, title:s.name, text:state.stratText[s.id]||fill(s.tpl), eff:3, fea:3, cost:3}); n++; } });
+  toast(n? `已添加 ${n} 个候选方案` : '请先勾选至少一个解决策略');
+  renderCandidates(); updateSteps();
+}
+function renderCandidates(){
+  const box = $('candBox');
+  if(!state.candidates.length){ box.innerHTML='<div class="hint">暂无候选方案。勾选解决策略并点击上方按钮添加。</div>'; return; }
+  const score = c=>c.eff+c.fea+c.cost;
+  const best = Math.max(...state.candidates.map(score));
+  box.innerHTML = `<table><tr><th style="width:46%">候选方案</th><th>效果</th><th>可行性</th><th>成本可控</th><th>总分</th><th>操作</th></tr>
+  ${state.candidates.map(c=>`<tr class="${score(c)===best?'best':''}">
+    <td><b>${c.title}</b><br><span style="color:var(--muted)">${c.text}</span></td>
+    ${['eff','fea','cost'].map(k=>`<td><select data-cid="${c.id}" data-k="${k}">${[1,2,3,4,5].map(v=>`<option ${c[k]==v?'selected':''} value="${v}">${v}</option>`).join('')}</select></td>`).join('')}
+    <td><b>${score(c)}</b>/15 ${score(c)===best?'<span class="badge">推荐方案</span>':''}</td>
+    <td><button class="del" data-del="${c.id}">删除</button></td>
+  </tr>`).join('')}</table>`;
+  box.querySelectorAll('select[data-cid]').forEach(sel=>{ sel.onchange=()=>{ const c=state.candidates.find(x=>x.id==sel.dataset.cid); c[sel.dataset.k]=+sel.value; renderCandidates(); }; });
+  box.querySelectorAll('[data-del]').forEach(b=>{ b.onclick=()=>{ state.candidates=state.candidates.filter(x=>x.id!=b.dataset.del); renderCandidates(); updateSteps(); }; });
+}
+
+/* ================= 报告 ================= */
+function generateReport(){
+  const missTxt = state.modelType==='incomplete' ? ['S1','S2','F'].filter((k,i)=>[state.missing.s1,state.missing.s2,state.missing.f][i]).join('、')||'未指定' : '—';
+  const score = c=>c.eff+c.fea+c.cost;
+  const best = state.candidates.length? state.candidates.reduce((a,b)=>score(b)>score(a)?b:a) : null;
+  const L=[];
+  L.push('════ TRIZ 物-场分析报告 ════');
+  L.push('一、问题背景');
+  L.push(`问题名称：${val('problemName')||'（未填）'}`);
+  L.push(`技术系统：${val('system')||'（未填）'}`);
+  L.push(`期望功能：${val('expect')||'（未填）'}`);
+  L.push(`当前问题：${val('problemDesc')||'（未填）'}`);
+  L.push('');
+  L.push('二、物场模型分析');
+  L.push(`S1（被作用对象）：${s1Name()}`);
+  L.push(`S2（工具/作用物）：${s2Name()}`);
+  L.push(`F（场/作用方式）：${fLabel()}`);
+  L.push(`模型类型：${TYPE_NAME[state.modelType]||'（未选择）'}`);
+  if(state.modelType==='incomplete') L.push(`缺失要素：${missTxt}`);
+  L.push('');
+  L.push('三、问题本质');
+  L.push(`当前系统中，S2（${s2Name()}）通过 F（${fLabel()}）作用于 S1（${s1Name()}），存在【${TYPE_NAME[state.modelType]||'待定'}】所描述的问题：${ ({incomplete:'要素缺失，功能无法实现',insufficient:'作用有效但效果不足',harmful:'作用产生有害副作用',excessive:'作用过强造成损伤/浪费',optimize:'功能正常但仍需优化'})[state.modelType]||'请完成模型判断'}。`);
+  L.push('');
+  L.push('四、解决方向与候选方案');
+  if(state.candidates.length){ state.candidates.forEach((c,i)=>{ L.push(`${i+1}. [${c.title}] ${c.text}   （评估：效果${c.eff} 可行性${c.fea} 成本${c.cost}，总分${score(c)}/15）`); }); }
+  else L.push('（暂无候选方案）');
+  L.push('');
+  L.push('五、推荐方案');
+  L.push(best? `推荐采用：${best.title} —— ${best.text}` : '（完成方案评估后自动生成）');
+  L.push('');
+  L.push('六、结论');
+  L.push(`通过物场分析，将原【${TYPE_NAME[state.modelType]||'问题'}】转化为完整、有效、可控的物场模型，实现期望功能：${val('expect')||'—'}。`);
+  state.report = L.join('\n');
+  $('reportPre').textContent = state.report;
+  updateSteps(); toast('报告已生成');
+  $('reportPre').scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+/* ================= 步骤指示 ================= */
+function updateSteps(){
+  const done = {
+    1: val('problemName')&&val('problemDesc'),
+    2: (val('s1')||val('s2'))&&val('f'),
+    3: !!state.modelType,
+    4: Object.values(state.stratChecked).some(Boolean),
+    5: state.candidates.length>0,
+    6: !!state.report
+  };
+  document.querySelectorAll('.step').forEach(s=>s.classList.toggle('done', !!done[s.dataset.s]));
+}
+
+/* ================= 交互绑定 ================= */
+['problemName','system','expect','problemDesc','s1','s2','fCustom'].forEach(id=>{ $(id).oninput=()=>{ updateSteps(); renderDiagram(); }; });
+$('f').onchange=()=>{ $('fCustomBox').hidden = val('f')!=='other'; updateSteps(); renderDiagram(); };
+
+document.querySelectorAll('.type-card').forEach(c=>{
+  c.onclick=()=>{
+    document.querySelectorAll('.type-card').forEach(x=>x.classList.remove('sel'));
+    c.classList.add('sel'); state.modelType=c.dataset.type;
+    $('missingBox').hidden = state.modelType!=='incomplete';
+    renderStrategies(); renderDiagram(); updateSteps();
+  };
+});
+['missS1','missS2','missF'].forEach((id,i)=>{ $(id).onchange=()=>{ state.missing=['s1','s2','f'][i]?state.missing:state.missing; state.missing[{missS1:'s1',missS2:'s2',missF:'f'}[id]]=$(id).checked; renderDiagram(); }; });
+
+$('addCandBtn').onclick=addCandidates;
+$('genReport').onclick=generateReport;
+$('copyReport').onclick=()=>{
+  if(!state.report){ toast('请先生成报告'); return; }
+  if(navigator.clipboard){ navigator.clipboard.writeText(state.report).then(()=>toast('报告已复制到剪贴板')); }
+  else{ const ta=document.createElement('textarea'); ta.value=state.report; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('报告已复制到剪贴板'); }
+};
+$('downReport').onclick=()=>{
+  if(!state.report){ toast('请先生成报告'); return; }
+  const blob=new Blob([state.report],{type:'text/markdown;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='物场分析报告.md'; a.click(); URL.revokeObjectURL(a.href);
+  toast('报告已下载');
+};
+
+$('loadCase').onclick=()=>{
+  const k=$('caseSelect').value; if(!k){ toast('请先选择一个案例'); return; }
+  const c=CASES[k];
+  $('problemName').value=c.problemName; $('system').value=c.system; $('expect').value=c.expect; $('problemDesc').value=c.problemDesc;
+  $('s1').value=c.s1; $('s2').value=c.s2||''; $('f').value=c.f; $('fCustomBox').hidden=true;
+  state.modelType=c.type; state.missing={s1:!!(c.missing&&c.missing.s1), s2:!!(c.missing&&c.missing.s2), f:!!(c.missing&&c.missing.f)};
+  $('missS1').checked=state.missing.s1; $('missS2').checked=state.missing.s2; $('missF').checked=state.missing.f;
+  $('missingBox').hidden = c.type!=='incomplete';
+  document.querySelectorAll('.type-card').forEach(x=>x.classList.toggle('sel', x.dataset.type===c.type));
+  state.stratChecked={}; state.stratText={};
+  renderStrategies(); renderDiagram(); updateSteps(); toast('案例已载入');
+};
+$('resetBtn').onclick=()=>{
+  ['problemName','system','expect','problemDesc','s1','s2','fCustom'].forEach(id=>$(id).value='');
+  $('f').value=''; $('fCustomBox').hidden=true;
+  state.modelType=''; state.missing={s1:false,s2:false,f:false}; state.stratChecked={}; state.stratText={}; state.candidates=[]; state.report='';
+  ['missS1','missS2','missF'].forEach(id=>$(id).checked=false); $('missingBox').hidden=true;
+  document.querySelectorAll('.type-card').forEach(x=>x.classList.remove('sel'));
+  $('reportPre').textContent='（完成左侧分析后，点击“生成分析报告”）';
+  renderStrategies(); renderCandidates(); renderDiagram(); updateSteps(); toast('已重置');
+};
+
+/* 页签 / 菜单 / 指南 */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.onclick=()=>{ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); t.classList.add('active');
+    document.querySelectorAll('.tab-pane').forEach(p=>p.hidden=true); $('pane-'+t.dataset.tab).hidden=false; };
+});
+document.querySelectorAll('#sideMenu .menu-item').forEach(m=>{
+  m.onclick=()=>{ document.querySelectorAll('#sideMenu .menu-item').forEach(x=>x.classList.remove('active')); m.classList.add('active');
+    if(m.textContent!=='问题定义') toast('演示版本：当前仅开放「问题定义 → 物-场建模」模块'); };
+});
+$('guideBtn').onclick=()=>$('guideMask').style.display='flex';
+$('guideClose').onclick=()=>$('guideMask').style.display='none';
+$('guideMask').onclick=e=>{ if(e.target===$('guideMask')) $('guideMask').style.display='none'; };
+
+/* 初始化 */
+renderStrategies(); renderCandidates(); renderDiagram(); updateSteps();
+</script>
+</body>
+</html>

@@ -1,10 +1,12 @@
 .PHONY: dev stop stop-apps test lint quality format clean install build security docker-up docker-down db-backup setup-hooks add-admin delete-admin user-ls docker-add-admin docker-delete-admin docker-user-ls db-reset docker-reset
 
 # PostgreSQL local cluster (sudo pg_ctl) — overridable from env
+# 5432 is taken by the host's Windows PG (forwarded into WSL); local PG uses 5433.
 PG_DATA_DIR    ?= /var/lib/postgres/data
 PG_SOCKET_DIR  ?= /tmp
 PG_LOG         ?= /tmp/pg.log
-PG_PORT        ?= 5432
+PG_PORT        ?= 5433
+PG_TCP_PORT    ?= 5433
 
 # PID files for backgrounded dev processes (absolute paths via abspath)
 DEV_PID_DIR    ?= .dev-pids
@@ -20,7 +22,7 @@ dev:
 	@$(MAKE) stop-apps
 	@$(MAKE) start-db
 	@echo "=== Starting backend (port 8000) ==="
-	@cd backend && sh -c 'nohup uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload >/tmp/backend.log 2>&1 & echo $$! > $(abspath $(BACKEND_PID))'
+	@cd backend && sh -c 'POSTGRES_PORT=$(PG_TCP_PORT) nohup uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload >/tmp/backend.log 2>&1 & echo $$! > $(abspath $(BACKEND_PID))'
 	@sleep 2
 	@echo "=== Starting frontend (port 5173) ==="
 	@cd frontend && sh -c 'npm run dev & echo $$! > $(abspath $(FRONTEND_PID))'
@@ -28,12 +30,14 @@ dev:
 start-db:
 	@if pg_isready -h $(PG_SOCKET_DIR) -p $(PG_PORT) -q 2>/dev/null; then \
 		echo "=== PostgreSQL already running on $(PG_SOCKET_DIR):$(PG_PORT) ==="; \
+	elif pg_isready -h 127.0.0.1 -p $(PG_TCP_PORT) -q 2>/dev/null; then \
+		echo "=== PostgreSQL already running on 127.0.0.1:$(PG_TCP_PORT) ==="; \
 	else \
-		echo "=== Starting PostgreSQL (socket: $(PG_SOCKET_DIR)) ==="; \
-		sudo -u postgres pg_ctl -D $(PG_DATA_DIR) -o "-k $(PG_SOCKET_DIR)" -l $(PG_LOG) start; \
+		echo "=== Starting PostgreSQL (socket: $(PG_SOCKET_DIR), TCP: 127.0.0.1:$(PG_TCP_PORT)) ==="; \
+		sudo -u postgres pg_ctl -D $(PG_DATA_DIR) -o "-k $(PG_SOCKET_DIR) -p $(PG_TCP_PORT)" -l $(PG_LOG) start; \
 		echo "=== Waiting for PostgreSQL to accept connections ==="; \
 		for i in $$(seq 1 20); do \
-			pg_isready -h $(PG_SOCKET_DIR) -p $(PG_PORT) -q 2>/dev/null && { echo "=== PostgreSQL ready ==="; exit 0; }; \
+			( pg_isready -h $(PG_SOCKET_DIR) -p $(PG_PORT) -q 2>/dev/null || pg_isready -h 127.0.0.1 -p $(PG_TCP_PORT) -q 2>/dev/null ) && { echo "=== PostgreSQL ready ==="; exit 0; }; \
 			sleep 0.5; \
 		done; \
 		echo "ERROR: PostgreSQL did not become ready in 10s. Last 20 lines of $(PG_LOG):" >&2; \
