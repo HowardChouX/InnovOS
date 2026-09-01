@@ -1,5 +1,5 @@
 # Stage 1: Build dependencies
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 RUN pip install uv --no-cache-dir --root-user-action=ignore -i https://pypi.tuna.tsinghua.edu.cn/simple
 WORKDIR /build
 COPY pyproject.toml uv.lock ./
@@ -8,7 +8,7 @@ ENV UV_HTTP_TIMEOUT=300
 RUN uv sync --frozen --no-group dev
 
 # Stage 2: Runtime
-FROM python:3.13-slim AS runtime
+FROM python:3.14-slim AS runtime
 RUN groupadd -r innovos && useradd -r -g innovos innovos
 COPY --from=builder /build/.venv /app/.venv
 RUN find /app/.venv/bin -type f -exec sed -i '1s|#!/build/.venv/bin/python|#!/usr/bin/env python3|' {} +
